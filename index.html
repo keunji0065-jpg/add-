@@ -380,22 +380,43 @@
 
         const SettingsModalContent = ({ 
             googleScriptUrl, setGoogleScriptUrl, inventoryScriptUrl, setInventoryScriptUrl, addressScriptUrl, setAddressScriptUrl,
-            customerSheetId, setCustomerSheetId, quickShipping, setQuickShipping, templateConfig, setTemplateConfig, bankAccount, setBankAccount,
+            customerSheetId, setCustomerSheetId, quickShipping, setQuickShipping, freeShippingThreshold, setFreeShippingThreshold, templateConfig, setTemplateConfig, bankAccount, setBankAccount,
             quickMessages, setQuickMessages, setIsSettingsOpen
         }) => {
             return (
                 <div className="absolute top-12 right-4 bg-white dark:bg-slate-800 shadow-xl border dark:border-slate-700 rounded-lg p-4 w-[420px] z-50 animate-pop max-h-[85vh] overflow-y-auto">
                     <h3 className="font-bold mb-4 flex items-center gap-2 border-b dark:border-slate-700 pb-2"><Icon name="gear" weight="fill" className="text-gray-500"/> 환경설정</h3>
+                    
+                    {/* 무료배송 강조 박스 - 2개 나란히 배치 */}
+                    <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg border border-blue-200 dark:border-blue-800 mb-4 shadow-sm">
+                        <div className="flex gap-4">
+                            <div className="flex-1">
+                                <label className="block text-sm font-bold text-blue-700 dark:text-blue-400 mb-1 flex items-center gap-1"><Icon name="truck" weight="fill"/> 기본 배송비</label>
+                                <input type="number" value={quickShipping} onChange={(e) => setQuickShipping(Number(e.target.value))} className="w-full border border-blue-300 dark:border-blue-700 rounded px-2 py-1.5 text-sm bg-white dark:bg-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 font-bold" />
+                            </div>
+                            <div className="flex-1">
+                                <label className="block text-sm font-bold text-blue-700 dark:text-blue-400 mb-1 flex items-center gap-1"><Icon name="gift" weight="fill"/> 무료배송 기준</label>
+                                <div className="relative">
+                                    <input type="number" value={freeShippingThreshold === 0 ? '' : freeShippingThreshold} onChange={(e) => setFreeShippingThreshold(Number(e.target.value))} className="w-full border border-blue-300 dark:border-blue-700 rounded px-2 py-1.5 text-sm bg-white dark:bg-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 font-bold" placeholder="0입력시 미적용" />
+                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-blue-500 font-bold pointer-events-none">원 이상</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div className="mb-4 space-y-4">
                         <SettingsField label="메인 구글 앱스 스크립트 URL" value={googleScriptUrl} onChange={setGoogleScriptUrl} />
                         <SettingsField label="고객용 상품 스크립트 URL (선택/자동저장용)" value={inventoryScriptUrl} onChange={setInventoryScriptUrl} placeholder="고객용 시트에서 배포한 앱스 스크립트 주소 입력" />
                         <SettingsField label="주소록 전용 앱스 스크립트 URL (선택)" value={addressScriptUrl} onChange={setAddressScriptUrl} placeholder="입력 시, 주소록은 이곳에서만 동기화됩니다." />
                         <SettingsField label="고객 주소록 시트 ID" value={customerSheetId} onChange={setCustomerSheetId} />
-                        <SettingsField label="기본 배송비" type="number" value={quickShipping} onChange={(v) => setQuickShipping(Number(v))} />
                         
                         <div className="border-t dark:border-slate-700 pt-4">
                             <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-2 flex items-center gap-1"><Icon name="chat-text" weight="fill"/> 주문서 멘트 설정</h4>
                             <div className="space-y-3">
+                                <div>
+                                    <label className="block text-[10px] font-bold text-blue-600 dark:text-blue-400 mb-1">상단 안내문 (창고/날짜 등)</label>
+                                    <input type="text" value={templateConfig.headerNotice || ''} onChange={(e)=>setTemplateConfig(p => ({...p, headerNotice: e.target.value}))} placeholder="예: [의류창고] 5월 18일 주문서" className="w-full border border-blue-200 dark:border-blue-800 rounded px-2 py-1.5 text-sm bg-blue-50/50 dark:bg-blue-900/10 dark:text-white mb-2 outline-none focus:ring-1 focus:ring-blue-400 font-bold" />
+                                </div>
                                 <div>
                                     <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1">닉네임 이모지</label>
                                     <input type="text" value={templateConfig.emoji} onChange={(e)=>setTemplateConfig(p => ({...p, emoji: e.target.value}))} className="w-full border dark:border-slate-600 rounded px-2 py-1.5 text-sm bg-slate-50 dark:bg-slate-900 dark:text-white mb-2 outline-none focus:ring-1 focus:ring-slate-400" />
@@ -498,7 +519,12 @@
                         {isEditing ? (
                             <div className="flex-1 flex gap-1 items-center min-w-0 pr-1">
                                 <input autoFocus type="text" value={localName} onChange={e=>setLocalName(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')handleSave();}} className="w-full border dark:border-slate-600 bg-transparent dark:text-white px-1 py-0.5 rounded text-[10px] outline-none focus:ring-1 focus:ring-slate-500" placeholder="상품명" />
-                                <input type="text" value={localPrice} onChange={e=>{const v = e.target.value.replace(/,/g, ''); if(!isNaN(v)) setLocalPrice(v ? Number(v).toLocaleString() : '');}} onKeyDown={e=>{if(e.key==='Enter')handleSave();}} className="w-14 border dark:border-slate-600 bg-transparent dark:text-white px-1 py-0.5 rounded text-[10px] text-right outline-none focus:ring-1 focus:ring-slate-500" placeholder="단가" />
+                                <input type="text" value={localPrice} onChange={e=>{
+                                    const v = e.target.value.replace(/,/g, ''); 
+                                    if(v === '-') { setLocalPrice('-'); return; }
+                                    if(!isNaN(v) && v !== '') setLocalPrice(Number(v).toLocaleString());
+                                    else if(v === '') setLocalPrice('');
+                                }} onKeyDown={e=>{if(e.key==='Enter')handleSave();}} className="w-14 border dark:border-slate-600 bg-transparent dark:text-white px-1 py-0.5 rounded text-[10px] text-right outline-none focus:ring-1 focus:ring-slate-500" placeholder="단가" />
                                 <button onClick={handleSave} className="bg-slate-600 hover:bg-slate-700 text-white px-1.5 py-0.5 rounded shadow-sm"><Icon name="check" weight="bold"/></button>
                                 <button onClick={()=>setIsEditing(false)} className="bg-slate-400 hover:bg-slate-500 text-white px-1.5 py-0.5 rounded shadow-sm"><Icon name="x" weight="bold"/></button>
                                 <button onClick={handleDelete} className="bg-red-500 hover:bg-red-600 text-white px-1.5 py-0.5 rounded shadow-sm ml-1"><Icon name="trash" weight="bold"/></button>
@@ -615,7 +641,12 @@
                             <input id={`qty-input-${item.id}`} type="number" value={localQty} onChange={(e) => setLocalQty(e.target.value)} onClick={(e) => e.stopPropagation()} onFocus={(e) => { e.target.select(); setIsQtyFocused(true); setSelectedNick(nick); }} onBlur={() => { setIsQtyFocused(false); const q = localQty === '' || isNaN(parseInt(localQty)) ? '' : parseInt(localQty); if (q !== item.quantity) handleQuantityUpdate(item.id, q); }} onKeyDown={(e) => { if(e.key==='Enter') { e.preventDefault(); document.getElementById(`price-input-${item.id}`)?.focus(); } }} className={`w-12 text-right pr-4 font-bold outline-none rounded py-0.5 transition-colors ${item.isCancelled ? 'text-[11px] bg-transparent line-through text-slate-400 dark:text-slate-500 cursor-not-allowed' : `${Number(localQty) >= 2 ? 'text-[12px] text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30' : 'text-[11px] text-slate-800 dark:text-slate-200 bg-transparent'} hover:bg-slate-200 dark:hover:bg-slate-600 focus:bg-white dark:focus:bg-slate-800 focus:ring-1 focus:ring-slate-400`}`} disabled={item.isCancelled} />
                             <span className={`absolute right-1 pointer-events-none ${Number(localQty) >= 2 && !item.isCancelled ? 'text-[10px] text-red-600 dark:text-red-400 font-bold' : 'text-[10px] text-slate-500 dark:text-slate-400'}`}>개</span>
                         </div>
-                        <input id={`price-input-${item.id}`} type="text" value={localPrice} onChange={(e) => { const val = e.target.value.replace(/,/g, ''); if (!isNaN(val) && val !== '') setLocalPrice(Number(val).toLocaleString()); else if (val === '') setLocalPrice(''); }} onClick={(e) => e.stopPropagation()} onFocus={(e) => { e.target.select(); setIsPriceFocused(true); setSelectedNick(nick); }} onBlur={() => { setIsPriceFocused(false); const val = String(localPrice).replace(/,/g, ''); if (!isNaN(val) && Number(val) !== Number(item.price)) { handleProductChange(item.id, 'price', val); } }} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); const val = String(localPrice).replace(/,/g, ''); if (!isNaN(val) && Number(val) !== Number(item.price)) { handleProductChange(item.id, 'price', val); } if (!isLast && nextItemId) { document.getElementById(`prod-input-${nextItemId}`)?.focus(); } else { addOrderLogic(nick, '', 1, true, item.id); } } }} className={`w-16 text-right bg-transparent outline-none px-1 rounded transition-colors font-bold ${item.isCancelled ? 'line-through text-slate-400 dark:text-slate-500 cursor-not-allowed' : (item.isUnmodified ? 'text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700/50' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 focus:bg-white dark:focus:bg-slate-800 focus:ring-1 focus:ring-slate-400 focus:text-slate-800 dark:focus:text-slate-100')} ${Number(item.price) === 0 && !item.isCancelled ? 'bg-red-50 dark:bg-red-900/10 border-b dark:border-red-900' : ''}`} disabled={item.isCancelled} />
+                        <input id={`price-input-${item.id}`} type="text" value={localPrice} onChange={(e) => { 
+                            const val = e.target.value.replace(/,/g, ''); 
+                            if (val === '-') { setLocalPrice('-'); return; }
+                            if (!isNaN(val) && val !== '') setLocalPrice(Number(val).toLocaleString()); 
+                            else if (val === '') setLocalPrice(''); 
+                        }} onClick={(e) => e.stopPropagation()} onFocus={(e) => { e.target.select(); setIsPriceFocused(true); setSelectedNick(nick); }} onBlur={() => { setIsPriceFocused(false); const val = String(localPrice).replace(/,/g, ''); if (!isNaN(val) && val !== '-' && Number(val) !== Number(item.price)) { handleProductChange(item.id, 'price', val); } }} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); const val = String(localPrice).replace(/,/g, ''); if (!isNaN(val) && val !== '-' && Number(val) !== Number(item.price)) { handleProductChange(item.id, 'price', val); } if (!isLast && nextItemId) { document.getElementById(`prod-input-${nextItemId}`)?.focus(); } else { addOrderLogic(nick, '', 1, true, item.id); } } }} className={`w-16 text-right bg-transparent outline-none px-1 rounded transition-colors font-bold ${item.isCancelled ? 'line-through text-slate-400 dark:text-slate-500 cursor-not-allowed' : (item.isUnmodified ? 'text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700/50' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 focus:bg-white dark:focus:bg-slate-800 focus:ring-1 focus:ring-slate-400 focus:text-slate-800 dark:focus:text-slate-100')} ${Number(item.price) === 0 && !item.isCancelled ? 'bg-red-50 dark:bg-red-900/10 border-b dark:border-red-900' : ''}`} disabled={item.isCancelled} />
                         <button onClick={(e)=>{e.stopPropagation(); handleOrderCancel(item.id); setSelectedNick(nick);}} className={`ml-1 ${item.isCancelled ? "text-slate-500 hover:text-slate-700" : "text-slate-300 dark:text-slate-600 hover:text-red-500"}`} title={item.isCancelled ? "취소 철회" : "주문 취소"}><Icon name={item.isCancelled ? "arrow-u-up-left" : "prohibit"} weight="bold"/></button>
                         <button onClick={(e)=>{e.stopPropagation(); handleOrderDelete(item.id); setSelectedNick(nick);}} className="text-slate-300 dark:text-slate-600 hover:text-red-500 ml-1"><Icon name="trash" weight="bold"/></button>
                     </div>
@@ -684,17 +715,19 @@
                                 )}
                             </div>
                         </div>
-                        <div className="flex flex-col gap-1 items-end text-right shrink-0 ml-2">
-                            <div className={`font-bold text-sm ${isPaidState && balance === 0 ? 'text-green-600 dark:text-green-400' : (balance < 0 ? 'text-slate-600 dark:text-slate-400' : 'text-slate-800 dark:text-slate-100')}`}>{grandTotal.toLocaleString()}원</div>
-                            {isCard ? (
-                                <div className="flex flex-col items-end"><div className="text-[10px] text-slate-600 dark:text-slate-400 font-bold">입금: {depositTotal.toLocaleString()} / 카드: {Math.max(0, balance).toLocaleString()}</div></div>
-                            ) : (
-                                <>
-                                    {balance !== 0 && depositTotal > 0 && (<div className="text-[10px] text-slate-500 dark:text-slate-400">(입금: {depositTotal.toLocaleString()}원)</div>)}
-                                    {balance > 0 && (<div className="text-[10px] font-bold text-red-500 dark:text-red-400 mt-0.5">미납: {balance.toLocaleString()}원</div>)}
-                                    {balance < 0 && (<div className="text-[10px] font-bold text-slate-600 dark:text-slate-400 mt-0.5">과납: {Math.abs(balance).toLocaleString()}원</div>)}
-                                </>
-                            )}
+                        <div className="flex flex-col items-start gap-1 text-xs mt-1 w-full overflow-hidden">
+                            <div className="flex flex-col gap-1 items-end text-right shrink-0 ml-2">
+                                <div className={`font-bold text-sm ${isPaidState && balance === 0 ? 'text-green-600 dark:text-green-400' : (balance < 0 ? 'text-slate-600 dark:text-slate-400' : 'text-slate-800 dark:text-slate-100')}`}>{grandTotal.toLocaleString()}원</div>
+                                {isCard ? (
+                                    <div className="flex flex-col items-end"><div className="text-[10px] text-slate-600 dark:text-slate-400 font-bold">입금: {depositTotal.toLocaleString()} / 카드: {Math.max(0, balance).toLocaleString()}</div></div>
+                                ) : (
+                                    <>
+                                        {balance !== 0 && depositTotal > 0 && (<div className="text-[10px] text-slate-500 dark:text-slate-400">(입금: {depositTotal.toLocaleString()}원)</div>)}
+                                        {balance > 0 && (<div className="text-[10px] font-bold text-red-500 dark:text-red-400 mt-0.5">미납: {balance.toLocaleString()}원</div>)}
+                                        {balance < 0 && (<div className="text-[10px] font-bold text-slate-600 dark:text-slate-400 mt-0.5">과납: {Math.abs(balance).toLocaleString()}원</div>)}
+                                    </>
+                                )}
+                            </div>
                         </div>
                     </div>
                     <div className="p-0.5 space-y-0.5 bg-white dark:bg-slate-800">
@@ -720,7 +753,7 @@
         // ============================================
         // 컴포넌트: 탭 (LiveTab)
         // ============================================
-        const LiveTab = ({ orders, setOrders, productHistory, setProductHistory, quickShipping, shippingOverrides, setShippingOverrides, bankAccount, googleScriptUrl, addressScriptUrl, inventoryScriptUrl, addresses, setAddresses, cardPayments, setCardPayments, matchedDeposits, setMatchedDeposits, depositorNames, setDepositorNames, clickedChats, setClickedChats, openModal, keywords, setKeywords, sentAddressRequests, setSentAddressRequests, deletedDepositIds, setDeletedDepositIds, checkedOrders, setCheckedOrders, addressMapping, setAddressMapping, templateConfig, specialCustomers, setSpecialCustomers, inventory, setInventory, quickMessages, customerSheetId, handleResetAllData }) => {
+        const LiveTab = ({ orders, setOrders, productHistory, setProductHistory, quickShipping, freeShippingThreshold, shippingOverrides, setShippingOverrides, bankAccount, googleScriptUrl, addressScriptUrl, inventoryScriptUrl, addresses, setAddresses, cardPayments, setCardPayments, matchedDeposits, setMatchedDeposits, depositorNames, setDepositorNames, clickedChats, setClickedChats, openModal, keywords, setKeywords, sentAddressRequests, setSentAddressRequests, deletedDepositIds, setDeletedDepositIds, checkedOrders, setCheckedOrders, addressMapping, setAddressMapping, templateConfig, specialCustomers, setSpecialCustomers, inventory, setInventory, quickMessages, customerSheetId, handleResetAllData }) => {
             const [chats, setChats] = useState([]);
             const [serverDeposits, setServerDeposits] = useState([]);
             const [manualDeposits, setManualDeposits] = useState([]);
@@ -790,7 +823,6 @@
                     if (idx !== -1) sortOrderCache.current.splice(idx, 1);
                     sortOrderCache.current.unshift(cNick);
                 }
-                if (orderListRef.current) orderListRef.current.scrollTo({ top: 0, behavior: 'smooth' });
             }, []);
 
             const [ignoredAutoMatch, setIgnoredAutoMatch] = useState(() => { const saved = localStorage.getItem('ignoredAutoMatch'); return saved ? new Set(JSON.parse(saved)) : new Set(); });
@@ -878,13 +910,16 @@
                 });
             }, [setSpecialCustomers]);
 
-            const getCalculatedShipping = useCallback((nick) => {
+            const getCalculatedShipping = useCallback((nick, productTotal = 0) => {
                 if (shippingOverrides[nick] !== undefined) return Number(shippingOverrides[nick]);
                 const nickNorm = normalizeString(nick); const specialKey = Object.keys(specialCustomers || {}).find(k => normalizeString(k) === nickNorm);
                 if (specialKey && specialCustomers[specialKey].type === 'vip') return 0; 
+                
+                if (freeShippingThreshold > 0 && productTotal >= freeShippingThreshold) return 0;
+                
                 const addrRes = addressLookup.get(nick); if (addrRes && addrRes.data && addrRes.data.address && addrRes.data.address.includes('제주')) return 8000;
                 return Number(quickShipping);
-            }, [shippingOverrides, specialCustomers, addressLookup, quickShipping]);
+            }, [shippingOverrides, specialCustomers, addressLookup, quickShipping, freeShippingThreshold]);
 
             const findAddressSuggestions = useCallback((nick) => {
                 if (!nick) return []; const cleanNick = normalizeString(nick); if (cleanNick.length < 2) return []; 
@@ -969,8 +1004,10 @@
                     const activeItems = items.filter(i => !i.isCancelled); const depositTotal = items.reduce((sum, i) => sum + (i.deposit || 0), 0); totalDeposit += depositTotal;
                     if (activeItems.length === 0) return; 
                     const addr = addressLookup.get(nick); if (!addr || !addr.data || !addr.data.address) missingAddressCount++;
-                    const isCard = cardPayments[nick]; const shipping = getCalculatedShipping(nick);
-                    const productTotal = activeItems.reduce((sum, i) => sum + Number(i.price), 0); const baseGrandTotal = productTotal + shipping; const baseBalance = baseGrandTotal - depositTotal;
+                    const isCard = cardPayments[nick]; 
+                    const productTotal = activeItems.reduce((sum, i) => sum + Number(i.price), 0); 
+                    const shipping = getCalculatedShipping(nick, productTotal);
+                    const baseGrandTotal = productTotal + shipping; const baseBalance = baseGrandTotal - depositTotal;
                     const cardFee = (isCard && baseBalance > 0) ? baseBalance * 0.1 : 0; const finalGrandTotal = baseGrandTotal + cardFee; const finalBalance = baseBalance + cardFee;
                     totalSales += finalGrandTotal; 
                     if (finalBalance > 0) { if (isCard) totalCardExpected += finalBalance; else totalUnpaid += finalBalance; }
@@ -982,7 +1019,9 @@
                 const status = {}; const groups = {}; orders.forEach(o => { if (!groups[o.customer]) groups[o.customer] = []; groups[o.customer].push(o); });
                 Object.entries(groups).forEach(([nick, items]) => {
                     const activeItems = items.filter(i => !i.isCancelled); if (activeItems.length === 0) { status[nick] = true; return; }
-                    const isCard = cardPayments[nick]; const shipping = getCalculatedShipping(nick); const productTotal = activeItems.reduce((sum, i) => sum + Number(i.price), 0);
+                    const isCard = cardPayments[nick]; 
+                    const productTotal = activeItems.reduce((sum, i) => sum + Number(i.price), 0);
+                    const shipping = getCalculatedShipping(nick, productTotal); 
                     const baseGrandTotal = productTotal + shipping; const depositTotal = items.reduce((sum, i) => sum + (i.deposit || 0), 0); const baseBalance = baseGrandTotal - depositTotal;
                     status[nick] = isCard || (baseBalance <= 0);
                 });
@@ -1003,7 +1042,7 @@
                     }
                     if (filterStatus === 'card') return cardPayments[nick];
                     const activeItems = items.filter(i => !i.isCancelled); const activeProd = activeItems.reduce((s,i) => s + Number(i.price), 0); const currentDep = items.reduce((s,i) => s + (i.deposit || 0), 0);
-                    const currentShip = getCalculatedShipping(nick); const baseBal = activeProd + (activeItems.length > 0 ? currentShip : 0) - currentDep; const isCard = cardPayments[nick]; const finalBal = baseBal + (isCard && baseBal > 0 ? baseBal * 0.1 : 0);
+                    const currentShip = getCalculatedShipping(nick, activeProd); const baseBal = activeProd + (activeItems.length > 0 ? currentShip : 0) - currentDep; const isCard = cardPayments[nick]; const finalBal = baseBal + (isCard && baseBal > 0 ? baseBal * 0.1 : 0);
                     if (filterStatus === 'unpaid') return !isCard && finalBal > 0 && activeProd > 0;
                     if (filterStatus === 'paid') return !isCard && finalBal <= 0 && activeProd > 0; return true;
                 });
@@ -1048,6 +1087,27 @@
                     if (text.trim().startsWith("<!DOCTYPE")) { setConnectionStatus({ code: 'error_auth', msg: '권한확인' }); return; }
                     if (text === lastFetchTextRef.current) return; lastFetchTextRef.current = text;
                     const data = JSON.parse(text); if (data.error) { setConnectionStatus({ code: 'error_auth', msg: '시트오류(ID확인)' }); return; }
+                    
+                    // 🔥 메인 데이터에 재고(inventory)가 포함되어 들어올 경우 자동 적용 (원본 호환성 복구)
+                    if (data.inventory || data.products) {
+                        let fetchedInv = data.inventory || data.products;
+                        if (fetchedInv.length > 0 && Array.isArray(fetchedInv[0])) {
+                            const headers = fetchedInv[0]; const rows = fetchedInv.slice(1);
+                            fetchedInv = rows.map(r => { const o = {}; headers.forEach((h,i)=>o[h]=r[i]); return { name: o['상품명']||o['name']||r[0], price: parseNum(o['단가']||o['가격']||o['price']||r[1]) }; });
+                        } else {
+                            fetchedInv = fetchedInv.map(i => ({ name: i.상품명||i.name||i.product, price: parseNum(i.단가||i.가격||i.price) }));
+                        }
+                        const validInv = fetchedInv.filter(i => i.name && String(i.name).trim() !== '');
+                        if (validInv.length > 0) {
+                            setInventory(prev => {
+                                const newMap = new Map(prev.map(i => [i.name, i]));
+                                validInv.forEach(item => { if (newMap.has(item.name)) { if (item.price > 0) newMap.get(item.name).price = item.price; } else { newMap.set(item.name, { id: `inv_${Date.now()}_${Math.random()}`, name: item.name, price: item.price }); } });
+                                return Array.from(newMap.values());
+                            });
+                            setProductHistory(prev => { const next = {...prev}; validInv.forEach(item => { if (item.price > 0) next[item.name] = item.price; }); return next; });
+                        }
+                    }
+
                     if (data.chats) {
                         const rawChats = data.chats; const seen = new Set(); const incoming = [];
                         rawChats.forEach((chat, idx) => {
@@ -1123,6 +1183,89 @@
 
             const handleResetAddresses = useCallback(() => { openModal("현재 저장된 모든 주소록을 삭제하고 시트에서 새로 불러오시겠습니까?\n(기존 주소가 싹 지워지고 새 시트 기준으로 동기화됩니다.)", 'confirm', () => { setAddresses([]); setAddressMapping({}); setTimeout(() => { fetchAddresses(); openModal("주소록이 초기화되고 새로고침 되었습니다.", 'alert'); }, 500); }); }, [openModal, setAddresses, setAddressMapping, fetchAddresses]);
 
+            const fetchInventory = useCallback(async (showToast = false) => {
+                let text = null;
+                const actualSheetId = getCleanSheetId(customerSheetId);
+
+                // 오류를 내뿜지 않고 여러 주소를 조용히 찔러보는 안전한 함수
+                const tryFetch = async (url) => {
+                    if (!url) return false;
+                    try {
+                        const res = await fetch(url);
+                        if (!res.ok) return false;
+                        const t = await res.text();
+                        if (t.trim().startsWith("<")) return false; // HTML(에러/로그인페이지)이면 무시
+                        text = t;
+                        return true;
+                    } catch (e) {
+                        return false; // 네트워크 오류 발생 시 조용히 실패 처리
+                    }
+                };
+
+                // 시도 1: 고객용 상품 스크립트 주소 (원래 프로그램 방식)
+                if (inventoryScriptUrl) {
+                    const sep = inventoryScriptUrl.includes('?') ? '&' : '?';
+                    if (await tryFetch(`${inventoryScriptUrl}${sep}t=${Date.now()}&sheet_id=${actualSheetId}`)) {}
+                    else if (await tryFetch(`${inventoryScriptUrl}${sep}action=get_inventory&t=${Date.now()}&sheet_id=${actualSheetId}`)) {}
+                }
+
+                // 시도 2: 메인 스크립트 주소 (상품 스크립트가 막혔을 때 우회)
+                if (!text && googleScriptUrl) {
+                    const sep = googleScriptUrl.includes('?') ? '&' : '?';
+                    if (await tryFetch(`${googleScriptUrl}${sep}action=get_inventory&t=${Date.now()}&sheet_id=${actualSheetId}`)) {}
+                    else if (await tryFetch(`${googleScriptUrl}${sep}t=${Date.now()}&sheet_id=${actualSheetId}`)) {}
+                }
+
+                // 모든 시도 실패
+                if (!text) {
+                    if (showToast) openModal("재고 데이터를 불러오지 못했습니다.\n(시트 연동 상태를 확인해주세요)", "alert");
+                    return;
+                }
+
+                try {
+                    const data = JSON.parse(text);
+                    let fetchedInv = data.inventory || data.products || data.data || data; 
+                    if (!fetchedInv || !Array.isArray(fetchedInv)) {
+                        if (showToast) openModal("시트에서 재고를 찾았으나 형식이 맞지 않습니다.", "alert");
+                        return;
+                    }
+
+                    if (fetchedInv.length > 0 && Array.isArray(fetchedInv[0])) {
+                        const headers = fetchedInv[0]; const rows = fetchedInv.slice(1);
+                        fetchedInv = rows.map(r => { const o = {}; headers.forEach((h,i)=>o[h]=r[i]); return { name: o['상품명']||o['name']||r[0], price: parseNum(o['단가']||o['가격']||o['price']||r[1]) }; });
+                    } else {
+                        fetchedInv = fetchedInv.map(i => ({ name: i.상품명||i.name||i.product||i[0], price: parseNum(i.단가||i.가격||i.price||i[1]) }));
+                    }
+                    
+                    const validInv = fetchedInv.filter(i => i.name && String(i.name).trim() !== '');
+                    if(validInv.length > 0) {
+                        setInventory(prev => {
+                            const newMap = new Map(prev.map(i => [i.name, i]));
+                            validInv.forEach(item => { 
+                                if (newMap.has(item.name)) { 
+                                    if (item.price > 0) newMap.get(item.name).price = item.price; 
+                                } else { 
+                                    newMap.set(item.name, { id: `inv_${Date.now()}_${Math.random()}`, name: item.name, price: item.price }); 
+                                } 
+                            });
+                            return Array.from(newMap.values());
+                        });
+                        setProductHistory(prev => { 
+                            const next = {...prev}; 
+                            validInv.forEach(item => { if (item.price > 0) next[item.name] = item.price; }); 
+                            return next; 
+                        });
+                        if (showToast) openModal(`재고 ${validInv.length}종을 시트에서 성공적으로 불러왔습니다!`, "alert");
+                    } else {
+                        if (showToast) openModal("시트에 등록된 재고 데이터가 비어있습니다.", "alert");
+                    }
+                } catch(e) {
+                    if (showToast) openModal("재고 데이터 파싱 중 오류가 발생했습니다.", "alert");
+                }
+            }, [inventoryScriptUrl, googleScriptUrl, customerSheetId, setInventory, setProductHistory, openModal]);
+
+            useEffect(() => { fetchInventory(false); const interval = setInterval(() => fetchInventory(false), 30000); return () => clearInterval(interval); }, [fetchInventory]);
+
             const clickedChatsRef = useRef(clickedChats); useEffect(() => { clickedChatsRef.current = clickedChats; }, [clickedChats]);
 
             useEffect(() => {
@@ -1145,14 +1288,19 @@
                 if (addedAny) { setClickedChats(prev => { const next = new Set(prev); newIds.forEach(id => next.add(id)); return next; }); }
             }, [chats, addOrderLogic]);
 
-            // 🚨 완벽 수정: 매칭 시 이중 잠금장치 설정 및 메모리 보존
             useEffect(() => {
                 const timer = setTimeout(() => {
                     if (allDeposits.length === 0 || orders.length === 0) return;
                     let updatedOrders = [...orders]; let newMatchedIds = new Set(matchedDeposits); let hasChanges = false; const customerBalances = {};
                     updatedOrders.forEach(o => {
                         if (o.isCancelled) return;
-                        if (!customerBalances[o.customer]) { const currentShipping = getCalculatedShipping(o.customer); customerBalances[o.customer] = { productTotal: 0, depositTotal: 0, shipping: currentShipping, activeItemsCount: 0, isCloud: false }; }
+                        if (!customerBalances[o.customer]) { 
+                            // 배송비 계산을 위해 활성 아이템의 총합을 구함
+                            const userItems = orders.filter(i => i.customer === o.customer && !i.isCancelled);
+                            const pTotal = userItems.reduce((sum, i) => sum + Number(i.price), 0);
+                            const currentShipping = getCalculatedShipping(o.customer, pTotal); 
+                            customerBalances[o.customer] = { productTotal: 0, depositTotal: 0, shipping: currentShipping, activeItemsCount: 0, isCloud: false }; 
+                        }
                         customerBalances[o.customer].productTotal += Number(o.price); customerBalances[o.customer].depositTotal += (o.deposit || 0); customerBalances[o.customer].activeItemsCount += 1;
                         if (o.loadedFromCloud) customerBalances[o.customer].isCloud = true;
                     });
@@ -1185,7 +1333,14 @@
 
             const autoSaveToGoogleSheet = useCallback(async () => { 
                 if (!googleScriptUrl || Object.keys(orders).length === 0) return; setIsSaving(true); 
-                const saveList = orders.filter(o=>!o.isCancelled).map(o => { let addrRes = addressLookup.get(o.customer); let addr = addrRes.data || {}; const currentShipping = getCalculatedShipping(o.customer); const isCard = cardPayments[o.customer] ? true : false; return { nickname: o.customer, product: o.product, qty: o.quantity, price: o.price, deposit: o.deposit, shipping: currentShipping, grandTotal: 0, address: addr.address || '', zipcode: addr.zipcode || '', phone: addr.phone || '', realname: addr.realname || '', memo: addr.memo || '', isCard: isCard }; }); 
+                const saveList = orders.filter(o=>!o.isCancelled).map(o => { 
+                    const userActiveItems = orders.filter(i => i.customer === o.customer && !i.isCancelled);
+                    const pTotal = userActiveItems.reduce((s, i) => s + Number(i.price), 0);
+                    let addrRes = addressLookup.get(o.customer); let addr = addrRes.data || {}; 
+                    const currentShipping = getCalculatedShipping(o.customer, pTotal); 
+                    const isCard = cardPayments[o.customer] ? true : false; 
+                    return { nickname: o.customer, product: o.product, qty: o.quantity, price: o.price, deposit: o.deposit, shipping: currentShipping, grandTotal: 0, address: addr.address || '', zipcode: addr.zipcode || '', phone: addr.phone || '', realname: addr.realname || '', memo: addr.memo || '', isCard: isCard }; 
+                }); 
                 try { const actualSheetId = getCleanSheetId(customerSheetId); await fetch(googleScriptUrl, { method: 'POST', body: JSON.stringify({ action: 'save_orders', sheet_id: actualSheetId, data: saveList }), mode: 'no-cors', headers: { 'Content-Type': 'text/plain;charset=utf-8' } }); } catch(e) { } finally { setIsSaving(false); } 
             }, [orders, cardPayments, getCalculatedShipping, googleScriptUrl, addressLookup, customerSheetId]);
 
@@ -1228,8 +1383,9 @@
                         } 
                         if (field === 'price' && o.product && String(o.product).trim() !== '') { 
                             const cleanProd = String(o.product).trim(); const valNum = String(value).replace(/,/g, '');
-                            const uPrice = o.quantity > 0 ? Number(valNum) / o.quantity : 0; 
-                            if (uPrice > 0) {
+                            const nVal = Number(valNum);
+                            const uPrice = (o.quantity > 0 && !isNaN(nVal)) ? nVal / o.quantity : 0; 
+                            if (!isNaN(nVal)) {
                                 setProductHistory(h => ({ ...h, [cleanProd]: uPrice })); 
                                 setInventory(prevInv => {
                                     if (!Array.isArray(prevInv)) return prevInv; const exists = prevInv.find(i => String(i.name).trim() === cleanProd);
@@ -1263,9 +1419,15 @@
             const copyOrderSheet = useCallback((nick, items, grandTotal, depositTotal, balance, isCard, addrData) => {
                 const activeItems = items.filter(i => !i.isCancelled); const addr = addrData || addressLookup.get(nick)?.data || {};
                 const itemListText = activeItems.map(i => `${i.product}${i.quantity > 1 ? ` (${i.quantity}개)` : ''} ${Number(i.price).toLocaleString()}원`).join('\n');
-                const currentShipping = getCalculatedShipping(nick); const { emoji, paidMsg, unpaidPrefix, overpaidMsg, addrNotice, surveyNotice, alwaysRequestAddress } = templateConfig;
+                const productTotal = activeItems.reduce((sum, i) => sum + Number(i.price), 0);
+                const currentShipping = getCalculatedShipping(nick, productTotal); 
+                const { emoji, paidMsg, unpaidPrefix, overpaidMsg, addrNotice, surveyNotice, alwaysRequestAddress, headerNotice } = templateConfig;
                 
-                let msg = `${emoji || '💙'} ${nick} 님 ${emoji || '💙'}\n\n[주문내역]\n${itemListText}\n배송비 ${currentShipping.toLocaleString()}원\n\n총 주문금액: ${grandTotal.toLocaleString()}원\n`;
+                let msg = `${emoji || '💙'} ${nick} 님 ${emoji || '💙'}\n\n`;
+                if (headerNotice) {
+                    msg += `${headerNotice}\n\n`;
+                }
+                msg += `[주문내역]\n${itemListText}\n배송비 ${currentShipping.toLocaleString()}원\n\n총 주문금액: ${grandTotal.toLocaleString()}원\n`;
                 
                 if (isCard) { 
                     const cardBase = Math.max(0, balance); if (depositTotal > 0) msg += `[입금확인]\n${depositTotal.toLocaleString()}원\n------------------\n`; 
@@ -1321,13 +1483,17 @@
                 let price = 0; const isCustomPriceValid = customPrice !== null && customPrice !== '';
                 if (isCustomPriceValid) price = Number(String(customPrice).replace(/,/g, '')); else price = invItem ? Number(invItem.price) : (hist[cContent] || 0);
 
-                if (cContent !== '' && (isCustomPriceValid || price > 0)) {
+                if (cContent !== '' && (isCustomPriceValid || price !== 0)) {
                     const priceToSave = price || 0;
                     setInventory(prevInv => { const invArr = Array.isArray(prevInv) ? prevInv : []; const exists = invArr.find(i => String(i.name).trim() === cContent); if (!exists) return [{ id: `inv_${Date.now()}_${Math.random()}`, name: cContent, price: priceToSave }, ...invArr]; return invArr; });
-                    if (priceToSave > 0) setProductHistory(h => ({ ...h, [cContent]: priceToSave }));
+                    if (priceToSave !== 0) setProductHistory(h => ({ ...h, [cContent]: priceToSave }));
                 }
 
-                if (!isAuto) { setCheckedOrders(prev => { const n = new Set(prev); n.delete(cNick); return n; }); setSelectedNick(cNick); setOrderSearch(''); bringToTopAndScroll(cNick); }
+                if (!isAuto) { 
+                    setCheckedOrders(prev => { const n = new Set(prev); n.delete(cNick); return n; }); 
+                    setSelectedNick(cNick); 
+                    bringToTopAndScroll(cNick); 
+                }
                 const newOrder = { id: Date.now() + Math.random(), customer: cNick, product: cContent, quantity: qty, price: Number(price) * qty, deposit: 0, isCancelled: false, isUnmodified: !markAsModified };
                 setOrders(prev => {
                     if (!afterId && !force && cContent !== '') { const existIdx = prev.findIndex(o => o.customer === cNick && o.product === cContent && !o.isCancelled); if (existIdx !== -1) { const next = [...prev]; next[existIdx] = { ...next[existIdx], quantity: next[existIdx].quantity + qty, price: (next[existIdx].quantity + qty) * price, isUnmodified: !markAsModified }; return next; } }
@@ -1457,7 +1623,7 @@
                 e.preventDefault(); const cleanName = newInvName.trim(); if(!cleanName) return openModal("상품명을 입력해주세요.", "alert"); const priceNum = Number(newInvPrice.replace(/,/g, '')) || 0;
                 if(inventory.some(i => i.name === cleanName)) { return openModal("이미 등록된 상품명입니다.", "alert"); }
                 setInventory(prev => [{ id: `inv_${Date.now()}`, name: cleanName, price: priceNum }, ...prev]);
-                if(priceNum > 0) setProductHistory(prev => ({...prev, [cleanName]: priceNum})); setNewInvName(''); setNewInvPrice('');
+                if(priceNum !== 0) setProductHistory(prev => ({...prev, [cleanName]: priceNum})); setNewInvName(''); setNewInvPrice('');
             };
 
             return (
@@ -1496,7 +1662,7 @@
                                         setInventory(prev => {
                                             const next = [...prev];
                                             combinations.reverse().forEach(opt => {
-                                                if(!next.some(i => i.name === opt)) { next.unshift({ id: `inv_${Date.now()}_${Math.random()}`, name: opt, price: priceNum }); if (priceNum > 0) { setProductHistory(h => ({...h, [opt]: priceNum})); } addedCount++; }
+                                                if(!next.some(i => i.name === opt)) { next.unshift({ id: `inv_${Date.now()}_${Math.random()}`, name: opt, price: priceNum }); if (priceNum !== 0) { setProductHistory(h => ({...h, [opt]: priceNum})); } addedCount++; }
                                             });
                                             return next;
                                         });
@@ -1567,7 +1733,7 @@
                                             <input id="manual-prod-input" type="text" list="product-list" placeholder="상품명" value={manualProduct} onChange={e => {setManualProduct(e.target.value); setCurrentSearchTerm(e.target.value);}} className={`w-full border dark:border-slate-600 rounded pl-2 pr-9 py-1.5 text-xs outline-none focus:ring-1 focus:ring-slate-500 bg-white dark:bg-slate-900 dark:text-white transition-all ${isFixedProductMode ? 'ring-2 ring-slate-600 border-slate-600' : ''}`} />
                                             <button type="button" onClick={() => setIsFixedProductMode(!isFixedProductMode)} className={`absolute right-1 top-1/2 -translate-y-1/2 px-1.5 py-0.5 rounded text-[10px] font-bold transition-colors ${isFixedProductMode ? 'bg-slate-700 text-white shadow-inner' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-300'}`} title="고정">고정</button>
                                         </div>
-                                        <input type="text" placeholder="단가" value={manualPrice} onChange={e => { const val = e.target.value.replace(/,/g, ''); if(!isNaN(val)) setManualPrice(val ? Number(val).toLocaleString() : ''); }} className={`w-16 border dark:border-slate-600 rounded px-2 py-1.5 text-xs outline-none text-right bg-white dark:bg-slate-900 transition-all ${isFixedProductMode ? 'ring-2 ring-slate-600 border-slate-600' : ''}`} />
+                                        <input type="text" placeholder="단가" value={manualPrice} onChange={e => { const val = e.target.value.replace(/,/g, ''); if(val === '-') { setManualPrice('-'); return; } if(!isNaN(val) && val !== '') setManualPrice(Number(val).toLocaleString()); else if(val === '') setManualPrice(''); }} className={`w-16 border dark:border-slate-600 rounded px-2 py-1.5 text-xs outline-none text-right bg-white dark:bg-slate-900 transition-all ${isFixedProductMode ? 'ring-2 ring-slate-600 border-slate-600' : ''}`} />
                                     </div>
                                     <button type="submit" className="bg-slate-700 hover:bg-slate-800 transition-colors text-white px-2 py-1.5 rounded text-xs font-bold shadow-sm shrink-0 whitespace-nowrap">＋</button>
                                 </form>
@@ -1579,9 +1745,9 @@
                         </div>
                         <div ref={orderListRef} className="flex-1 overflow-y-auto p-1.5 bg-slate-50 dark:bg-slate-900 relative z-0" onScroll={handleOrderScroll}>
                             {displayedOrders.map(([nick, items]) => {
-                                const ship = getCalculatedShipping(nick);
                                 const activeItems = items.filter(i => !i.isCancelled);
                                 const prodSum = activeItems.reduce((s, i) => s + Number(i.price), 0);
+                                const ship = getCalculatedShipping(nick, prodSum);
                                 const depSum = items.reduce((s, i) => s + (i.deposit || 0), 0);
                                 const baseGrand = prodSum + (activeItems.length > 0 ? ship : 0);
                                 const baseBal = baseGrand - depSum;
@@ -1678,6 +1844,7 @@
                                 <span className="flex items-center gap-1"><Icon name="package" weight="fill"/> 실시간 재고</span>
                                 <div className="flex items-center gap-1.5">
                                     <span className="text-xs text-slate-500 dark:text-slate-400">{inventory.length}종</span>
+                                    <button onClick={(e) => { e.stopPropagation(); fetchInventory(true); }} className="bg-emerald-500 hover:bg-emerald-600 text-white text-[9px] px-1.5 py-0.5 rounded shadow-sm transition-colors flex items-center gap-0.5" title="시트에서 새로고침"><Icon name="arrows-clockwise" weight="bold"/></button>
                                     <button onClick={(e) => { e.stopPropagation(); setIsBatchModalOpen(true); }} className="bg-slate-600 hover:bg-slate-700 text-white text-[9px] px-1.5 py-0.5 rounded shadow-sm transition-colors flex items-center gap-0.5" title="옵션 일괄 생성"><Icon name="list-plus" weight="bold"/> 일괄옵션</button>
                                     <button onClick={async (e) => {
                                         e.stopPropagation();
@@ -1695,7 +1862,7 @@
                             <div className="flex items-center gap-1 mt-1">
                                 <form onSubmit={handleQuickAddProduct} className="flex-1 flex gap-1 items-center bg-white dark:bg-slate-900 p-0.5 rounded border dark:border-slate-600">
                                     <input type="text" placeholder="새 상품명" value={newInvName} onChange={e=>setNewInvName(e.target.value)} className="w-full text-[10px] px-1.5 py-1 bg-transparent outline-none dark:text-white font-bold" />
-                                    <input type="text" placeholder="단가" value={newInvPrice} onChange={e=> { const val = e.target.value.replace(/,/g, ''); if(!isNaN(val)) setNewInvPrice(val ? Number(val).toLocaleString() : ''); }} className="w-14 text-[10px] px-1 py-1 bg-transparent text-right outline-none dark:text-white font-bold" />
+                                    <input type="text" placeholder="단가" value={newInvPrice} onChange={e=> { const val = e.target.value.replace(/,/g, ''); if(val === '-') { setNewInvPrice('-'); return; } if(!isNaN(val) && val !== '') setNewInvPrice(Number(val).toLocaleString()); else if(val === '') setNewInvPrice(''); }} className="w-14 text-[10px] px-1 py-1 bg-transparent text-right outline-none dark:text-white font-bold" />
                                     <button type="submit" className="bg-slate-700 hover:bg-slate-800 text-white px-1.5 py-1 rounded text-[10px] font-bold shrink-0">등록</button>
                                 </form>
                                 <div className="relative w-16 sm:w-20 shrink-0">
@@ -1724,23 +1891,32 @@
             );
         };
 
-        const OrderManagementTab = ({ orders, shippingOverrides, quickShipping, addresses, handleExportBackup, handleImportBackup, addressMapping, cardPayments, specialCustomers, openModal }) => {
+        const OrderManagementTab = ({ orders, shippingOverrides, quickShipping, freeShippingThreshold, addresses, handleExportBackup, handleImportBackup, addressMapping, cardPayments, specialCustomers, openModal }) => {
             
+            const findAddress = (nick) => { if (addressMapping[nick]) return addresses.find(a => normalizeString(a.nickname) === normalizeString(addressMapping[nick])); return addresses.find(a => normalizeString(a.nickname) === normalizeString(nick)); };
+            const getCalculatedShipping = (nick, productTotal = 0) => { 
+                if (shippingOverrides && shippingOverrides[nick] !== undefined) return Number(shippingOverrides[nick]); 
+                const nickNorm = normalizeString(nick); const specialKey = Object.keys(specialCustomers || {}).find(k => normalizeString(k) === nickNorm); 
+                if (specialKey && specialCustomers[specialKey].type === 'vip') return 0; 
+                
+                if (freeShippingThreshold > 0 && productTotal >= freeShippingThreshold) return 0;
+
+                const addr = findAddress(nick); 
+                if (addr && addr.address && addr.address.includes('제주')) return 8000; 
+                return Number(quickShipping); 
+            };
+
             const getUnpaidDataList = () => {
                 const groups = {}; orders.forEach(o => { if (!groups[o.customer]) groups[o.customer] = []; groups[o.customer].push(o); });
                 const dataList = [];
                 Object.entries(groups).forEach(([nick, items]) => {
                     if (cardPayments && cardPayments[nick]) return; 
                     const activeItems = items.filter(i => !i.isCancelled); if (activeItems.length === 0) return;
-                    let currentShipping = Number(quickShipping);
-                    if (shippingOverrides && shippingOverrides[nick] !== undefined) currentShipping = Number(shippingOverrides[nick]);
-                    const nickNorm = normalizeString(nick); const specialKey = Object.keys(specialCustomers || {}).find(k => normalizeString(k) === nickNorm);
-                    if (specialKey && specialCustomers[specialKey].type === 'vip') currentShipping = 0;
-                    else {
-                        const targetAddr = addressMapping[nick] ? addresses.find(a => normalizeString(a.nickname) === normalizeString(addressMapping[nick])) : addresses.find(a => normalizeString(a.nickname) === normalizeString(nick));
-                        if (targetAddr && targetAddr.address && targetAddr.address.includes('제주')) currentShipping = 8000;
-                    }
-                    const productTotal = activeItems.reduce((sum, i) => sum + Number(i.price), 0); const grandTotal = productTotal + (activeItems.length > 0 ? currentShipping : 0);
+                    
+                    const productTotal = activeItems.reduce((sum, i) => sum + Number(i.price), 0); 
+                    const currentShipping = getCalculatedShipping(nick, productTotal);
+
+                    const grandTotal = productTotal + (activeItems.length > 0 ? currentShipping : 0);
                     const depositTotal = items.reduce((sum, i) => sum + (i.deposit || 0), 0); const balance = grandTotal - depositTotal;
                     
                     if (balance !== 0) { 
@@ -1759,7 +1935,7 @@
                         }).join('\n');
                         if (currentShipping > 0) itemListTextForCopy += `\n배송비 ${currentShipping.toLocaleString()}원`;
                         
-                        const { emoji, unpaidPrefix, overpaidMsg } = JSON.parse(localStorage.getItem('templateConfig') || "{}");
+                        const { emoji, unpaidPrefix, overpaidMsg, headerNotice } = JSON.parse(localStorage.getItem('templateConfig') || "{}");
                         let bankStr = localStorage.getItem('bankAccount') || FIXED_BANK_ACCOUNT;
                         try { bankStr = JSON.parse(bankStr); } catch(e){}
                         
@@ -1767,7 +1943,11 @@
                         let parsedBank = String(bankStr).replace(/\\n/g, '\n').replace(/^"|"$/g, '');
                         let parsedOverpaidMsg = String(overpaidMsg || '과납금액이 있습니다!\n환불받으실 계좌를 남겨주시거나, 적립금으로 처리 원하시면 말씀해주세요.').replace(/\\n/g, '\n').replace(/^"|"$/g, '');
 
-                        let msgTextCopy = `${emoji || '💙'} ${nick} 님 ${emoji || '💙'}\n\n[주문내역]\n${itemListTextForCopy}\n\n총 주문금액: ${grandTotal.toLocaleString()}원\n입금확인: ${depositTotal.toLocaleString()}원\n`;
+                        let msgTextCopy = `${emoji || '💙'} ${nick} 님 ${emoji || '💙'}\n\n`;
+                        if (headerNotice) {
+                            msgTextCopy += `${headerNotice}\n\n`;
+                        }
+                        msgTextCopy += `[주문내역]\n${itemListTextForCopy}\n\n총 주문금액: ${grandTotal.toLocaleString()}원\n입금확인: ${depositTotal.toLocaleString()}원\n`;
                         
                         if (isOverpaid) {
                             msgTextCopy += `과납금액: ${absBalance.toLocaleString()}원\n------------------\n${parsedOverpaidMsg}`;
@@ -1830,9 +2010,6 @@
                 try { document.execCommand('copy'); openModal('카톡 안내 메시지가 모두 복사되었습니다!\n(카톡 대화창에 바로 붙여넣기 하세요)', 'alert'); } catch (err) { openModal('복사 실패', 'alert'); } document.body.removeChild(textArea);
             };
 
-            const findAddress = (nick) => { if (addressMapping[nick]) return addresses.find(a => normalizeString(a.nickname) === normalizeString(addressMapping[nick])); return addresses.find(a => normalizeString(a.nickname) === normalizeString(nick)); };
-            const getCalculatedShipping = (nick) => { if (shippingOverrides && shippingOverrides[nick] !== undefined) return Number(shippingOverrides[nick]); const nickNorm = normalizeString(nick); const specialKey = Object.keys(specialCustomers || {}).find(k => normalizeString(k) === nickNorm); if (specialKey && specialCustomers[specialKey].type === 'vip') return 0; const addr = findAddress(nick); if (addr && addr.address && addr.address.includes('제주')) return 8000; return Number(quickShipping); };
-
             const handleExportProducts = () => { 
                 const summary = {}; const unpaidSummary = {}; const paidSummary = {}; const customerPaidStatus = {}; const customerGroups = {};
                 orders.forEach(o => { if(!customerGroups[o.customer]) customerGroups[o.customer] = []; customerGroups[o.customer].push(o); });
@@ -1840,8 +2017,9 @@
                 Object.entries(customerGroups).forEach(([nick, items]) => {
                     const activeItems = items.filter(i => !i.isCancelled); if(activeItems.length === 0) { customerPaidStatus[nick] = false; return; }
                     const isCard = savedCardPayments[nick]; 
-                    const shipping = getCalculatedShipping(nick);
-                    const productTotal = activeItems.reduce((sum, i) => sum + Number(i.price), 0); const depositTotal = items.reduce((sum, i) => sum + (i.deposit || 0), 0);
+                    const productTotal = activeItems.reduce((sum, i) => sum + Number(i.price), 0); 
+                    const shipping = getCalculatedShipping(nick, productTotal);
+                    const depositTotal = items.reduce((sum, i) => sum + (i.deposit || 0), 0);
                     const grandTotal = productTotal + (activeItems.length > 0 ? shipping : 0); 
                     customerPaidStatus[nick] = (depositTotal >= grandTotal) || isCard;
                 });
@@ -1860,8 +2038,9 @@
                 const groups = {}; orders.forEach(o => { if (!groups[o.customer]) groups[o.customer] = []; groups[o.customer].push(o); }); 
                 let entries = Object.entries(groups).map(([nick, items]) => {
                     const activeItems = items.filter(i => !i.isCancelled); const isCard = cardPayments[nick]; 
-                    const currentShipping = getCalculatedShipping(nick);
-                    const productTotal = activeItems.reduce((sum, i) => sum + Number(i.price), 0); const depositTotal = items.reduce((sum, i) => sum + (i.deposit || 0), 0); 
+                    const productTotal = activeItems.reduce((sum, i) => sum + Number(i.price), 0); 
+                    const currentShipping = getCalculatedShipping(nick, productTotal);
+                    const depositTotal = items.reduce((sum, i) => sum + (i.deposit || 0), 0); 
                     const grandTotal = productTotal + (activeItems.length > 0 ? currentShipping : 0); 
                     const isPaid = (depositTotal >= grandTotal) || isCard;
                     return { nick, items: activeItems, isPaid, isCard, depositTotal, grandTotal };
@@ -1988,6 +2167,7 @@
             const [orders, setOrders] = useLocalStorage('youtubeOrders', []);
             const [activeTab, setActiveTab] = useState('live');
             const [quickShipping, setQuickShipping] = useLocalStorage('quickShipping', 4000); 
+            const [freeShippingThreshold, setFreeShippingThreshold] = useLocalStorage('freeShippingThreshold', 200000);
             const [bankAccount, setBankAccount] = useLocalStorage('bankAccount', FIXED_BANK_ACCOUNT);
             const [productHistory, setProductHistory] = useLocalStorage('productHistory', {});
             const [shippingOverrides, setShippingOverrides] = useLocalStorage('shippingOverrides', {});
@@ -2022,7 +2202,7 @@
             const [addressMapping, setAddressMapping] = useLocalStorage('addressMapping', {});
             const [specialCustomers, setSpecialCustomers] = useLocalStorage('specialCustomers', {});
             const [inventory, setInventory] = useLocalStorage('productInventory', []);
-            const [templateConfig, setTemplateConfig] = useLocalStorage('templateConfig', { emoji: '💙', paidMsg: '😍 완납 확인! 감사합니다 😍', unpaidPrefix: '[미입금]\n총 입금하실 금액\n👉', overpaidMsg: '과납금액이 있습니다!\n환불받으실 계좌를 남겨주시거나, 적립금으로 처리 원하시면 말씀해주세요.', addrNotice: '※ 배송지 변경 시 채팅으로 변경할 주소를 남겨주세요!', surveyNotice: '방송마다 1회 하단의 주문서(배송지입력) 필수!!', alwaysRequestAddress: false });
+            const [templateConfig, setTemplateConfig] = useLocalStorage('templateConfig', { headerNotice: '', emoji: '💙', paidMsg: '😍 완납 확인! 감사합니다 😍', unpaidPrefix: '[미입금]\n총 입금하실 금액\n👉', overpaidMsg: '과납금액이 있습니다!\n환불받으실 계좌를 남겨주시거나, 적립금으로 처리 원하시면 말씀해주세요.', addrNotice: '※ 배송지 변경 시 채팅으로 변경할 주소를 남겨주세요!', surveyNotice: '방송마다 1회 하단의 주문서(배송지입력) 필수!!', alwaysRequestAddress: false });
             const [quickMessages, setQuickMessages] = useLocalStorage('quickMessages', ["안녕하세요! 주문은 하단 링크 클릭💙", "⚠️ 주소 미입력시 배송 보류!", "문의는 카톡 채널로🙏", "확인 중입니다🥰"]);
             const [isSettingsOpen, setIsSettingsOpen] = useState(false);
             const [isVipModalOpen, setIsVipModalOpen] = useState(false);
@@ -2044,7 +2224,7 @@
                 });
             }, [openModal]);
 
-            const handleExportBackup = () => downloadExcel([{ orders, productHistory, shippingOverrides, cardPayments, matchedDeposits: [...matchedDeposits], clickedChats: [...clickedChats], addressMapping, specialCustomers, inventory, templateConfig, depositorNames, keywords: keywords }], "kallo_backup");
+            const handleExportBackup = () => downloadExcel([{ orders, productHistory, shippingOverrides, cardPayments, matchedDeposits: [...matchedDeposits], clickedChats: [...clickedChats], addressMapping, specialCustomers, inventory, templateConfig, depositorNames, keywords: keywords, quickShipping, freeShippingThreshold }], "kallo_backup");
             
             const handleImportBackup = (e) => { 
                 const f = e.target.files[0]; 
@@ -2059,12 +2239,16 @@
                             if(d[0].inventory) setInventory(d[0].inventory); 
                             if(d[0].templateConfig) setTemplateConfig(()=>d[0].templateConfig); 
                             if(d[0].keywords) setKeywords(()=>d[0].keywords);
+                            if(d[0].quickShipping !== undefined) setQuickShipping(d[0].quickShipping);
+                            if(d[0].freeShippingThreshold !== undefined) setFreeShippingThreshold(d[0].freeShippingThreshold);
                         } else if (d.orders) { 
                             setOrders(d.orders || []); 
                             if(d.addresses) setAddresses(d.addresses); 
                             if(d.inventory) setInventory(d.inventory); 
                             if(d.templateConfig) setTemplateConfig(()=>d.templateConfig); 
                             if(d.keywords) setKeywords(()=>d.keywords);
+                            if(d.quickShipping !== undefined) setQuickShipping(d.quickShipping);
+                            if(d.freeShippingThreshold !== undefined) setFreeShippingThreshold(d.freeShippingThreshold);
                         }
                         openModal("복구 완료", "alert"); 
                     } catch(err) { openModal("파일 오류", "alert"); } 
@@ -2096,37 +2280,6 @@
                                     loadedOrders.forEach(o => { if (o.customer && o._isCard) newCardPayments[o.customer] = true; delete o._isCard; });
                                     setOrders(loadedOrders); 
                                     setCardPayments(prev => ({ ...prev, ...newCardPayments })); 
-                                    
-                                    setInventory(prevInv => {
-                                        const newInv = [...(Array.isArray(prevInv) ? prevInv : [])];
-                                        let changed = false;
-                                        loadedOrders.forEach(o => {
-                                            if (o.product && !o.isCancelled) {
-                                                const prodName = String(o.product).trim();
-                                                const unitPrice = (o.quantity && o.quantity > 0) ? (o.price / o.quantity) : o.price;
-                                                if (prodName !== '' && !newInv.some(i => i.name === prodName)) {
-                                                    newInv.push({ id: `inv_${Date.now()}_${Math.random()}`, name: prodName, price: unitPrice || 0 });
-                                                    changed = true;
-                                                }
-                                            }
-                                        });
-                                        return changed ? newInv : prevInv;
-                                    });
-                                    setProductHistory(prev => {
-                                        const next = { ...prev };
-                                        let changed = false;
-                                        loadedOrders.forEach(o => {
-                                            if (o.product && !o.isCancelled) {
-                                                const prodName = String(o.product).trim();
-                                                const unitPrice = (o.quantity && o.quantity > 0) ? (o.price / o.quantity) : o.price;
-                                                if (prodName !== '' && unitPrice > 0 && !next[prodName]) {
-                                                    next[prodName] = unitPrice;
-                                                    changed = true;
-                                                }
-                                            }
-                                        });
-                                        return changed ? next : prev;
-                                    });
                                 } 
                             } catch(e) {} 
                         }); 
@@ -2162,6 +2315,7 @@
                             addressScriptUrl={addressScriptUrl} setAddressScriptUrl={setAddressScriptUrl}
                             customerSheetId={customerSheetId} setCustomerSheetId={setCustomerSheetId}
                             quickShipping={quickShipping} setQuickShipping={setQuickShipping}
+                            freeShippingThreshold={freeShippingThreshold} setFreeShippingThreshold={setFreeShippingThreshold}
                             templateConfig={templateConfig} setTemplateConfig={setTemplateConfig}
                             bankAccount={bankAccount} setBankAccount={setBankAccount}
                             quickMessages={quickMessages} setQuickMessages={setQuickMessages}
@@ -2170,8 +2324,8 @@
                     )}
                     
                     <main className="flex-1 overflow-hidden bg-slate-200 dark:bg-slate-950 p-2 relative">
-                        {activeTab === 'live' && <LiveTab {...{ orders, setOrders, productHistory, setProductHistory, quickShipping, shippingOverrides, setShippingOverrides, bankAccount, googleScriptUrl, addressScriptUrl, inventoryScriptUrl, addresses, setAddresses, cardPayments, setCardPayments, matchedDeposits, setMatchedDeposits, depositorNames, setDepositorNames, clickedChats, setClickedChats, openModal, keywords, setKeywords, sentAddressRequests, setSentAddressRequests, deletedDepositIds, setDeletedDepositIds, checkedOrders, setCheckedOrders, addressMapping, setAddressMapping, templateConfig, specialCustomers, setSpecialCustomers, inventory, setInventory, quickMessages, customerSheetId, handleResetAllData }} />}
-                        {activeTab === 'manage' && <OrderManagementTab {...{ orders, shippingOverrides, quickShipping, addresses, handleExportBackup, handleImportBackup, addressMapping, cardPayments, specialCustomers, openModal }} />}
+                        {activeTab === 'live' && <LiveTab {...{ orders, setOrders, productHistory, setProductHistory, quickShipping, freeShippingThreshold, shippingOverrides, setShippingOverrides, bankAccount, googleScriptUrl, addressScriptUrl, inventoryScriptUrl, addresses, setAddresses, cardPayments, setCardPayments, matchedDeposits, setMatchedDeposits, depositorNames, setDepositorNames, clickedChats, setClickedChats, openModal, keywords, setKeywords, sentAddressRequests, setSentAddressRequests, deletedDepositIds, setDeletedDepositIds, checkedOrders, setCheckedOrders, addressMapping, setAddressMapping, templateConfig, specialCustomers, setSpecialCustomers, inventory, setInventory, quickMessages, customerSheetId, handleResetAllData }} />}
+                        {activeTab === 'manage' && <OrderManagementTab {...{ orders, shippingOverrides, quickShipping, freeShippingThreshold, addresses, handleExportBackup, handleImportBackup, addressMapping, cardPayments, specialCustomers, openModal }} />}
                     </main>
                 </div>
             );
