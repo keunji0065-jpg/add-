@@ -78,12 +78,28 @@
             return s;
         };
 
+        const extractKo = (str) => {
+            if (!str) return '';
+            return String(str).replace(/[^가-힣]/g, '');
+        };
+
+        const parseSafeDate = (val) => {
+            if (!val) return new Date(0);
+            const s = String(val).trim();
+            let d = new Date(s);
+            if (!isNaN(d) && d.getTime() > 0) return d;
+            
+            const match = s.match(/(\d{4})[./-]\s*(\d{1,2})[./-]\s*(\d{1,2})/);
+            if (match) {
+                return new Date(parseInt(match[1]), parseInt(match[2])-1, parseInt(match[3]));
+            }
+            return new Date(0);
+        };
+
         const formatMMDD = (val) => {
             if (!val) return '';
-            let dt = new Date(val);
-            if (!isNaN(dt)) return `${String(dt.getMonth() + 1).padStart(2, '0')}/${String(dt.getDate()).padStart(2, '0')}`;
-            const match = String(val).match(/(\d{4})[./-]\s*(\d{1,2})[./-]\s*(\d{1,2})/);
-            if (match) return `${String(match[2]).padStart(2, '0')}/${String(match[3]).padStart(2, '0')}`;
+            let dt = parseSafeDate(val);
+            if (dt.getTime() > 0) return `${String(dt.getMonth() + 1).padStart(2, '0')}/${String(dt.getDate()).padStart(2, '0')}`;
             return '';
         };
 
@@ -503,12 +519,12 @@
 
             return (
                 <div onClick={() => setSelectedNick(prev => prev === nick ? null : nick)} className={`bg-white dark:bg-slate-800 rounded shadow-sm transition-all overflow-hidden cursor-pointer ${borderClass} border mb-1.5`}>
-                    <div className={`px-2 py-1 flex justify-between items-center border-b dark:border-slate-700 ${headerBgClass}`}>
-                        <div className="flex flex-col gap-0.5 flex-1 min-w-0">
-                            <div className="flex items-center gap-1 flex-wrap mb-0.5">
-                                <span onClick={(e) => { e.stopPropagation(); const textArea = document.createElement("textarea"); textArea.value = nick; document.body.appendChild(textArea); textArea.select(); try { document.execCommand('copy'); const el = e.currentTarget; el.classList.add('text-green-500', 'dark:text-green-400'); setTimeout(() => el.classList.remove('text-green-500', 'dark:text-green-400'), 500); } catch (err) {} document.body.removeChild(textArea); }} className={`font-bold text-[12px] text-slate-900 dark:text-slate-100 truncate cursor-pointer hover:text-slate-600 dark:hover:text-slate-400 transition-colors`} title="클릭하여 닉네임 복사">{nick}</span>
+                    <div className={`px-2 py-1 flex justify-between items-start border-b dark:border-slate-700 ${headerBgClass}`}>
+                        <div className="flex flex-col gap-0.5 flex-1 min-w-[50%] pr-2">
+                            <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
+                                <span onClick={(e) => { e.stopPropagation(); const textArea = document.createElement("textarea"); textArea.value = nick; textArea.style.position = 'fixed'; textArea.style.top = '-9999px'; document.body.appendChild(textArea); textArea.select(); try { document.execCommand('copy'); const el = e.currentTarget; el.classList.add('text-green-500', 'dark:text-green-400'); setTimeout(() => el.classList.remove('text-green-500', 'dark:text-green-400'), 500); } catch (err) {} document.body.removeChild(textArea); }} className={`font-bold text-[12px] text-slate-900 dark:text-slate-100 truncate max-w-[120px] sm:max-w-[150px] inline-block align-bottom cursor-pointer hover:text-slate-600 dark:hover:text-slate-400 transition-colors`} title="클릭하여 닉네임 복사">{nick}</span>
                                 {addrConflict && (
-                                    <button onClick={(e) => { e.stopPropagation(); handlePromoteAddress(nick, addrConflict); }} className="ml-1 bg-red-50 hover:bg-red-100 border border-red-300 text-red-600 text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm animate-pulse flex items-center gap-0.5 transition-colors" title="클릭하여 새 주소(정보) 적용하기">🚨 정보변경 감지</button>
+                                    <button onClick={(e) => { e.stopPropagation(); handlePromoteAddress(nick, addrConflict); }} className="ml-1 bg-red-50 hover:bg-red-100 border border-red-300 text-red-600 text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm animate-pulse flex items-center gap-0.5 transition-colors shrink-0" title="클릭하여 새 주소(정보) 적용하기">🚨 정보변경 감지</button>
                                 )}
                                 {isVip && (<span onClick={(e) => e.stopPropagation()} className="ml-1 text-[10px] px-1.5 py-0.5 rounded border bg-slate-800 dark:bg-slate-200 border-slate-900 dark:border-slate-100 text-amber-400 dark:text-amber-600 font-bold shadow-sm shrink-0 flex items-center gap-0.5 cursor-default" title="우측 상단 VIP 관리대장에서 관리 가능"><Icon name="crown" weight="fill"/> VIP</span>)}
                                 <button onClick={(e) => { e.stopPropagation(); addOrderLogic(nick, '', 1); }} className="bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold hover:bg-slate-300 dark:hover:bg-slate-600 shrink-0" title="빈 상품줄 추가">+</button>
@@ -537,7 +553,7 @@
                                         {addressMapping[nick] && <Icon name="link-break" className="shrink-0 text-red-400 ml-1" weight="bold"/>}
                                     </div>
                                 ) : (
-                                    <div className="flex items-center gap-1 flex-wrap">
+                                    <div className="flex items-center gap-1 flex-wrap mt-0.5">
                                         {addrType === 'raw' ? (<span className="text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 px-1.5 py-0.5 rounded border border-orange-200 dark:border-orange-800 text-[10px] flex items-center gap-1 font-bold animate-pulse shrink-0"><Icon name="warning-diamond" weight="fill"/> ⚠️ 새 주소 접수됨</span>) : (<span className="text-red-400 dark:text-red-900/60 text-[10px] flex items-center gap-1 shrink-0"><Icon name="warning-circle" weight="fill"/> 주소없음</span>)}
                                         <button onClick={(e) => { e.stopPropagation(); openModal("연결할 주소록의 닉네임을 입력하세요.", "prompt", (targetNick) => { if(targetNick) handleAddressMapping(nick, targetNick); }); }} className="text-[10px] bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-1.5 py-0.5 rounded border border-slate-300 dark:border-slate-600 hover:bg-slate-200 dark:hover:bg-slate-600 flex items-center gap-1 shrink-0"><Icon name="link" weight="bold" /> 연결</button>
                                         <button onClick={(e) => { e.stopPropagation(); onOpenQuickAddress(nick); }} className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-1.5 py-0.5 rounded border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center gap-1 shrink-0 transition-colors shadow-sm"><Icon name="pencil-line" weight="bold" /> 직접입력</button>
@@ -546,15 +562,15 @@
                                 )}
                             </div>
                         </div>
-                        <div className="flex flex-col gap-1 items-end text-right shrink-0 ml-2">
-                            <div className={`font-bold text-sm ${isPaidState && balance === 0 ? 'text-green-600 dark:text-green-400' : (balance < 0 ? 'text-slate-600 dark:text-slate-400' : 'text-slate-800 dark:text-slate-100')}`}>{grandTotal.toLocaleString()}원</div>
+                        <div className="flex flex-col items-end justify-start gap-0.5 text-xs shrink-0 whitespace-nowrap ml-2 mt-0.5">
+                            <div className={`font-bold text-sm text-right ${isPaidState && balance === 0 ? 'text-green-600 dark:text-green-400' : (balance < 0 ? 'text-slate-600 dark:text-slate-400' : 'text-slate-800 dark:text-slate-100')}`}>{grandTotal.toLocaleString()}원</div>
                             {isCard ? (
-                                <div className="flex flex-col items-end"><div className="text-[10px] text-slate-600 dark:text-slate-400 font-bold">입금: {depositTotal.toLocaleString()} / 카드: {Math.max(0, balance).toLocaleString()}</div></div>
+                                <div className="flex flex-col items-end"><div className="text-[10px] text-slate-600 dark:text-slate-400 font-bold text-right leading-tight mt-0.5">입금: {depositTotal.toLocaleString()}<br/>카드: {Math.max(0, balance).toLocaleString()}</div></div>
                             ) : (
                                 <>
-                                    {balance !== 0 && depositTotal > 0 && (<div className="text-[10px] text-slate-500 dark:text-slate-400">(입금: {depositTotal.toLocaleString()}원)</div>)}
-                                    {balance > 0 && (<div className="text-[10px] font-bold text-red-500 dark:text-red-400 mt-0.5">미납: {balance.toLocaleString()}원</div>)}
-                                    {balance < 0 && (<div className="text-[10px] font-bold text-slate-600 dark:text-slate-400 mt-0.5">과납: {Math.abs(balance).toLocaleString()}원</div>)}
+                                    {balance !== 0 && depositTotal > 0 && (<div className="text-[10px] text-slate-500 dark:text-slate-400 text-right mt-0.5">입금: {depositTotal.toLocaleString()}</div>)}
+                                    {balance > 0 && (<div className="text-[10px] font-bold text-red-500 dark:text-red-400 text-right mt-0.5">미납: {balance.toLocaleString()}</div>)}
+                                    {balance < 0 && (<div className="text-[10px] font-bold text-slate-600 dark:text-slate-400 text-right mt-0.5">과납: {Math.abs(balance).toLocaleString()}</div>)}
                                 </>
                             )}
                         </div>
@@ -671,24 +687,84 @@
             };
 
             const addressLookup = useMemo(() => {
-                const masterMap = {}; const rawMap = {};
+                const masterMap = {}; 
+                const rawMap = {};
+                const exactNickMap = {};
+                const koBaseMap = {};
+                const realNameMap = {};
+
                 addresses.forEach(a => {
                     const cleanNick = normalizeString(a.nickname);
-                    if (a._source === 'master') { if (!masterMap[cleanNick] || new Date(a.timestamp) > new Date(masterMap[cleanNick].timestamp)) { masterMap[cleanNick] = a; } } 
-                    else { if (!rawMap[cleanNick] || new Date(a.timestamp) > new Date(rawMap[cleanNick].timestamp)) { rawMap[cleanNick] = a; } }
+                    const ts = parseSafeDate(a.timestamp).getTime();
+                    
+                    if (a._source === 'master') { 
+                        if (!masterMap[cleanNick] || ts > parseSafeDate(masterMap[cleanNick].timestamp).getTime()) { masterMap[cleanNick] = a; } 
+                    } else { 
+                        if (!rawMap[cleanNick] || ts > parseSafeDate(rawMap[cleanNick].timestamp).getTime()) { rawMap[cleanNick] = a; } 
+                    }
+
+                    const targetAddr = masterMap[cleanNick] || rawMap[cleanNick] || a;
+                    
+                    if (!exactNickMap[cleanNick]) exactNickMap[cleanNick] = [];
+                    if (!exactNickMap[cleanNick].includes(targetAddr)) exactNickMap[cleanNick].push(targetAddr);
+
+                    const cleanReal = normalizeString(a.realname);
+                    if (cleanReal) {
+                        if (!realNameMap[cleanReal]) realNameMap[cleanReal] = [];
+                        if (!realNameMap[cleanReal].includes(targetAddr)) realNameMap[cleanReal].push(targetAddr);
+                    }
+
+                    const ko = extractKo(a.nickname);
+                    if (ko && ko.length >= 2) {
+                        if (!koBaseMap[ko]) koBaseMap[ko] = [];
+                        if (!koBaseMap[ko].includes(targetAddr)) koBaseMap[ko].push(targetAddr);
+                    }
                 });
 
                 return {
                     get: (nick) => {
                         if (!nick) return { data: null, conflict: null, type: 'none' };
+                        
                         const mappedTarget = addressMapping[nick];
-                        const targetNick = mappedTarget ? normalizeString(mappedTarget) : normalizeString(nick);
+                        if (mappedTarget) {
+                            const mNick = normalizeString(mappedTarget);
+                            const mAddr = masterMap[mNick] || rawMap[mNick];
+                            if (mAddr) return { data: mAddr, conflict: null, type: mAddr._source || 'mapped' };
+                        }
 
-                        const master = masterMap[targetNick]; const raw = rawMap[targetNick];
-                        let conflict = null;
-                        if (master && raw) { if (new Date(raw.timestamp) > new Date(master.timestamp)) { if (raw.address !== master.address || raw.phone !== master.phone || raw.realname !== master.realname) { conflict = raw; } } }
-                        if (master) return { data: master, conflict: conflict, type: 'master' };
-                        if (raw) return { data: raw, conflict: null, type: 'raw' };
+                        const cleanNick = normalizeString(nick);
+                        
+                        const exactMatches = exactNickMap[cleanNick] || realNameMap[cleanNick];
+                        if (exactMatches && exactMatches.length === 1) {
+                            const addr = exactMatches[0];
+                            const mAddr = masterMap[normalizeString(addr.nickname)] || rawMap[normalizeString(addr.nickname)] || addr;
+                            
+                            const master = masterMap[normalizeString(mAddr.nickname)];
+                            const raw = rawMap[normalizeString(mAddr.nickname)];
+                            let conflict = null;
+                            if (master && raw) { 
+                                if (parseSafeDate(raw.timestamp).getTime() > parseSafeDate(master.timestamp).getTime()) { 
+                                    if (raw.address !== master.address || raw.phone !== master.phone || raw.realname !== master.realname) { conflict = raw; } 
+                                } 
+                            }
+                            return { data: master || raw || mAddr, conflict: conflict, type: master ? 'master' : 'raw' };
+                        }
+
+                        const koNick = extractKo(nick);
+                        if (koNick && koNick.length >= 2) {
+                            const koMatches = koBaseMap[koNick];
+                            if (koMatches && koMatches.length === 1) {
+                                const addr = koMatches[0];
+                                const master = masterMap[normalizeString(addr.nickname)];
+                                const raw = rawMap[normalizeString(addr.nickname)];
+                                let conflict = null;
+                                if (master && raw && parseSafeDate(raw.timestamp).getTime() > parseSafeDate(master.timestamp).getTime()) {
+                                    if (raw.address !== master.address || raw.phone !== master.phone || raw.realname !== master.realname) { conflict = raw; }
+                                }
+                                return { data: master || raw || addr, conflict: conflict, type: master ? 'master' : 'raw' };
+                            }
+                        }
+
                         return { data: null, conflict: null, type: 'none' };
                     }
                 };
@@ -890,27 +966,22 @@
                         if (aN === term && bN !== term) return -1; if (aN !== term && bN === term) return 1;
                         if (aN.startsWith(term) && !bN.startsWith(term)) return -1; if (!aN.startsWith(term) && bN.startsWith(term)) return 1;
                     }
-                    if (selectedNick) {
-                        const aIdx = sortOrderCache.current.indexOf(a[0]); const bIdx = sortOrderCache.current.indexOf(b[0]);
-                        if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
-                        if (aIdx === -1 && bIdx !== -1) return -1; 
-                        if (aIdx !== -1 && bIdx === -1) return 1;
-                        return Math.max(...b[1].map(o=>o.id)) - Math.max(...a[1].map(o=>o.id));
-                    }
+                    
+                    const aIdx = sortOrderCache.current.indexOf(a[0]); 
+                    const bIdx = sortOrderCache.current.indexOf(b[0]);
+                    if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
+                    if (aIdx === -1 && bIdx !== -1) return -1; 
+                    if (aIdx !== -1 && bIdx === -1) return 1;
                     return Math.max(...b[1].map(o=>o.id)) - Math.max(...a[1].map(o=>o.id));
                 });
                 
-                if (!selectedNick) {
-                    sortOrderCache.current = entries.map(e => e[0]);
-                } else {
-                    const newNicks = entries.map(e => e[0]).filter(n => !sortOrderCache.current.includes(n));
-                    if (newNicks.length > 0) {
-                        sortOrderCache.current = [...newNicks, ...sortOrderCache.current];
-                    }
+                const newNicks = entries.map(e => e[0]).filter(n => !sortOrderCache.current.includes(n));
+                if (newNicks.length > 0) {
+                    sortOrderCache.current = [...newNicks, ...sortOrderCache.current];
                 }
                 
                 return entries;
-            }, [orders, deferredOrderSearch, filterStatus, cardPayments, getCalculatedShipping, addressLookup, depositorNames, selectedNick]);
+            }, [orders, deferredOrderSearch, filterStatus, cardPayments, getCalculatedShipping, addressLookup, depositorNames]);
 
             const totalItemsCount = useMemo(() => { let count = 0; filteredGroupedOrders.forEach(([_, items]) => { count += items.filter(i => !i.isCancelled).length; }); return count; }, [filteredGroupedOrders]);
             useEffect(() => { setDisplayLimit(30); }, [deferredOrderSearch, filterStatus, selectedNick]);
@@ -1155,7 +1226,7 @@
                         try { 
                             await fetchGas(googleScriptUrl, { action: 'save_address', data: mappedData }); 
                         } catch (err) {
-                            setGlobalError("🚨 구글 시트 통신 에러: 스크립트 권한을 '모든 사용자'로 설정하세요.");
+                            setGlobalError("🚨 구글 시트 통신 에러: 스크립 권한을 '모든 사용자'로 설정하세요.");
                         }
                     }
                 }); 
@@ -1358,9 +1429,25 @@
             }, [orders, addressMapping]);
 
             const visibleAddresses = useMemo(() => {
-                let res = [...addresses];
-                if (addressSearch) { const term = addressSearch.toLowerCase(); res = res.filter(a => String(a.nickname).toLowerCase().includes(term) || String(a.realname).toLowerCase().includes(term) || String(a.phone).includes(term) || (a.linkedNicks && a.linkedNicks.some(ln => String(ln).toLowerCase().includes(term)))); }
-                res.sort((a, b) => { const tA = new Date(a.timestamp || 0).getTime(); const tB = new Date(b.timestamp || 0).getTime(); return tB - tA; });
+                // 중복 제거 및 최신 데이터 유지
+                const latestMap = {};
+                addresses.forEach(a => {
+                    const cleanNick = normalizeString(a.nickname);
+                    const ts = parseSafeDate(a.timestamp).getTime();
+                    if (!latestMap[cleanNick] || ts > parseSafeDate(latestMap[cleanNick].timestamp).getTime()) {
+                        latestMap[cleanNick] = a;
+                    }
+                });
+                
+                let res = Object.values(latestMap);
+                
+                if (addressSearch) { 
+                    const term = addressSearch.toLowerCase(); 
+                    res = res.filter(a => String(a.nickname).toLowerCase().includes(term) || String(a.realname).toLowerCase().includes(term) || String(a.phone).includes(term) || (a.linkedNicks && a.linkedNicks.some(ln => String(ln).toLowerCase().includes(term)))); 
+                }
+                
+                res.sort((a, b) => { const tA = parseSafeDate(a.timestamp).getTime(); const tB = parseSafeDate(b.timestamp).getTime(); return tB - tA; });
+                
                 if (selectedNick) {
                     const targetClean = normalizeString(selectedNick);
                     res.sort((a, b) => {
