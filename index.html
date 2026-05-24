@@ -6,7 +6,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <title>깔로 주문서 PRO - 초고속 관제탑 버전</title>
+    <title>깔로 주문서 PRO - 버전</title>
     
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin="anonymous"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
@@ -363,7 +363,7 @@
                     groups[o.customer].quantity += Number(o.quantity || 0);
                     groups[o.customer].orderIds.push(o.id);
                 });
-                return Object.values(groups).sort((a, b) => a.customer.localeCompare(b.customer, 'ko'));
+                return Object.values(groups).sort((a, b) => String(a.customer).localeCompare(String(b.customer), 'ko'));
             }, [activeOrders]);
 
             const isExpanded = expandedInventoryItem === item.name;
@@ -556,8 +556,8 @@
                                 ) : (
                                     <div className="flex items-center gap-1 flex-wrap mt-0.5">
                                         {addrType === 'raw' ? (<span className="text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 px-1.5 py-0.5 rounded border border-orange-200 dark:border-orange-800 text-[10px] flex items-center gap-1 font-bold animate-pulse shrink-0"><Icon name="warning-diamond" weight="fill"/> ⚠️ 새 주소 접수됨</span>) : (<span className="text-red-400 dark:text-red-900/60 text-[10px] flex items-center gap-1 shrink-0"><Icon name="warning-circle" weight="fill"/> 주소없음</span>)}
-                                        <button onClick={(e) => { e.stopPropagation(); openModal("연결할 주소록의 닉네임을 입력하세요.", "prompt", (targetNick) => { if(targetNick) handleAddressMapping(nick, targetNick); }); }} className="text-[10px] bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-1.5 py-0.5 rounded border border-slate-300 dark:border-slate-600 hover:bg-slate-200 dark:hover:bg-slate-600 flex items-center gap-1 shrink-0"><Icon name="link" weight="bold" /> 연결</button>
-                                        <button onClick={(e) => { e.stopPropagation(); onOpenQuickAddress(nick); }} className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-1.5 py-0.5 rounded border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center gap-1 shrink-0 transition-colors shadow-sm"><Icon name="pencil-line" weight="bold" /> 직접입력</button>
+                                        <button onClick={(e) => { e.stopPropagation(); openModal("연결할 주소록의 닉네임을 입력하세요.", "prompt", (targetNick) => { if(targetNick) handleAddressMapping(nick, targetNick); }); }} className="text-[10px] bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-1.5 py-0.5 rounded border dark:border-slate-600 hover:bg-slate-200 dark:hover:bg-slate-600 flex items-center gap-1 shrink-0"><Icon name="link" weight="bold" /> 연결</button>
+                                        <button onClick={(e) => { e.stopPropagation(); onOpenQuickAddress(nick); }} className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-1.5 py-0.5 rounded border dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center gap-1 shrink-0 transition-colors shadow-sm"><Icon name="pencil-line" weight="bold" /> 직접입력</button>
                                         {suggestions && suggestions.length > 0 && (<div className="flex flex-wrap gap-1 items-center bg-orange-50 dark:bg-orange-900/10 px-1 py-0.5 rounded"><span className="text-[9px] text-orange-700 dark:text-orange-400 font-bold shrink-0">유사:</span>{suggestions.map(s => (<button key={s} onClick={(e) => {e.stopPropagation(); handleAddressMapping(nick, s);}} className="bg-white dark:bg-slate-700 border border-orange-200 dark:border-orange-800 text-orange-700 dark:text-orange-300 px-1.5 py-0.5 rounded text-[9px] hover:bg-orange-100 dark:hover:bg-orange-900 transition-colors shadow-sm shrink-0">{s}</button>))}</div>)}
                                     </div>
                                 )}
@@ -596,7 +596,7 @@
             return true;
         });
 
-        const LiveTab = ({ orders, setOrders, productHistory, setProductHistory, quickShipping, jejuShipping, freeShippingThreshold, shippingOverrides, setShippingOverrides, bankAccount, googleScriptUrl, inventoryScriptUrl, employeeSheetId, rawSheetId, addresses, setAddresses, cardPayments, setCardPayments, matchedDeposits, setMatchedDeposits, depositorNames, setDepositorNames, openModal, sentAddressRequests, setSentAddressRequests, deletedDepositIds, setDeletedDepositIds, checkedOrders, setCheckedOrders, addressMapping, setAddressMapping, templateConfig, specialCustomers, setSpecialCustomers, inventory, setInventory, quickMessages, handleResetAllData, broadcastName, setGlobalError }) => {
+        const LiveTab = ({ orders, setOrders, productHistory, setProductHistory, quickShipping, jejuShipping, freeShippingThreshold, shippingOverrides, setShippingOverrides, bankAccount, googleScriptUrl, inventoryScriptUrl, employeeSheetId, rawSheetId, addresses, setAddresses, cardPayments, setCardPayments, matchedDeposits, setMatchedDeposits, depositorNames, setDepositorNames, openModal, sentAddressRequests, setSentAddressRequests, deletedDepositIds, setDeletedDepositIds, checkedOrders, setCheckedOrders, addressMapping, setAddressMapping, templateConfig, specialCustomers, setSpecialCustomers, inventory, setInventory, quickMessages, handleResetAllData, broadcastName, setGlobalError, addressCutoffDate }) => {
             const [serverDeposits, setServerDeposits] = useState([]);
             const [manualDeposits, setManualDeposits] = useState([]);
             const [selectedNick, setSelectedNick] = useState(null);
@@ -1075,14 +1075,35 @@
                     }
 
                     const data = await fetchGas(url);
-                    let fetchedAddrs = data.addresses || data.data || data;
-                    if (fetchedAddrs && Array.isArray(fetchedAddrs) && fetchedAddrs.length > 0) {
-                        setAddresses(fetchedAddrs); 
+                    let rawData = data.addresses || data.data || data;
+                    
+                    if (rawData && Array.isArray(rawData) && rawData.length > 0) {
+                        if (Array.isArray(rawData[0])) {
+                            const headers = rawData[0];
+                            rawData = rawData.slice(1).map(r => {
+                                const obj = {};
+                                headers.forEach((h, i) => obj[h || `col_${i}`] = r[i]);
+                                return obj;
+                            });
+                        }
+
+                        const cutoff = parseSafeDate(addressCutoffDate);
+                        cutoff.setHours(0,0,0,0);
+
+                        const filtered = rawData.filter(a => {
+                            const dStr = a.timestamp || a.date || a['시간'] || a['제출시간'] || '';
+                            if (!dStr) return true;
+                            const d = parseSafeDate(dStr);
+                            if (d.getTime() === 0) return true;
+                            return d >= cutoff;
+                        });
+
+                        setAddresses(filtered); 
                     }
                 } catch(e) {
                     console.error("주소록 가져오기 실패", e);
                 }
-            }, [googleScriptUrl, rawSheetId, setAddresses]);
+            }, [googleScriptUrl, rawSheetId, setAddresses, addressCutoffDate]);
 
             useEffect(() => { fetchAddresses(); const interval = setInterval(fetchAddresses, 10000); return () => clearInterval(interval); }, [fetchAddresses]);
 
@@ -1658,7 +1679,7 @@
                             <div className="font-bold text-slate-800 dark:text-slate-200 flex items-center justify-between">
                                 <span className="flex items-center gap-1"><Icon name="address-book" weight="fill"/> 실시간 주소록</span>
                                 <div className="flex items-center gap-1.5">
-                                    <span className="text-xs text-slate-500 dark:text-slate-400 mr-1">{addresses.length}명</span>
+                                    <span className="text-xs text-slate-500 dark:text-slate-400 mr-1">{visibleAddresses.length}명</span>
                                     <button onClick={handleResetAddresses} className="bg-slate-500 hover:bg-slate-600 text-white text-[10px] px-1.5 py-0.5 rounded shadow-sm transition-colors flex items-center gap-0.5" title="기존 주소 삭제 및 새로고침"><Icon name="trash" weight="bold"/> 비우기</button>
                                 </div>
                             </div>
@@ -1971,6 +1992,7 @@
             const [inventory, setInventory] = useLocalStorage('productInventory', []);
             const [templateConfig, setTemplateConfig] = useLocalStorage('templateConfig', { emoji: '💙', paidMsg: '😍 완납 확인! 감사합니다 😍', unpaidPrefix: '[미입금]\n총 입금하실 금액\n👉', addrNotice: '※ 배송지 변경 시 채팅으로 변경할 주소를 남겨주세요!', surveyNotice: '방송마다 1회 하단의 주문서(배송지입력) 필수!!', alwaysRequestAddress: false });
             const [quickMessages, setQuickMessages] = useLocalStorage('quickMessages', ["안녕하세요! 주문은 하단 링크 클릭💙", "⚠️ 주소 미입력시 배송 보류!", "문의는 카톡 채널로🙏", "확인 중입니다🥰"]);
+            const [addressCutoffDate, setAddressCutoffDate] = useLocalStorage('addressCutoffDate', '2026-05-20');
             
             const [isSettingsOpen, setIsSettingsOpen] = useState(false);
             const [isVipModalOpen, setIsVipModalOpen] = useState(false);
@@ -2090,6 +2112,10 @@
                                     </div>
                                     <div className="text-[10px] text-slate-500 mt-1">예: 기본 4000, 제주 8000, 기준액 70000 (0 입력시 무료배송 안함)</div>
                                 </div>
+                                <div className="mt-3">
+                                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">주소록 수집 시작일 (이 날짜 이후 제출된 폼만 불러옴)</label>
+                                    <input type="date" value={addressCutoffDate} onChange={(e)=>setAddressCutoffDate(e.target.value)} className="w-full border dark:border-slate-600 rounded px-2 py-1.5 text-sm bg-slate-50 dark:bg-slate-900 dark:text-white outline-none" />
+                                </div>
                                 <div className="border-t dark:border-slate-700 pt-4"><h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-2 flex items-center gap-1"><Icon name="chat-text" weight="fill"/> 주문서 멘트 설정</h4>
                                     <div className="space-y-3">
                                         <div><label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1">닉네임 이모지</label><input type="text" value={templateConfig.emoji} onChange={(e)=>{setTemplateConfig(p => ({...p, emoji: e.target.value}));}} className="w-full border dark:border-slate-600 rounded px-2 py-1.5 text-sm bg-slate-50 dark:bg-slate-900 dark:text-white mb-2 outline-none focus:ring-1 focus:ring-slate-400" />
@@ -2113,7 +2139,7 @@
                         </div>
                     )}
                     <main className="flex-1 overflow-hidden bg-slate-200 dark:bg-slate-950 p-2 relative">
-                        {activeTab === 'live' && <LiveTab {...{ orders, setOrders, productHistory, setProductHistory, quickShipping, jejuShipping, freeShippingThreshold, shippingOverrides, setShippingOverrides, bankAccount, googleScriptUrl, inventoryScriptUrl, employeeSheetId, rawSheetId, addresses, setAddresses, cardPayments, setCardPayments, matchedDeposits, setMatchedDeposits, depositorNames, setDepositorNames, openModal, sentAddressRequests, setSentAddressRequests, deletedDepositIds, setDeletedDepositIds, checkedOrders, setCheckedOrders, addressMapping, setAddressMapping, templateConfig, specialCustomers, setSpecialCustomers, inventory, setInventory, quickMessages, handleResetAllData, broadcastName, setGlobalError }} />}
+                        {activeTab === 'live' && <LiveTab {...{ orders, setOrders, productHistory, setProductHistory, quickShipping, jejuShipping, freeShippingThreshold, shippingOverrides, setShippingOverrides, bankAccount, googleScriptUrl, inventoryScriptUrl, employeeSheetId, rawSheetId, addresses, setAddresses, cardPayments, setCardPayments, matchedDeposits, setMatchedDeposits, depositorNames, setDepositorNames, openModal, sentAddressRequests, setSentAddressRequests, deletedDepositIds, setDeletedDepositIds, checkedOrders, setCheckedOrders, addressMapping, setAddressMapping, templateConfig, specialCustomers, setSpecialCustomers, inventory, setInventory, quickMessages, handleResetAllData, broadcastName, setGlobalError, addressCutoffDate }} />}
                         {activeTab === 'manage' && <OrderManagementTab {...{ orders, shippingOverrides, quickShipping, jejuShipping, freeShippingThreshold, broadcastName, addresses, handleExportBackup, handleImportBackup, addressMapping, cardPayments, specialCustomers, openModal }} />}
                     </main>
                 </div>
