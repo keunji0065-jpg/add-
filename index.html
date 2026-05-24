@@ -629,13 +629,7 @@
             }, []);
 
             const bringToTop = useCallback((rawNick) => {
-                if (!rawNick) return;
-                const cNick = String(rawNick).replace(/@/g, '').trim();
-                if (sortOrderCache.current) {
-                    const idx = sortOrderCache.current.indexOf(cNick);
-                    if (idx !== -1) sortOrderCache.current.splice(idx, 1);
-                    sortOrderCache.current.unshift(cNick);
-                }
+                // 제자리 고정을 위해 기능 제거됨 (화면 튕김 방지)
             }, []);
 
             const [ignoredAutoMatch, setIgnoredAutoMatch] = useState(() => {
@@ -760,6 +754,9 @@
             const allDepositsRef = useRef(allDeposits);
             useEffect(() => { allDepositsRef.current = allDeposits; }, [allDeposits]);
             
+            const matchedDepositsRef = useRef(matchedDeposits);
+            useEffect(() => { matchedDepositsRef.current = matchedDeposits; }, [matchedDeposits]);
+            
             const totalDepositAmount = useMemo(() => {
                 const filtered = allDeposits.filter(d => !deletedDepositIds.has(d.id));
                 const searchFiltered = !depositSearch ? filtered : filtered.filter(d => (d.name||'').includes(depositSearch) || String(d.amount).includes(depositSearch));
@@ -867,10 +864,10 @@
                         const isChosung = /^[ㄱ-ㅎa-zA-Z0-9]+$/.test(term);
                         const addrInfo = addressLookup.get(nick)?.data;
                         const realName = addrInfo ? addrInfo.realname : (depositorNames[nick] || '');
-                        const phone = addrInfo ? addrInfo.phone : '';
+                        const phone = addrInfo ? String(addrInfo.phone) : '';
                         
                         const nickClean = nick.toLowerCase().replace(/\s/g, '');
-                        const realNameClean = realName ? realName.toLowerCase().replace(/\s/g, '') : '';
+                        const realNameClean = realName ? String(realName).toLowerCase().replace(/\s/g, '') : '';
                         const phoneClean = phone ? phone.replace(/-/g, '') : '';
 
                         if (nickClean.includes(term) || (isChosung && getChosung(nickClean).includes(term)) ||
@@ -900,15 +897,27 @@
                         if (aN === term && bN !== term) return -1; if (aN !== term && bN === term) return 1;
                         if (aN.startsWith(term) && !bN.startsWith(term)) return -1; if (!aN.startsWith(term) && bN.startsWith(term)) return 1;
                     }
-                    if (selectedNick) {
-                        const aIdx = sortOrderCache.current.indexOf(a[0]); const bIdx = sortOrderCache.current.indexOf(b[0]);
-                        if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
-                        if (aIdx === -1 && bIdx !== -1) return -1; 
-                        if (aIdx !== -1 && bIdx === -1) return 1;
-                    }
+                    
+                    // 주문서 제자리 고정: 선택 여부와 무관하게 안정적인 캐시 기반 정렬
+                    const aIdx = sortOrderCache.current.indexOf(a[0]); 
+                    const bIdx = sortOrderCache.current.indexOf(b[0]);
+                    
+                    if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
+                    if (aIdx === -1 && bIdx !== -1) return -1; // 새 주문은 위로
+                    if (aIdx !== -1 && bIdx === -1) return 1;
+                    
                     return Math.max(...b[1].map(o=>o.id)) - Math.max(...a[1].map(o=>o.id));
                 });
-                if (!selectedNick) sortOrderCache.current = entries.map(e => e[0]);
+                
+                // 검색 중이 아닐 때만 새로운 주문자 추가 (기존 캐시 유지)
+                if (!deferredOrderSearch && filterStatus === 'all') {
+                    const currentCachedSet = new Set(sortOrderCache.current);
+                    const newNicks = entries.filter(e => !currentCachedSet.has(e[0])).map(e => e[0]);
+                    if (newNicks.length > 0) {
+                        sortOrderCache.current = [...newNicks, ...sortOrderCache.current];
+                    }
+                }
+                
                 return entries;
             }, [orders, deferredOrderSearch, filterStatus, cardPayments, getCalculatedShipping, addressLookup, depositorNames, selectedNick]);
 
@@ -988,7 +997,8 @@
                 } catch (e) {}
             }, [googleScriptUrl, setOrders, setGlobalError]);
             
-            useEffect(() => { fetchData(); const interval = setInterval(fetchData, 4500); return () => clearInterval(interval); }, [fetchData]);
+            // 🔥 통신 주기 최적화: 4.5초 -> 3초 (시트에서 2.5초 동안 대기해주므로, 화면은 더 자주 가져와도 문제없이 쾌적합니다)
+            useEffect(() => { fetchData(); const interval = setInterval(fetchData, 3000); return () => clearInterval(interval); }, [fetchData]);
 
             // 주소록 가져오기 로직
             const fetchAddresses = useCallback(async () => {
@@ -1028,68 +1038,85 @@
                 }
             }, [orders, addressLookup, openModal]);
 
-            // 이중 잠금장치 매칭 설정
+            // 이중 잠금장치 매칭 설정 (경쟁 상태 완벽 방어)
             useEffect(() => {
                 const timer = setTimeout(() => {
-                    if (allDeposits.length === 0 || orders.length === 0) return;
-                    let updatedOrders = [...orders]; let newMatchedIds = new Set(matchedDeposits); let hasChanges = false; const customerBalances = {};
-                    
-                    updatedOrders.forEach(o => {
-                        if (o.isCancelled) return;
-                        if (!customerBalances[o.customer]) {
-                            customerBalances[o.customer] = { productTotal: 0, depositTotal: 0, activeItemsCount: 0, isCloud: false };
-                        }
-                        customerBalances[o.customer].productTotal += Number(o.price); customerBalances[o.customer].depositTotal += (o.deposit || 0); customerBalances[o.customer].activeItemsCount += 1;
-                        if (o.loadedFromCloud) customerBalances[o.customer].isCloud = true;
-                    });
+                    setOrders(prevOrders => {
+                        const currentAllDeposits = allDepositsRef.current;
+                        if (currentAllDeposits.length === 0 || prevOrders.length === 0) return prevOrders;
 
-                    const matchLookup = {};
-                    Object.keys(customerBalances).forEach(nick => {
-                        const cb = customerBalances[nick];
-                        const currentShipping = getCalculatedShipping(nick, cb.productTotal);
-                        cb.grandTotal = cb.productTotal + (cb.activeItemsCount > 0 ? currentShipping : 0); cb.balance = cb.grandTotal - cb.depositTotal;
-                        const savedRealName = depositorNames[nick] ? cleanForMatch(depositorNames[nick]) : '';
-                        const addrRes = addressLookup.get(nick); const addressRealName = addrRes && addrRes.data ? cleanForMatch(addrRes.data.realname) : '';
-                        const nickClean = cleanForMatch(nick);
-                        const possibleNames = new Set([savedRealName, addressRealName, nickClean, nickClean && savedRealName ? nickClean + savedRealName : null, nickClean && savedRealName ? savedRealName + nickClean : null, nickClean && addressRealName ? nickClean + addressRealName : null, nickClean && addressRealName ? addressRealName + nickClean : null].filter(Boolean));
-                        possibleNames.forEach(pName => { if (!matchLookup[pName]) matchLookup[pName] = []; matchLookup[pName].push(nick); });
-                    });
-
-                    allDeposits.forEach(deposit => {
-                        if (newMatchedIds.has(deposit.id) || deletedDepositIds.has(deposit.id) || ignoredAutoMatch.has(deposit.id)) return;
-                        const depositNameClean = cleanForMatch(deposit.name); if (depositNameClean.length < 1) return; 
+                        let updatedOrders = [...prevOrders]; 
+                        let newMatchedIds = new Set(matchedDepositsRef.current); 
+                        let hasChanges = false; 
+                        const customerBalances = {};
                         
-                        let exactMatches = matchLookup[depositNameClean] || [];
-                        exactMatches = [...new Set(exactMatches)];
-                        let matchedCustomer = null; const depositAmount = Number(deposit.amount);
-                        
-                        if (exactMatches.length === 1) { matchedCustomer = exactMatches[0]; } 
-                        else if (exactMatches.length > 1) {
-                            const amountMatches = exactMatches.filter(nick => customerBalances[nick].balance === depositAmount);
-                            if (amountMatches.length === 1) matchedCustomer = amountMatches[0];
-                        }
-                        
-                        if (matchedCustomer) {
-                            const cb = customerBalances[matchedCustomer];
-                            if (cb.balance <= 0) { 
-                                newMatchedIds.add(deposit.id); hasChanges = true; 
-                            } else {
-                                let applied = false;
-                                updatedOrders = updatedOrders.map(o => { 
-                                    if (o.customer === matchedCustomer && !applied) { 
-                                        applied = true; return { ...o, deposit: (o.deposit || 0) + depositAmount, loadedFromCloud: false }; 
-                                    } 
-                                    return o; 
-                                });
-                                cb.depositTotal += depositAmount; cb.balance -= depositAmount; cb.isCloud = false; 
-                                newMatchedIds.add(deposit.id); hasChanges = true;
+                        updatedOrders.forEach(o => {
+                            if (o.isCancelled) return;
+                            if (!customerBalances[o.customer]) {
+                                customerBalances[o.customer] = { productTotal: 0, depositTotal: 0, activeItemsCount: 0, isCloud: false };
                             }
+                            customerBalances[o.customer].productTotal += Number(o.price); 
+                            customerBalances[o.customer].depositTotal += (o.deposit || 0); 
+                            customerBalances[o.customer].activeItemsCount += 1;
+                            if (o.loadedFromCloud) customerBalances[o.customer].isCloud = true;
+                        });
+
+                        const matchLookup = {};
+                        Object.keys(customerBalances).forEach(nick => {
+                            const cb = customerBalances[nick];
+                            const currentShipping = getCalculatedShipping(nick, cb.productTotal);
+                            cb.grandTotal = cb.productTotal + (cb.activeItemsCount > 0 ? currentShipping : 0); 
+                            cb.balance = cb.grandTotal - cb.depositTotal;
+                            const savedRealName = depositorNames[nick] ? cleanForMatch(depositorNames[nick]) : '';
+                            const addrRes = addressLookup.get(nick); 
+                            const addressRealName = addrRes && addrRes.data ? cleanForMatch(addrRes.data.realname) : '';
+                            const nickClean = cleanForMatch(nick);
+                            const possibleNames = new Set([savedRealName, addressRealName, nickClean, nickClean && savedRealName ? nickClean + savedRealName : null, nickClean && savedRealName ? savedRealName + nickClean : null, nickClean && addressRealName ? nickClean + addressRealName : null, nickClean && addressRealName ? addressRealName + nickClean : null].filter(Boolean));
+                            possibleNames.forEach(pName => { if (!matchLookup[pName]) matchLookup[pName] = []; matchLookup[pName].push(nick); });
+                        });
+
+                        currentAllDeposits.forEach(deposit => {
+                            if (newMatchedIds.has(deposit.id) || deletedDepositIds.has(deposit.id) || ignoredAutoMatch.has(deposit.id)) return;
+                            const depositNameClean = cleanForMatch(deposit.name); if (depositNameClean.length < 1) return; 
+                            
+                            let exactMatches = matchLookup[depositNameClean] || [];
+                            exactMatches = [...new Set(exactMatches)];
+                            let matchedCustomer = null; const depositAmount = Number(deposit.amount);
+                            
+                            if (exactMatches.length === 1) { matchedCustomer = exactMatches[0]; } 
+                            else if (exactMatches.length > 1) {
+                                const amountMatches = exactMatches.filter(nick => customerBalances[nick].balance === depositAmount);
+                                if (amountMatches.length === 1) matchedCustomer = amountMatches[0];
+                            }
+                            
+                            if (matchedCustomer) {
+                                const cb = customerBalances[matchedCustomer];
+                                if (cb.balance <= 0) { 
+                                    newMatchedIds.add(deposit.id); hasChanges = true; 
+                                } else {
+                                    let applied = false;
+                                    updatedOrders = updatedOrders.map(o => { 
+                                        if (o.customer === matchedCustomer && !applied) { 
+                                            applied = true; return { ...o, deposit: (o.deposit || 0) + depositAmount, loadedFromCloud: false }; 
+                                        } 
+                                        return o; 
+                                    });
+                                    cb.depositTotal += depositAmount; cb.balance -= depositAmount; cb.isCloud = false; 
+                                    newMatchedIds.add(deposit.id); hasChanges = true;
+                                }
+                            }
+                        });
+                        
+                        if (hasChanges) { 
+                            // 상태 업데이트 충돌 방지를 위해 비동기 처리
+                            setTimeout(() => setMatchedDeposits(newMatchedIds), 0);
+                            return updatedOrders; 
                         }
+                        return prevOrders;
                     });
-                    if (hasChanges) { setOrders(updatedOrders); setMatchedDeposits(newMatchedIds); }
                 }, 500); 
                 return () => clearTimeout(timer);
-            }, [allDeposits, orders, matchedDeposits, depositorNames, deletedDepositIds, getCalculatedShipping, ignoredAutoMatch, addressLookup]);
+            }, [allDeposits, orders, depositorNames, deletedDepositIds, getCalculatedShipping, ignoredAutoMatch, addressLookup]);
 
             const autoSaveToGoogleSheet = useCallback(async () => { 
                 if (!googleScriptUrl || Object.keys(orders).length === 0) return; setIsSaving(true); 
@@ -1275,14 +1302,18 @@
                 });
             }, [setCheckedOrders, setOrders, setInventory, setProductHistory]);
 
-            const handleSendToEmployee = async () => {
-                if (!employeeSheetId) return openModal("설정(⚙️) 메뉴에서 '직원 공유용 시트 ID'를 먼저 입력해주세요.", "alert");
+            const syncToEmployeeSheet = useCallback(async (isSilent = false) => {
+                if (!employeeSheetId) {
+                    if (!isSilent) openModal("설정(⚙️) 메뉴에서 '직원 공유용 시트 ID'를 먼저 입력해주세요.", "alert");
+                    return;
+                }
                 
-                const payloadData = []; const processedOrderIds = []; const groups = {};
+                const payloadData = []; const groups = {};
                 orders.forEach(o => { if(!groups[o.customer]) groups[o.customer]=[]; groups[o.customer].push(o); });
 
                 Object.entries(groups).forEach(([nick, items]) => {
-                    const activeItems = items.filter(i => !i.isCancelled && !i.isSentToEmp);
+                    // 🚨 핵심 수정: 이미 전송된 건(!i.isSentToEmp) 필터링 삭제. 취소 안된 모든 유효 주문을 수집!
+                    const activeItems = items.filter(i => !i.isCancelled);
                     if (activeItems.length === 0) return;
 
                     const addrInfo = addressLookup.get(nick);
@@ -1295,34 +1326,58 @@
                     const grandTotal = productTotal + shipping;
                     const isPaid = (depositTotal >= grandTotal) || isCard;
 
-                    if (!isPaid) return; // 입금 미완료면 전송 보류
-
                     const fullAddress = addrInfo.data.zipcode ? `(${addrInfo.data.zipcode}) ${addrInfo.data.address}` : addrInfo.data.address;
-                    const status = isCard ? "카드결제" : "입금완료";
-                    const productStr = activeItems.map(i => `${i.product} ${i.quantity}개`).join(', ');
+                    
+                    let status = "미입금";
+                    if (isCard) status = "카드결제";
+                    else if (isPaid) status = "입금완료";
+                    
+                    const productNames = activeItems.map(i => i.product).join('\n');
+                    const productQtys = activeItems.map(i => i.quantity).join('\n');
+                    const safePhone = addrInfo.data.phone ? "'" + addrInfo.data.phone : '';
 
                     payloadData.push({
-                        date: new Date().toLocaleString(), status: status, nickname: nick, product_with_qty: productStr,
-                        realname: addrInfo.data.realname, phone: addrInfo.data.phone, address: fullAddress, memo: addrInfo.data.memo
+                        date: new Date().toLocaleString(), status: status, nickname: nick, 
+                        product: productNames, quantity: productQtys,
+                        realname: addrInfo.data.realname, phone: safePhone, address: fullAddress, memo: addrInfo.data.memo
                     });
-                    activeItems.forEach(i => processedOrderIds.push(i.id));
                 });
 
-                if (payloadData.length === 0) return openModal("현재 직원 시트로 전송할 '입금+주소 완료' 신규 주문이 없습니다.", "alert");
+                if (payloadData.length === 0) {
+                    if (!isSilent) openModal("현재 직원 시트로 전송할 '주소 완료' 유효 주문이 없습니다.", "alert");
+                    return;
+                }
 
-                openModal(`총 ${payloadData.length}명의 확정 주문을 직원 시트로 전송하시겠습니까?`, "confirm", async () => {
-                    setIsSendingEmp(true);
-                    try {
-                        const response = await fetchGas(googleScriptUrl, { action: 'send_to_employee', employee_sheet_id: employeeSheetId, sheet_tab_name: broadcastName, data: payloadData });
-                        if(response.success !== false) {
-                            setOrders(prev => prev.map(o => processedOrderIds.includes(o.id) ? { ...o, isSentToEmp: true } : o));
-                            openModal("직원 시트로 성공적으로 전송되었습니다!\n(전송된 주문은 초록색 체크가 표시됩니다.)", "alert");
-                        }
-                    } catch(e) { 
-                        openModal("전송 실패: " + e.message, "alert"); 
-                    } finally { setIsSendingEmp(false); }
+                if (!isSilent) setIsSendingEmp(true);
+                try {
+                    // action을 'sync_to_employee'로 변경. 구글 앱스 스크립트에서도 이 이름으로 받아야 합니다!
+                    const response = await fetchGas(googleScriptUrl, { action: 'sync_to_employee', employee_sheet_id: employeeSheetId, sheet_tab_name: broadcastName, data: payloadData });
+                    if(response.success !== false) {
+                        setOrders(prev => prev.map(o => ({ ...o, isSentToEmp: true })));
+                        if (!isSilent) openModal("직원 시트 전체 동기화(덮어쓰기)가 완료되었습니다!", "alert");
+                    }
+                } catch(e) { 
+                    if (!isSilent) openModal("동기화 전송 실패: " + e.message, "alert"); 
+                } finally { 
+                    if (!isSilent) setIsSendingEmp(false); 
+                }
+            }, [employeeSheetId, orders, addressLookup, cardPayments, getCalculatedShipping, googleScriptUrl, broadcastName, openModal, setOrders]);
+
+            const handleSendToEmployee = () => {
+                openModal(`현재 유효한 주문 전체를 송장 시트에 '전체 덮어쓰기' 하시겠습니까?`, "confirm", () => {
+                    syncToEmployeeSheet(false);
                 });
             };
+
+            // 🌟 60초마다 자동으로 백그라운드에서 송장 시트 덮어쓰기 동기화 🌟
+            useEffect(() => {
+                const interval = setInterval(() => {
+                    if (employeeSheetId && orders.length > 0) {
+                        syncToEmployeeSheet(true);
+                    }
+                }, 60000); 
+                return () => clearInterval(interval);
+            }, [syncToEmployeeSheet, employeeSheetId, orders.length]);
 
             const handleManualSubmit = (e) => { e.preventDefault(); if(!manualNick.trim()) return openModal("닉네임을 입력해주세요.", 'alert'); bringToTop(manualNick); addOrderLogic(manualNick, manualProduct, 1, false, null, manualPrice, true); setManualNick(''); if (!isFixedProductMode) { setManualProduct(''); setManualPrice(''); } };
             const handleDepositClick = (dep) => {
@@ -1478,8 +1533,9 @@
                             <div className="flex justify-between items-center">
                                 <span className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1"><Icon name="package" weight="fill"/> 주문서 <span className="text-xs font-normal text-slate-500">({filteredGroupedOrders.length}명 / {totalItemsCount}건)</span></span>
                                 <div className="flex items-center gap-1.5">
-                                    <button onClick={handleSendToEmployee} disabled={isSendingEmp} className={`px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1 shadow-sm transition-colors ${isSendingEmp ? 'bg-slate-400 text-slate-200 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 text-white'}`} title="확정된 주문을 직원 시트로 쏩니다">
-                                        {isSendingEmp ? <Icon name="spinner" className="animate-spin" /> : <Icon name="paper-plane-right" weight="fill" />} 송장 시트로 전송
+                                    <span className="text-[9px] text-blue-500 dark:text-blue-400 font-bold animate-pulse flex items-center gap-0.5" title="1분마다 직원 시트에 자동으로 덮어쓰기 동기화 중입니다."><Icon name="arrows-clockwise" weight="bold" /> 자동 동기화 중</span>
+                                    <button onClick={handleSendToEmployee} disabled={isSendingEmp} className={`px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1 shadow-sm transition-colors ${isSendingEmp ? 'bg-slate-400 text-slate-200 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 text-white'}`} title="현재 주문 상태를 직원 시트에 전체 덮어쓰기 합니다.">
+                                        {isSendingEmp ? <Icon name="spinner" className="animate-spin" /> : <Icon name="paper-plane-right" weight="fill" />} 수동 전체 동기화
                                     </button>
                                     <button onClick={handleResetAllData} className="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1 shadow-sm transition-colors"><Icon name="trash" weight="fill"/> 데이터 전체 초기화</button>
                                 </div>
@@ -1531,7 +1587,7 @@
                         </div>
                     </div>
 
-                    <div className="w-[20%] flex flex-col bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-lg overflow-hidden shadow-sm min-w-[200px]">
+                    <div className="w-[15%] flex flex-col bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-lg overflow-hidden shadow-sm min-w-[160px]">
                         <div className="p-2 bg-slate-100 dark:bg-slate-800 border-b dark:border-slate-700 flex flex-col gap-2">
                             <div className="font-bold text-slate-800 dark:text-slate-200 flex items-center justify-between">
                                 <span className="flex items-center gap-1"><Icon name="money" weight="fill"/> 입금 내역</span>
@@ -1565,7 +1621,7 @@
                         <div className="p-1 bg-white dark:bg-slate-800 text-center font-bold text-[10px] border-t dark:border-slate-700">총: <span className="text-slate-800 dark:text-slate-200 text-xs">{totalDepositAmount.toLocaleString()}</span>원</div>
                     </div>
 
-                    <div className="w-[18%] flex flex-col bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-lg overflow-hidden shadow-sm min-w-[180px]">
+                    <div className="w-[25%] flex flex-col bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-lg overflow-hidden shadow-sm min-w-[250px]">
                         <div className="p-2 bg-slate-100 dark:bg-slate-800 border-b dark:border-slate-700 flex flex-col gap-2">
                             <div className="font-bold text-slate-800 dark:text-slate-200 flex items-center justify-between">
                                 <span className="flex items-center gap-1"><Icon name="address-book" weight="fill"/> 실시간 주소록</span>
@@ -1720,8 +1776,26 @@
                     const addrInfo = addresses.find(a => normalizeString(a.nickname) === normalizeString(nick)) || {}; 
                     const fullAddress = addrInfo.zipcode ? `(${addrInfo.zipcode}) ${addrInfo.address || ''}` : (addrInfo.address || ''); 
                     const statusColumn = isCard ? "카드결제" : (isPaid ? "" : "미입금");
-                    const createRow = (productValue) => ({ '날짜시간': new Date().toLocaleString(), '공란1': '', '입금상태': statusColumn, '닉네임': nick, '주문제품(수량)': productValue, '이름': addrInfo.realname || '', '핸드폰번호': addrInfo.phone || '', '주소': fullAddress, '배송메모': addrInfo.memo || '' }); 
-                    excelRows.push(createRow(`[ ${nick} ]`)); items.forEach(item => { const qtyPart = item.quantity > 1 ? ` ★${item.quantity}개` : ''; excelRows.push(createRow(`${item.product}${qtyPart}`)); }); 
+                    
+                    // 전화번호 010 유지 및 주문제품과 수량 완전 분리
+                    const safePhone = addrInfo.phone ? "'" + addrInfo.phone : '';
+                    const createRow = (productName, qty) => ({ 
+                        '날짜시간': new Date().toLocaleString(), 
+                        '공란1': '', 
+                        '입금상태': statusColumn, 
+                        '닉네임': nick, 
+                        '주문제품': productName, 
+                        '수량': qty,
+                        '이름': addrInfo.realname || '', 
+                        '핸드폰번호': safePhone, 
+                        '주소': fullAddress, 
+                        '배송메모': addrInfo.memo || '' 
+                    }); 
+                    
+                    excelRows.push(createRow(`[ ${nick} ]`, '')); 
+                    items.forEach(item => { 
+                        excelRows.push(createRow(item.product, item.quantity)); 
+                    }); 
                 }); 
                 downloadExcel(excelRows, '고객별_정산_배송리스트'); 
             };
