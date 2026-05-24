@@ -1835,33 +1835,71 @@
                 downloadExcel(excelRows, '고객별_정산_배송리스트'); 
             };
 
-            const handleExportUnpaid = () => {
-                const groups = {}; orders.forEach(o => { if (!groups[o.customer]) groups[o.customer] = []; groups[o.customer].push(o); });
-                const data = []; Object.entries(groups).forEach(([nick, items]) => {
-                    if (cardPayments && cardPayments[nick]) return; 
-                    const activeItems = items.filter(i => !i.isCancelled); if (activeItems.length === 0) return;
+            // 🚨 미입금자 리스트를 "전체 고객 카톡 전송 메시지 다운로드" 기능으로 변경
+            const handleExportAllMessages = () => {
+                const groups = {}; 
+                orders.forEach(o => { if (!groups[o.customer]) groups[o.customer] = []; groups[o.customer].push(o); });
+                
+                // 설정값 불러오기
+                const templateConfigStr = localStorage.getItem('templateConfig');
+                const templateConfig = templateConfigStr ? JSON.parse(templateConfigStr) : { emoji: '💙', paidMsg: '😍 완납 확인! 감사합니다 😍', unpaidPrefix: '[미입금]\n총 입금하실 금액\n👉', addrNotice: '※ 배송지 변경 시 채팅으로 변경할 주소를 남겨주세요!', surveyNotice: '방송마다 1회 하단의 주문서(배송지입력) 필수!!', alwaysRequestAddress: false };
+                const bankStr = localStorage.getItem('bankAccount') || "카카오뱅크 김선정\n7942 18 01611";
+                const sentAddressRequestsStr = localStorage.getItem('sentAddressRequests');
+                const sentAddressRequests = sentAddressRequestsStr ? new Set(JSON.parse(sentAddressRequestsStr)) : new Set();
+                
+                const data = []; 
+                Object.entries(groups).forEach(([nick, items]) => {
+                    const activeItems = items.filter(i => !i.isCancelled); 
+                    if (activeItems.length === 0) return;
+                    
+                    const isCard = cardPayments && cardPayments[nick];
                     const productTotal = activeItems.reduce((sum, i) => sum + Number(i.price), 0);
                     const currentShipping = getCalculatedShipping(nick, productTotal);
-                    const grandTotal = productTotal + (activeItems.length > 0 ? currentShipping : 0);
-                    const depositTotal = items.reduce((sum, i) => sum + (i.deposit || 0), 0); const balance = grandTotal - depositTotal;
-                    if (balance > 0) { 
-                        let itemListText = activeItems.map(item => {
-                            const unitPrice = item.quantity > 0 ? item.price / item.quantity : 0;
-                            return `${item.product}${item.quantity > 1 ? ` (${item.quantity}개)` : ''} ${unitPrice.toLocaleString()}원`;
-                        }).join('\n');
-                        if (currentShipping > 0) itemListText += `\n배송비 ${currentShipping.toLocaleString()}원`;
-                        
-                        const { emoji, unpaidPrefix } = JSON.parse(localStorage.getItem('templateConfig') || "{}");
-                        const bankStr = localStorage.getItem('bankAccount') || FIXED_BANK_ACCOUNT;
-                        const msgText = `${emoji} ${nick} 님 ${emoji}\n[${broadcastName} 주문목록]\n${itemListText}\n\n총 주문금액: ${grandTotal.toLocaleString()}원\n입금확인: ${depositTotal.toLocaleString()}원\n미입금액: ${balance.toLocaleString()}원\n------------------\n${unpaidPrefix || '[미입금] 총 입금하실 금액 👉'}\n${bankStr}\n입금 부탁드립니다 🙏`;
-                        
-                        data.push({ '닉네임': nick, '주문내역 (상세)': itemListText, '총금액': grandTotal.toLocaleString() + '원', '입금액': depositTotal.toLocaleString() + '원', '미입금액': balance.toLocaleString() + '원', '카톡안내메시지': msgText });
+                    const baseGrandTotal = productTotal + currentShipping;
+                    const depositTotal = items.reduce((sum, i) => sum + (i.deposit || 0), 0); 
+                    const baseBalance = baseGrandTotal - depositTotal;
+                    
+                    const cardFee = (isCard && baseBalance > 0) ? baseBalance * 0.1 : 0;
+                    const grandTotal = baseGrandTotal + cardFee;
+                    const balance = baseBalance + cardFee;
+
+                    const itemListTextForMsg = activeItems.map(i => `${i.product}${i.quantity > 1 ? ` ★${i.quantity}개` : ''} ${Number(i.price).toLocaleString()}원`).join('\n');
+                    const itemListTextForExcel = activeItems.map(i => `${i.product}(${i.quantity}개)`).join(', '); // 상품명 컬럼용
+                    
+                    const addrInfo = findAddress(nick) || {};
+                    
+                    // 메시지 생성 로직 (copyOrderSheet와 동일)
+                    let msg = `${templateConfig.emoji} ${nick} 님 ${templateConfig.emoji}\n\n[${broadcastName} 주문목록]\n${itemListTextForMsg}\n배송비 ${currentShipping.toLocaleString()}원\n\n총 주문금액 ${grandTotal.toLocaleString()}원\n------------------\n`;
+                    if (isCard) { 
+                        const cardBase = Math.max(0, balance);
+                        if (depositTotal > 0) msg += `[입금확인]\n${depositTotal.toLocaleString()}원\n------------------\n\n`; 
+                        msg += `[카드결제]\n금액 ${cardBase.toLocaleString()}원\n수수료(10%) ${(cardBase * 0.1).toLocaleString()}원\n👉결제요청액 ${(cardBase * 1.1).toLocaleString()}원 예정\n\n핸드폰번호 남겨주세요🌸\n------------------\n\n`; 
+                    } else { 
+                        const isPaid = (balance <= 0) && (grandTotal >= 0); 
+                        if (depositTotal > 0) msg += `[입금확인]\n${depositTotal.toLocaleString()}원\n------------------\n\n`; 
+                        if (isPaid) msg += `${templateConfig.paidMsg}\n------------------\n`; 
+                        else msg += `${templateConfig.unpaidPrefix}\n${(balance > 0 ? balance : 0).toLocaleString()}원 \n\n${bankStr}\n입금 부탁드립니다 🙏\n------------------\n\n`; 
                     }
+
+                    if (addrInfo && addrInfo.address && !templateConfig.alwaysRequestAddress) {
+                        msg += `\n[배송지 확인]\n\n${addrInfo.realname || nick}\n${addrInfo.phone || ''}\n${addrInfo.address} ${addrInfo.zipcode ? `(${addrInfo.zipcode})` : ''}\n${addrInfo.memo ? addrInfo.memo + '\n' : ''}\n------------------\n${templateConfig.addrNotice}`;
+                    } else if (!sentAddressRequests.has(nick) || templateConfig.alwaysRequestAddress) { 
+                        msg += `\n${templateConfig.surveyNotice}`; 
+                    }
+                    
+                    data.push({ 
+                        '닉네임': nick, 
+                        '상품명': itemListTextForExcel, 
+                        '가격': grandTotal.toLocaleString() + '원', 
+                        '입금액': depositTotal.toLocaleString() + '원', 
+                        '카톡전송메세지': msg 
+                    });
                 });
-                if (data.length === 0) { openModal("미입금 내역이 없습니다.", "alert"); return; }
+                
+                if (data.length === 0) { openModal("주문 내역이 없습니다.", "alert"); return; }
                 data.sort((a, b) => String(a['닉네임'] || '').localeCompare(String(b['닉네임'] || '')));
-                downloadExcel(data, '미입금자_상세리스트');
-           };
+                downloadExcel(data, '전체고객_카톡메세지_리스트');
+            };
 
            const handlePrintPackingList = () => {
                const groups = {};
@@ -1937,10 +1975,11 @@
                             <p className="text-slate-500 dark:text-slate-400 mb-4 text-xs">완납 상단 / 카드 중간 / 노쇼 하단 자동 정렬</p>
                             <button onClick={handleExportCustomers} className="w-full bg-slate-700 text-white font-bold py-3 rounded-lg transition-transform hover:scale-105 shadow-md flex items-center justify-center gap-2 hover:bg-slate-800"><Icon name="download-simple" weight="bold"/> 엑셀 다운로드</button>
                         </div>
-                        <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-lg border dark:border-slate-700 text-center ring-2 ring-red-100 dark:ring-red-900/30">
-                            <h2 className="text-lg font-bold mb-2 text-red-600 dark:text-red-400 flex items-center justify-center gap-2"><Icon name="warning-circle" weight="fill"/> 미입금자 상세 리스트</h2>
-                            <p className="text-slate-500 dark:text-slate-400 mb-4 text-xs">입금을 완료하지 않은 노쇼 고객 목록</p>
-                            <button onClick={handleExportUnpaid} className="w-full bg-red-500 text-white font-bold py-3 rounded-lg transition-transform hover:scale-105 shadow-md flex items-center justify-center gap-2 hover:bg-red-600"><Icon name="download-simple" weight="bold"/> 엑셀 다운로드</button>
+                        {/* 👇 이 부분이 전체 카톡 전송 메시지 다운로드로 변경되었습니다 👇 */}
+                        <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-lg border dark:border-slate-700 text-center ring-2 ring-blue-100 dark:ring-blue-900/30">
+                            <h2 className="text-lg font-bold mb-2 text-blue-600 dark:text-blue-400 flex items-center justify-center gap-2"><Icon name="chat-circle-dots" weight="fill"/> 전체 카톡 전송 메시지</h2>
+                            <p className="text-slate-500 dark:text-slate-400 mb-4 text-xs">전체 고객 대상 카톡 메시지 일괄 다운로드</p>
+                            <button onClick={handleExportAllMessages} className="w-full bg-blue-500 text-white font-bold py-3 rounded-lg transition-transform hover:scale-105 shadow-md flex items-center justify-center gap-2 hover:bg-blue-600"><Icon name="download-simple" weight="bold"/> 엑셀 다운로드</button>
                         </div>
                         <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-lg border dark:border-slate-700 text-center ring-2 ring-slate-200 dark:ring-slate-900/30">
                             <h2 className="text-lg font-bold mb-2 text-slate-700 dark:text-slate-300 flex items-center justify-center gap-2"><Icon name="printer" weight="fill"/> 포장 리스트 인쇄</h2>
