@@ -158,11 +158,10 @@
 
         // ============================================
         // 컴포넌트: Modals
-        // ============================================
         const Modal = ({ isOpen, type, message, onConfirm, onCancel, initialValue }) => {
-            const [inputValue, setInputValue] = useState(initialValue || '');
+            const [inputValue, setInputValue] = useState('');
             const inputRef = useRef(null);
-            
+
             useEffect(() => {
                 const handleKeyDown = (e) => {
                     if (!isOpen) return;
@@ -971,37 +970,31 @@
                         }
                     } catch (e) {
                         setGlobalError(`🚨 통신 오류: ${e.message}`);
-                        // 🚨 이전에는 여기에 return; 이 있어서 주문서 파싱까지 멈춰버렸습니다. (삭제 완료)
                     }
 
                     try {
                         const dataOrd = await fetchGas(`${googleScriptUrl}${separator}action=get_approved_orders&t=${Date.now()}`);
                         if (dataOrd && dataOrd.success && dataOrd.approved_orders && dataOrd.approved_orders.length > 0) {
-                            const rowIndices = [];
                             
                             setOrders(prev => {
                                 const next = [...prev];
-                                let hasNew = false; // 새 주문이 추가되었는지 확인
+                                let hasNew = false;
+                                const nowTime = Date.now();
 
                                 dataOrd.approved_orders.forEach(row => {
                                     const cNick = String(row.nickname).replace(/@/g, '').trim();
                                     const cContent = String(row.product).trim();
                                     const qty = Number(row.quantity) || 1;
                                     
-                                    // 🚨 핵심 방어: 시트가 'O' 처리를 늦게 하더라도 웹에서 2번 추가하지 않도록 고유 서명 기억
-                                    const signature = `${row.time}_${cNick}_${cContent}_${qty}`;
+                                    const signature = `${row.rowIndex}_${row.time}_${cNick}_${cContent}`;
                                     
-                                    if (processedOrdersRef.current.has(signature)) {
-                                        // 이미 화면에 들어온 주문이면 화면 추가는 건너뛰고 시트 마킹(O)만 다시 요청
-                                        rowIndices.push(row.rowIndex);
+                                    if (recentProcessedRef.current[signature] && (nowTime - recentProcessedRef.current[signature] < 10000)) {
                                         return;
                                     }
                                     
-                                    processedOrdersRef.current.add(signature);
-                                    rowIndices.push(row.rowIndex);
+                                    recentProcessedRef.current[signature] = nowTime;
                                     hasNew = true;
 
-                                    // 🚨 치명적 버그 수정: inventory가 배열이 아닐 때 터지는 현상 완벽 방어
                                     const inv = inventoryRef.current;
                                     const invItem = Array.isArray(inv) ? inv.find(i => String(i.name).trim() === cContent) : null;
                                     const price = invItem ? Number(invItem.price) : (productHistoryRef.current[cContent] || 0);
@@ -1013,10 +1006,9 @@
                                 });
                                 return hasNew ? next : prev;
                             });
-
-                            if (rowIndices.length > 0) {
-                                fetchGas(googleScriptUrl, { action: 'mark_orders_done', rowIndices: rowIndices }).catch(e => console.log(e));
-                            }
+                            
+                            // 🚨 기존에 있던 이중 통신(mark_orders_done POST 요청) 코드 완전 삭제!!
+                            // 이제 구글 백엔드가 알아서 O를 즉시 찍어버리므로 여기서 두 번 요청할 필요가 없습니다.
                         }
                     } catch(e) {
                         setGlobalError(`🚨 라이브댓글 통신 오류: ${e.message}`);
