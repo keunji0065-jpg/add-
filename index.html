@@ -6,7 +6,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <title>깔로 주문서 PRO - 초고속 관제탑 버전</title>
+    <title>깔로 주문서 PRO - </title>
     
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin="anonymous"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
@@ -1329,7 +1329,7 @@
                 orders.forEach(o => { if(!groups[o.customer]) groups[o.customer]=[]; groups[o.customer].push(o); });
 
                 Object.entries(groups).forEach(([nick, items]) => {
-                    // 🚨 핵심 수정: 이미 전송된 건(!i.isSentToEmp) 필터링 삭제. 취소 안된 모든 유효 주문을 수집!
+                    // 🚨 취소 안된 모든 유효 주문을 수집!
                     const activeItems = items.filter(i => !i.isCancelled);
                     if (activeItems.length === 0) return;
 
@@ -1349,14 +1349,15 @@
                     if (isCard) status = "카드결제";
                     else if (isPaid) status = "입금완료";
                     
-                    const productNames = activeItems.map(i => i.product).join('\n');
-                    const productQtys = activeItems.map(i => i.quantity).join('\n');
                     const safePhone = addrInfo.data.phone ? "'" + addrInfo.data.phone : '';
 
-                    payloadData.push({
-                        date: new Date().toLocaleString(), status: status, nickname: nick, 
-                        product: productNames, quantity: productQtys,
-                        realname: addrInfo.data.realname, phone: safePhone, address: fullAddress, memo: addrInfo.data.memo
+                    // 🚨 제품 및 수량을 개별 행(Row)으로 완벽히 분리하여 전송
+                    activeItems.forEach(item => {
+                        payloadData.push({
+                            date: new Date().toLocaleString(), status: status, nickname: nick, 
+                            product: item.product, quantity: item.quantity,
+                            realname: addrInfo.data.realname, phone: safePhone, address: fullAddress, memo: addrInfo.data.memo
+                        });
                     });
                 });
 
@@ -1367,8 +1368,8 @@
 
                 if (!isSilent) setIsSendingEmp(true);
                 try {
-                    // action을 'sync_to_employee'로 변경. 구글 앱스 스크립트에서도 이 이름으로 받아야 합니다!
-                    const response = await fetchGas(googleScriptUrl, { action: 'sync_to_employee', employee_sheet_id: employeeSheetId, sheet_tab_name: broadcastName, data: payloadData });
+                    // 🚨 백엔드(구글 스크립트) 코드와 완벽하게 일치하도록 액션 이름을 'send_to_employee'로 수정!
+                    const response = await fetchGas(googleScriptUrl, { action: 'send_to_employee', employee_sheet_id: employeeSheetId, sheet_tab_name: broadcastName, data: payloadData });
                     if(response.success !== false) {
                         setOrders(prev => prev.map(o => ({ ...o, isSentToEmp: true })));
                         if (!isSilent) openModal("직원 시트 전체 동기화(덮어쓰기)가 완료되었습니다!", "alert");
