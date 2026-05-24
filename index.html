@@ -616,6 +616,7 @@
             const [quickAddrModal, setQuickAddrModal] = useState({ isOpen: false, nick: '', editData: null });
             
             const sortOrderCache = useRef([]);
+            const processedOrdersRef = useRef(new Set()); // 🚨 중복 데이터 방지용 철통 방어 캐시
 
             useEffect(() => {
                 const handleKeyDown = (e) => {
@@ -974,11 +975,25 @@
                             
                             setOrders(prev => {
                                 const next = [...prev];
+                                let hasNew = false; // 새 주문이 추가되었는지 확인
+
                                 dataOrd.approved_orders.forEach(row => {
-                                    rowIndices.push(row.rowIndex);
                                     const cNick = String(row.nickname).replace(/@/g, '').trim();
                                     const cContent = String(row.product).trim();
                                     const qty = Number(row.quantity) || 1;
+                                    
+                                    // 🚨 핵심 방어: 시트가 'O' 처리를 늦게 하더라도 웹에서 2번 추가하지 않도록 고유 서명 기억
+                                    const signature = `${row.time}_${cNick}_${cContent}_${qty}`;
+                                    
+                                    if (processedOrdersRef.current.has(signature)) {
+                                        // 이미 화면에 들어온 주문이면 화면 추가는 건너뛰고 시트 마킹(O)만 다시 요청
+                                        rowIndices.push(row.rowIndex);
+                                        return;
+                                    }
+                                    
+                                    processedOrdersRef.current.add(signature);
+                                    rowIndices.push(row.rowIndex);
+                                    hasNew = true;
 
                                     const invItem = inventoryRef.current.find(i => String(i.name).trim() === cContent);
                                     const price = invItem ? Number(invItem.price) : (productHistoryRef.current[cContent] || 0);
@@ -988,10 +1003,12 @@
                                         quantity: qty, price: price * qty, deposit: 0, isCancelled: false, isUnmodified: true, isSentToEmp: false
                                     });
                                 });
-                                return next;
+                                return hasNew ? next : prev;
                             });
 
-                            fetchGas(googleScriptUrl, { action: 'mark_orders_done', rowIndices: rowIndices }).catch(e => console.log(e));
+                            if (rowIndices.length > 0) {
+                                fetchGas(googleScriptUrl, { action: 'mark_orders_done', rowIndices: rowIndices }).catch(e => console.log(e));
+                            }
                         }
                     } catch(e) {}
                 } catch (e) {}
