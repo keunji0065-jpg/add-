@@ -6,7 +6,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <title>깔로 주문서 PRO - </title>
+    <title>깔로 주문서 PRO - 초고속 관제탑 버전</title>
     
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin="anonymous"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
@@ -105,13 +105,19 @@
             if (text.includes("<!DOCTYPE") || text.includes("<html")) {
                 throw new Error("권한 에러(HTML 반환). 시트의 '새 배포' 시 '모든 사용자' 설정이 풀려있습니다.");
             }
+            
+            let data;
             try {
-                const data = JSON.parse(text);
-                if (data.error) throw new Error(data.error);
-                return data;
+                data = JSON.parse(text);
             } catch(e) {
-                throw new Error("데이터 파싱 에러");
+                throw new Error("데이터 파싱 에러 반환값: " + text.substring(0, 30) + "...");
             }
+            
+            if (data.error) {
+                throw new Error(data.error); // 진짜 에러 원인을 밖으로 던짐!
+            }
+            
+            return data;
         };
 
         const useLocalStorage = (key, initialValue) => {
@@ -965,7 +971,7 @@
                         }
                     } catch (e) {
                         setGlobalError(`🚨 통신 오류: ${e.message}`);
-                        return;
+                        // 🚨 이전에는 여기에 return; 이 있어서 주문서 파싱까지 멈춰버렸습니다. (삭제 완료)
                     }
 
                     try {
@@ -995,7 +1001,9 @@
                                     rowIndices.push(row.rowIndex);
                                     hasNew = true;
 
-                                    const invItem = inventoryRef.current.find(i => String(i.name).trim() === cContent);
+                                    // 🚨 치명적 버그 수정: inventory가 배열이 아닐 때 터지는 현상 완벽 방어
+                                    const inv = inventoryRef.current;
+                                    const invItem = Array.isArray(inv) ? inv.find(i => String(i.name).trim() === cContent) : null;
                                     const price = invItem ? Number(invItem.price) : (productHistoryRef.current[cContent] || 0);
 
                                     next.unshift({
@@ -1010,7 +1018,9 @@
                                 fetchGas(googleScriptUrl, { action: 'mark_orders_done', rowIndices: rowIndices }).catch(e => console.log(e));
                             }
                         }
-                    } catch(e) {}
+                    } catch(e) {
+                        setGlobalError(`🚨 라이브댓글 통신 오류: ${e.message}`);
+                    }
                 } catch (e) {}
             }, [googleScriptUrl, setOrders, setGlobalError]);
             
