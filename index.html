@@ -503,7 +503,7 @@
             return true;
         });
 
-        const CustomerBlock = memo(({ nick, items, isSelected, currentShipping, isCard, isPaidState, grandTotal, depositTotal, balance, baseGrandTotal, baseBalance, addr, addrType, addrConflict, addressMapping, autoDepositorName, displayDepositorName, isAutoDepositor, depositorNames, copyStatus, isOrderConfirmed, isEditingShipping, setSelectedNick, addOrderLogic, handleNicknameEdit, toggleCardPayment, handleShippingChange, setEditingShippingNick, openModal, setDepositorNames, handleFullDepositToggle, copyOrderSheet, handleOrderCheckToggle, handleAddressUnmapping, handleAddressMapping, handlePromoteAddress, handleProductChange, handleQuantityUpdate, handleOrderCancel, handleOrderDelete, toggleVIP, specialCustomers, onOpenQuickAddress, findAddressSuggestions }) => {
+        const CustomerBlock = memo(({ nick, items, isSelected, currentShipping, isCard, isPaidState, grandTotal, depositTotal, balance, baseGrandTotal, baseBalance, addr, addrType, addrConflict, addressMapping, autoDepositorName, displayDepositorName, isAutoDepositor, depositorNames, copyStatus, isOrderConfirmed, isEditingShipping, setSelectedNick, addOrderLogic, handleNicknameEdit, toggleCardPayment, handleShippingChange, setEditingShippingNick, openModal, setDepositorNames, handleFullDepositToggle, copyOrderSheet, handleOrderCheckToggle, handleAddressUnmapping, handleAddressMapping, handlePromoteAddress, handleProductChange, handleQuantityUpdate, handleOrderCancel, handleOrderDelete, toggleVIP, specialCustomers, onOpenQuickAddress, findAddressSuggestions, cashReceiptStatus, toggleCashReceipt }) => {
             let borderClass = 'border-transparent', headerBgClass = 'bg-white dark:bg-slate-800';
             if (isCard) { borderClass = 'border-slate-300 dark:border-slate-700 ring-1 ring-slate-300 dark:ring-slate-700'; headerBgClass = 'bg-slate-50 dark:bg-slate-800/80'; } 
             else if (!isPaidState && balance > 0) { borderClass = 'border-red-200 dark:border-red-900 ring-1 ring-red-200 dark:ring-red-900'; headerBgClass = 'bg-red-50 dark:bg-red-900/10'; } 
@@ -527,6 +527,7 @@
                                 <button onClick={(e) => { e.stopPropagation(); addOrderLogic(nick, '', 1); }} className="bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold hover:bg-slate-300 dark:hover:bg-slate-600 shrink-0" title="빈 상품줄 추가">+</button>
                                 <button onClick={(e)=>{e.stopPropagation(); handleNicknameEdit(nick);}} className="text-slate-400 dark:text-slate-500 hover:text-slate-700 shrink-0" title="닉네임 수정"><Icon name="pencil-simple" weight="bold" size={12}/></button>
                                 <button onClick={(e) => { e.stopPropagation(); toggleCardPayment(nick); }} className={`ml-1 text-[10px] px-1.5 py-0.5 rounded border transition-colors shrink-0 ${isCard ? 'bg-slate-700 dark:bg-slate-300 border-slate-800 dark:border-slate-200 text-white dark:text-slate-900 font-bold' : 'bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-400 border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-600'}`}>카드</button>
+                                <button onClick={(e) => { e.stopPropagation(); toggleCashReceipt(nick); }} className={`ml-1 text-[10px] px-1.5 py-0.5 rounded border transition-colors shrink-0 ${cashReceiptStatus ? 'bg-indigo-600 border-indigo-700 text-white font-bold shadow-inner' : 'bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-400 border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-600'}`} title="현금영수증 발급 요청">현영</button>
                                 
                                 <div onClick={(e) => e.stopPropagation()} className="ml-1 shrink-0">
                                     {isEditingShipping ? (
@@ -581,6 +582,7 @@
             );
         }, (prev, next) => {
             if (prev.nick !== next.nick || prev.isSelected !== next.isSelected || prev.currentShipping !== next.currentShipping || prev.isCard !== next.isCard || prev.isPaidState !== next.isPaidState || prev.grandTotal !== next.grandTotal || prev.depositTotal !== next.depositTotal || prev.balance !== next.balance || prev.isOrderConfirmed !== next.isOrderConfirmed || prev.isEditingShipping !== next.isEditingShipping || prev.displayDepositorName !== next.displayDepositorName || prev.addr?.address !== next.addr?.address || prev.addr?.realname !== next.addr?.realname || prev.addr?.phone !== next.addr?.phone || prev.copyStatus[prev.nick] !== next.copyStatus[next.nick] || !!prev.addrConflict !== !!next.addrConflict) return false;
+            if (prev.cashReceiptStatus !== next.cashReceiptStatus) return false;
             const pVip = prev.specialCustomers && prev.specialCustomers[normalizeString(prev.nick)]?.type === 'vip';
             const nVip = next.specialCustomers && next.specialCustomers[normalizeString(next.nick)]?.type === 'vip';
             if (pVip !== nVip) return false;
@@ -592,7 +594,7 @@
             return true;
         });
 
-        const LiveTab = ({ orders, setOrders, productHistory, setProductHistory, quickShipping, jejuShipping, freeShippingThreshold, shippingOverrides, setShippingOverrides, bankAccount, googleScriptUrl, inventoryScriptUrl, employeeSheetId, rawSheetId, addresses, setAddresses, cardPayments, setCardPayments, matchedDeposits, setMatchedDeposits, depositorNames, setDepositorNames, openModal, sentAddressRequests, setSentAddressRequests, deletedDepositIds, setDeletedDepositIds, checkedOrders, setCheckedOrders, addressMapping, setAddressMapping, templateConfig, specialCustomers, setSpecialCustomers, inventory, setInventory, quickMessages, handleResetAllData, broadcastName, setGlobalError, addressCutoffDate }) => {
+        const LiveTab = ({ orders, setOrders, productHistory, setProductHistory, quickShipping, jejuShipping, freeShippingThreshold, shippingOverrides, setShippingOverrides, bankAccount, googleScriptUrl, inventoryScriptUrl, employeeSheetId, rawSheetId, addresses, setAddresses, cardPayments, setCardPayments, matchedDeposits, setMatchedDeposits, depositorNames, setDepositorNames, openModal, sentAddressRequests, setSentAddressRequests, deletedDepositIds, setDeletedDepositIds, checkedOrders, setCheckedOrders, addressMapping, setAddressMapping, templateConfig, specialCustomers, setSpecialCustomers, inventory, setInventory, quickMessages, handleResetAllData, broadcastName, setGlobalError, addressCutoffDate, cashReceipts, setCashReceipts }) => {
             const [serverDeposits, setServerDeposits] = useState([]);
             const [manualDeposits, setManualDeposits] = useState([]);
             const [selectedNick, setSelectedNick] = useState(null);
@@ -1227,12 +1229,14 @@
                     if (val) {
                         const newN = val.replace(/@/g, '').trim(); setOrders(prev => prev.map(o => o.customer === old ? { ...o, customer: newN } : o));
                         if (shippingOverrides[old]) { setShippingOverrides(prev => { const n = {...prev, [newN]: prev[old]}; delete n[old]; return n; }); }
+                        if (cashReceipts[old]) { setCashReceipts(prev => { const n = {...prev, [newN]: prev[old]}; delete n[old]; return n; }); }
                         if (selectedNick === old) setSelectedNick(newN);
                     }
                 }, null, old);
-            }, [openModal, setOrders, shippingOverrides, setShippingOverrides, selectedNick, setSelectedNick]);
+            }, [openModal, setOrders, shippingOverrides, setShippingOverrides, selectedNick, setSelectedNick, cashReceipts, setCashReceipts]);
 
             const toggleCardPayment = useCallback((nick) => setCardPayments(prev => ({ ...prev, [nick]: !prev[nick] })), [setCardPayments]);
+            const toggleCashReceipt = useCallback((nick) => setCashReceipts(prev => ({ ...prev, [nick]: !prev[nick] })), [setCashReceipts]);
             const handleShippingChange = useCallback((nick, val) => { setShippingOverrides(prev => ({ ...prev, [nick]: val === '' ? 0 : Number(val) })); }, [setShippingOverrides]);
             const handleOrderCheckToggle = useCallback((nick) => setCheckedOrders(prev => { const next = new Set(prev); if (next.has(nick)) next.delete(nick); else next.add(nick); return next; }), [setCheckedOrders]);
             
@@ -1635,7 +1639,7 @@
                                 
                                 const { data: addrData, conflict: addrConflict, type: addrType } = addressLookup.get(nick);
                                 
-                                return (<CustomerBlock key={nick} nick={nick} items={items} isSelected={selectedNick === nick} currentShipping={ship} isCard={isCard} isPaidState={bal <= 0 && activeItems.length > 0} grandTotal={grand} depositTotal={depSum} balance={bal} baseGrandTotal={baseGrand} baseBalance={baseBal} addr={addrData} addrType={addrType} addrConflict={addrConflict} addressMapping={addressMapping} autoDepositorName={addrData?.realname || ''} displayDepositorName={depositorNames[nick] || addrData?.realname || '입금자'} isAutoDepositor={!depositorNames[nick] && addrData?.realname} depositorNames={depositorNames} copyStatus={copyStatus} isOrderConfirmed={checkedOrders.has(nick)} isEditingShipping={editingShippingNick === nick} setSelectedNick={setSelectedNick} addOrderLogic={addOrderLogic} handleNicknameEdit={handleNicknameEdit} toggleCardPayment={toggleCardPayment} handleShippingChange={handleShippingChange} setEditingShippingNick={setEditingShippingNick} openModal={openModal} setDepositorNames={setDepositorNames} handleFullDepositToggle={handleFullDepositToggle} copyOrderSheet={copyOrderSheet} handleOrderCheckToggle={handleOrderCheckToggle} handleAddressUnmapping={handleAddressUnmapping} handleAddressMapping={handleAddressMapping} handlePromoteAddress={handlePromoteAddress} handleProductChange={handleProductChange} handleQuantityUpdate={handleQuantityUpdate} handleOrderCancel={handleOrderCancel} handleOrderDelete={handleOrderDelete} toggleVIP={toggleVIP} specialCustomers={specialCustomers} onOpenQuickAddress={(nick) => setQuickAddrModal({ isOpen: true, nick, editData: null })} findAddressSuggestions={findAddressSuggestions} />);
+                                return (<CustomerBlock key={nick} nick={nick} items={items} isSelected={selectedNick === nick} currentShipping={ship} isCard={isCard} isPaidState={bal <= 0 && activeItems.length > 0} grandTotal={grand} depositTotal={depSum} balance={bal} baseGrandTotal={baseGrand} baseBalance={baseBal} addr={addrData} addrType={addrType} addrConflict={addrConflict} addressMapping={addressMapping} autoDepositorName={addrData?.realname || ''} displayDepositorName={depositorNames[nick] || addrData?.realname || '입금자'} isAutoDepositor={!depositorNames[nick] && addrData?.realname} depositorNames={depositorNames} copyStatus={copyStatus} isOrderConfirmed={checkedOrders.has(nick)} isEditingShipping={editingShippingNick === nick} setSelectedNick={setSelectedNick} addOrderLogic={addOrderLogic} handleNicknameEdit={handleNicknameEdit} toggleCardPayment={toggleCardPayment} handleShippingChange={handleShippingChange} setEditingShippingNick={setEditingShippingNick} openModal={openModal} setDepositorNames={setDepositorNames} handleFullDepositToggle={handleFullDepositToggle} copyOrderSheet={copyOrderSheet} handleOrderCheckToggle={handleOrderCheckToggle} handleAddressUnmapping={handleAddressUnmapping} handleAddressMapping={handleAddressMapping} handlePromoteAddress={handlePromoteAddress} handleProductChange={handleProductChange} handleQuantityUpdate={handleQuantityUpdate} handleOrderCancel={handleOrderCancel} handleOrderDelete={handleOrderDelete} toggleVIP={toggleVIP} specialCustomers={specialCustomers} onOpenQuickAddress={(nick) => setQuickAddrModal({ isOpen: true, nick, editData: null })} findAddressSuggestions={findAddressSuggestions} cashReceiptStatus={cashReceipts[nick]} toggleCashReceipt={toggleCashReceipt} />);
                             })}
                             {displayedOrders.length === 0 && (
                                 <div className="text-center text-slate-400 py-10 mt-10">
@@ -1773,7 +1777,7 @@
             );
         };
 
-        const OrderManagementTab = ({ orders, shippingOverrides, quickShipping, jejuShipping, freeShippingThreshold, broadcastName, addresses, handleExportBackup, handleImportBackup, addressMapping, cardPayments, specialCustomers, openModal }) => {
+        const OrderManagementTab = ({ orders, shippingOverrides, quickShipping, jejuShipping, freeShippingThreshold, broadcastName, addresses, handleExportBackup, handleImportBackup, addressMapping, cardPayments, specialCustomers, openModal, cashReceipts, inventory, productHistory }) => {
             const findAddress = (nick) => {
                 if (addressMapping[nick]) return addresses.find(a => normalizeString(a.nickname) === normalizeString(addressMapping[nick]));
                 return addresses.find(a => normalizeString(a.nickname) === normalizeString(nick));
@@ -1811,7 +1815,16 @@
                     summary[name] += Number(o.quantity); if (customerPaidStatus[o.customer]) paidSummary[name] += Number(o.quantity); else unpaidSummary[name] += Number(o.quantity);
                 }); 
                 const sortedKeys = Object.keys(summary).filter(product => summary[product] > 0).sort((a, b) => a.localeCompare(b, 'ko', { numeric: true }));
-                const data = sortedKeys.map(product => ({ '상품명': product, '입금완료 수량': paidSummary[product]||0, '미입금 수량': (summary[product]||0) - (paidSummary[product]||0) })); 
+                const data = sortedKeys.map(product => {
+                    const invItem = inventory && Array.isArray(inventory) ? inventory.find(i => String(i.name).trim() === String(product).trim()) : null;
+                    const price = invItem ? Number(invItem.price) : (productHistory && productHistory[product] ? Number(productHistory[product]) : 0);
+                    return { 
+                        '상품명': product, 
+                        '제품금액': price,
+                        '입금완료 수량': paidSummary[product]||0, 
+                        '미입금 수량': (summary[product]||0) - (paidSummary[product]||0) 
+                    };
+                }); 
                 downloadExcel(data, '상품별_발주리스트'); 
             };
 
@@ -1924,6 +1937,34 @@
                 downloadExcel(data, '전체고객_카톡메세지_리스트');
             };
 
+            const handleExportCashReceipts = () => {
+                const groups = {}; 
+                orders.forEach(o => { if (!groups[o.customer]) groups[o.customer] = []; groups[o.customer].push(o); });
+                
+                const data = []; 
+                Object.entries(groups).forEach(([nick, items]) => {
+                    if (!cashReceipts || !cashReceipts[nick]) return;
+                    
+                    const activeItems = items.filter(i => !i.isCancelled); 
+                    if (activeItems.length === 0) return;
+                    
+                    const depositTotal = items.reduce((sum, i) => sum + (i.deposit || 0), 0); 
+                    const addrInfo = findAddress(nick) || {};
+                    const phone = addrInfo.phone || '';
+                    
+                    data.push({ 
+                        '방송명': broadcastName, 
+                        '닉네임': nick, 
+                        '금액': depositTotal, 
+                        '전화번호': phone 
+                    });
+                });
+                
+                if (data.length === 0) { openModal("현금영수증 요청자로 체크(현영)된 고객이 없습니다.", "alert"); return; }
+                data.sort((a, b) => String(a['닉네임'] || '').localeCompare(String(b['닉네임'] || '')));
+                downloadExcel(data, '현금영수증_요청리스트');
+            };
+
            const handlePrintPackingList = () => {
                const groups = {};
                orders.forEach(o => {
@@ -2009,6 +2050,11 @@
                             <p className="text-slate-500 dark:text-slate-400 mb-4 text-xs">감열지 10x15cm 세로 양식 (닉네임 오름차순 정렬)</p>
                             <button onClick={handlePrintPackingList} className="w-full bg-slate-600 text-white font-bold py-3 rounded-lg transition-transform hover:scale-105 shadow-md flex items-center justify-center gap-2 hover:bg-slate-700"><Icon name="printer" weight="bold"/> 10x15cm 인쇄</button>
                         </div>
+                        <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-lg border dark:border-slate-700 text-center ring-2 ring-indigo-100 dark:ring-indigo-900/30">
+                            <h2 className="text-lg font-bold mb-2 text-indigo-600 dark:text-indigo-400 flex items-center justify-center gap-2"><Icon name="receipt" weight="fill"/> 현금영수증 요청 리스트</h2>
+                            <p className="text-slate-500 dark:text-slate-400 mb-4 text-xs">현영 체크된 고객의 (방송명/닉네임/금액/전화번호) 추출</p>
+                            <button onClick={handleExportCashReceipts} className="w-full bg-indigo-500 text-white font-bold py-3 rounded-lg transition-transform hover:scale-105 shadow-md flex items-center justify-center gap-2 hover:bg-indigo-600"><Icon name="download-simple" weight="bold"/> 엑셀 다운로드</button>
+                        </div>
                         <div className="col-span-2 bg-slate-100 dark:bg-slate-800 p-6 rounded-xl border dark:border-slate-700 flex flex-row items-center justify-between">
                             <div className="text-left">
                                 <h2 className="text-lg font-bold mb-2 text-slate-800 dark:text-slate-200 flex items-center gap-2"><Icon name="database" weight="fill"/> 전체 데이터 백업 / 복구</h2>
@@ -2036,6 +2082,7 @@
             const [shippingOverrides, setShippingOverrides] = useLocalStorage('shippingOverrides', {});
             const [addresses, setAddresses] = useLocalStorage('verifiedAddresses', []);
             const [cardPayments, setCardPayments] = useLocalStorage('cardPayments', {});
+            const [cashReceipts, setCashReceipts] = useLocalStorage('cashReceipts', {});
             const [isDarkMode, setIsDarkMode] = useLocalStorage('darkMode', false);
             
             const [matchedDeposits, setMatchedDeposits] = useState(() => { const s = localStorage.getItem('matchedDeposits'); return s ? new Set(JSON.parse(s)) : new Set(); });
@@ -2075,7 +2122,7 @@
             
             const handleResetAllData = useCallback(() => {
                 openModal("방송 데이터를 완전히 초기화하시겠습니까?\n(입금내역, 주문서, 재고 기록이 영구 삭제됩니다.\n※ 주소록 및 VIP 명단은 절대 지워지지 않습니다!)", 'confirm', () => {
-                    const keysToRemove = ['youtubeOrders', 'cardPayments', 'shippingOverrides', 'matchedDeposits', 'sentAddressRequests', 'deletedDepositIds', 'checkedOrders', 'productInventory', 'productHistory', 'ignoredAutoMatch'];
+                    const keysToRemove = ['youtubeOrders', 'cardPayments', 'cashReceipts', 'shippingOverrides', 'matchedDeposits', 'sentAddressRequests', 'deletedDepositIds', 'checkedOrders', 'productInventory', 'productHistory', 'ignoredAutoMatch'];
                     keysToRemove.forEach(k => localStorage.removeItem(k));
                     window.location.reload();
                 });
@@ -2083,7 +2130,7 @@
 
             const handleExportBackup = () => {
                 const backupData = [{ 
-                    orders, productHistory, shippingOverrides, cardPayments, 
+                    orders, productHistory, shippingOverrides, cardPayments, cashReceipts,
                     matchedDeposits: [...matchedDeposits], addressMapping, 
                     specialCustomers, inventory, templateConfig, depositorNames,
                     addresses, deletedDepositIds: [...deletedDepositIds],
@@ -2116,6 +2163,7 @@
                         if(data.productHistory) setProductHistory(data.productHistory);
                         if(data.shippingOverrides) setShippingOverrides(data.shippingOverrides);
                         if(data.cardPayments) setCardPayments(data.cardPayments);
+                        if(data.cashReceipts) setCashReceipts(data.cashReceipts);
                         if(data.matchedDeposits) setMatchedDeposits(new Set(data.matchedDeposits));
                         if(data.addressMapping) setAddressMapping(data.addressMapping);
                         if(data.specialCustomers) setSpecialCustomers(data.specialCustomers);
@@ -2208,8 +2256,8 @@
                         </div>
                     )}
                     <main className="flex-1 overflow-hidden bg-slate-200 dark:bg-slate-950 p-2 relative">
-                        {activeTab === 'live' && <LiveTab {...{ orders, setOrders, productHistory, setProductHistory, quickShipping, jejuShipping, freeShippingThreshold, shippingOverrides, setShippingOverrides, bankAccount, googleScriptUrl, inventoryScriptUrl, employeeSheetId, rawSheetId, addresses, setAddresses, cardPayments, setCardPayments, matchedDeposits, setMatchedDeposits, depositorNames, setDepositorNames, openModal, sentAddressRequests, setSentAddressRequests, deletedDepositIds, setDeletedDepositIds, checkedOrders, setCheckedOrders, addressMapping, setAddressMapping, templateConfig, specialCustomers, setSpecialCustomers, inventory, setInventory, quickMessages, handleResetAllData, broadcastName, setGlobalError, addressCutoffDate }} />}
-                        {activeTab === 'manage' && <OrderManagementTab {...{ orders, shippingOverrides, quickShipping, jejuShipping, freeShippingThreshold, broadcastName, addresses, handleExportBackup, handleImportBackup, addressMapping, cardPayments, specialCustomers, openModal }} />}
+                        {activeTab === 'live' && <LiveTab {...{ orders, setOrders, productHistory, setProductHistory, quickShipping, jejuShipping, freeShippingThreshold, shippingOverrides, setShippingOverrides, bankAccount, googleScriptUrl, inventoryScriptUrl, employeeSheetId, rawSheetId, addresses, setAddresses, cardPayments, setCardPayments, matchedDeposits, setMatchedDeposits, depositorNames, setDepositorNames, openModal, sentAddressRequests, setSentAddressRequests, deletedDepositIds, setDeletedDepositIds, checkedOrders, setCheckedOrders, addressMapping, setAddressMapping, templateConfig, specialCustomers, setSpecialCustomers, inventory, setInventory, quickMessages, handleResetAllData, broadcastName, setGlobalError, addressCutoffDate, cashReceipts, setCashReceipts }} />}
+                        {activeTab === 'manage' && <OrderManagementTab {...{ orders, shippingOverrides, quickShipping, jejuShipping, freeShippingThreshold, broadcastName, addresses, handleExportBackup, handleImportBackup, addressMapping, cardPayments, specialCustomers, openModal, cashReceipts, inventory, productHistory }} />}
                     </main>
                 </div>
             );
