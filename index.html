@@ -58,12 +58,13 @@
 
         const getChosung = (str) => {
             if (!str) return '';
+            const safeStr = String(str);
             const cho = ["ㄱ","ㄲ","ㄴ","ㄷ","ㄸ","ㄹ","ㅁ","ㅂ","ㅃ","ㅅ","ㅇ","ㅆ","ㅈ","ㅉ","ㅊ","ㅋ","ㅌ","ㅍ","ㅎ"];
             let result = "";
-            for (let i = 0; i < str.length; i++) {
-                const code = str.charCodeAt(i) - 44032;
+            for (let i = 0; i < safeStr.length; i++) {
+                const code = safeStr.charCodeAt(i) - 44032;
                 if (code > -1 && code < 11172) result += cho[Math.floor(code / 588)];
-                else result += str.charAt(i);
+                else result += safeStr.charAt(i);
             }
             return result;
         };
@@ -828,14 +829,14 @@
             
             const totalDepositAmount = useMemo(() => {
                 const filtered = allDeposits.filter(d => !deletedDepositIds.has(d.id));
-                const searchFiltered = !depositSearch ? filtered : filtered.filter(d => (d.name||'').includes(depositSearch) || String(d.amount).includes(depositSearch));
+                const searchFiltered = !depositSearch ? filtered : filtered.filter(d => String(d.name||'').includes(depositSearch) || String(d.amount).includes(depositSearch));
                 return searchFiltered.reduce((sum, d) => sum + Number(d.amount), 0);
             }, [allDeposits, deletedDepositIds, depositSearch]);
 
             const filteredDeposits = useMemo(() => { 
                 let result = [...allDeposits]; 
                 result = result.filter(d => !deletedDepositIds.has(d.id)); 
-                if (depositSearch) result = result.filter(d => (d.name||'').includes(depositSearch) || String(d.amount).includes(depositSearch)); 
+                if (depositSearch) result = result.filter(d => String(d.name||'').includes(depositSearch) || String(d.amount).includes(depositSearch)); 
                 
                 let targetNick = '', targetReal = '', addressRealName = '';
                 if (selectedNick) { 
@@ -929,21 +930,21 @@
                 let entries = Object.entries(groups).filter(([nick, items]) => {
                     if (filterStatus === 'no-address') { return !(addressLookup.get(nick)?.data?.address); }
                     if (deferredOrderSearch) {
-                        const term = deferredOrderSearch.toLowerCase().replace(/\s/g, '');
+                        const term = String(deferredOrderSearch).toLowerCase().replace(/\s/g, '');
                         const isChosung = /^[ㄱ-ㅎa-zA-Z0-9]+$/.test(term);
                         const addrInfo = addressLookup.get(nick)?.data;
                         const realName = addrInfo ? addrInfo.realname : (depositorNames[nick] || '');
                         const phone = addrInfo ? addrInfo.phone : '';
                         
-                        const nickClean = nick.toLowerCase().replace(/\s/g, '');
-                        const realNameClean = realName ? realName.toLowerCase().replace(/\s/g, '') : '';
-                        const phoneClean = phone ? phone.replace(/-/g, '') : '';
+                        const nickClean = String(nick).toLowerCase().replace(/\s/g, '');
+                        const realNameClean = realName ? String(realName).toLowerCase().replace(/\s/g, '') : '';
+                        const phoneClean = phone ? String(phone).replace(/-/g, '') : '';
 
                         if (nickClean.includes(term) || (isChosung && getChosung(nickClean).includes(term)) ||
                             (realNameClean && (realNameClean.includes(term) || (isChosung && getChosung(realNameClean).includes(term)))) ||
                             (phoneClean && phoneClean.includes(term))) return true;
                             
-                        return items.some(i => i.product && (i.product.toLowerCase().replace(/\s/g, '').includes(term) || (isChosung && getChosung(i.product.toLowerCase().replace(/\s/g, '')).includes(term))));
+                        return items.some(i => i.product && (String(i.product).toLowerCase().replace(/\s/g, '').includes(term) || (isChosung && getChosung(String(i.product).toLowerCase().replace(/\s/g, '')).includes(term))));
                     }
                     if (filterStatus === 'card') return cardPayments[nick];
                     const activeItems = items.filter(i => !i.isCancelled);
@@ -961,8 +962,9 @@
 
                 entries.sort((a, b) => {
                     if (deferredOrderSearch) {
-                        const term = deferredOrderSearch.toLowerCase().replace(/\s/g, '');
-                        const aN = a[0].toLowerCase().replace(/\s/g, ''); const bN = b[0].toLowerCase().replace(/\s/g, '');
+                        const term = String(deferredOrderSearch).toLowerCase().replace(/\s/g, '');
+                        const aN = String(a[0]).toLowerCase().replace(/\s/g, ''); 
+                        const bN = String(b[0]).toLowerCase().replace(/\s/g, '');
                         if (aN === term && bN !== term) return -1; if (aN !== term && bN === term) return 1;
                         if (aN.startsWith(term) && !bN.startsWith(term)) return -1; if (!aN.startsWith(term) && bN.startsWith(term)) return 1;
                     }
@@ -990,12 +992,12 @@
             
             const nicknameSuggestions = useMemo(() => {
                 if (!manualNick.trim()) return [];
-                const term = manualNick.toLowerCase().replace(/\s/g, ''); const isC = /^[ㄱ-ㅎa-zA-Z0-9]+$/.test(term);
+                const term = String(manualNick).toLowerCase().replace(/\s/g, ''); const isC = /^[ㄱ-ㅎa-zA-Z0-9]+$/.test(term);
                 const allN = new Set(); orders.forEach(o => allN.add(o.customer)); addresses.forEach(a => allN.add(a.nickname));
                 const res = []; 
                 for (const n of allN) {
                     const a = addressLookup.get(n)?.data; const rN = a ? a.realname : (depositorNames[n] || '');
-                    const nCl = n.toLowerCase().replace(/\s/g, ''); const rCl = rN ? rN.toLowerCase().replace(/\s/g, '') : '';
+                    const nCl = String(n).toLowerCase().replace(/\s/g, ''); const rCl = rN ? String(rN).toLowerCase().replace(/\s/g, '') : '';
                     if (nCl.includes(term) || (isC && getChosung(nCl).includes(term)) || (rCl && (rCl.includes(term) || (isC && getChosung(rCl).includes(term))))) {
                         res.push({ nick: n, realName: rN }); if (res.length >= 5) break; 
                     }
@@ -1442,7 +1444,7 @@
                 let res = Object.values(latestMap);
                 
                 if (addressSearch) { 
-                    const term = addressSearch.toLowerCase(); 
+                    const term = String(addressSearch).toLowerCase(); 
                     res = res.filter(a => String(a.nickname).toLowerCase().includes(term) || String(a.realname).toLowerCase().includes(term) || String(a.phone).includes(term) || (a.linkedNicks && a.linkedNicks.some(ln => String(ln).toLowerCase().includes(term)))); 
                 }
                 
@@ -1461,9 +1463,9 @@
 
             const handleQuickAddProduct = async (e) => {
                 e.preventDefault();
-                const cleanName = newInvName.trim();
+                const cleanName = String(newInvName).trim();
                 if(!cleanName) return openModal("상품명을 입력해주세요.", "alert");
-                const priceNum = Number(newInvPrice.replace(/,/g, '')) || 0;
+                const priceNum = Number(String(newInvPrice).replace(/,/g, '')) || 0;
                 
                 if(inventory.some(i => i.name === cleanName)) return openModal("이미 등록된 상품명입니다.", "alert");
                 
@@ -1733,7 +1735,7 @@
                             <div className="w-6 shrink-0"></div>
                         </div>
                         <div className="flex-1 overflow-y-auto p-1.5 space-y-1.5 bg-slate-50 dark:bg-slate-900">
-                            {inventory.filter(i => !currentSearchTerm || String(i.name).toLowerCase().includes(currentSearchTerm.toLowerCase())).map(item => (
+                            {inventory.filter(i => !currentSearchTerm || String(i.name).toLowerCase().includes(String(currentSearchTerm).toLowerCase())).map(item => (
                                 <InventoryItemRow 
                                     key={item.id} item={item} orders={orders} setOrders={setOrders} inventory={inventory} setInventory={setInventory} setProductHistory={setProductHistory} openModal={openModal} expandedInventoryItem={expandedInventoryItem} setExpandedInventoryItem={setExpandedInventoryItem} setManualProduct={setManualProduct} setCurrentSearchTerm={setCurrentSearchTerm} setManualPrice={setManualPrice} setIsFixedProductMode={setIsFixedProductMode} customerPaidStatus={customerPaidStatus}
                                 />
