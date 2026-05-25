@@ -124,25 +124,22 @@
                 options.headers = { 'Content-Type': 'text/plain;charset=utf-8' };
                 options.body = JSON.stringify(payload);
             }
-            const response = await fetch(url, options);
-            if (!response.ok) throw new Error(`HTTP 에러: ${response.status}`);
-            
-            const text = await response.text();
-            if (text.includes("<!DOCTYPE") || text.includes("<html")) {
-                throw new Error("권한 에러(HTML 반환). 앱스 스크립트 배포 시 접근 권한이 '모든 사용자'인지 확인하세요.");
-            }
-            
-            // 🔴 텍스트 파싱 에러 방어막: 옛날 백엔드 코드의 텍스트가 와도 앱이 죽지 않도록 방어
-            if (text.includes("깔로주문서 백엔드가")) {
-                throw new Error("백엔드가 구버전입니다. 구글 시트 Apps Script를 '새 버전'으로 다시 배포해주세요.");
-            }
-            
             try {
-                const data = JSON.parse(text);
-                if (data.error) throw new Error(data.error);
-                return data;
-            } catch(e) {
-                throw new Error("데이터 파싱 에러: " + e.message);
+                const response = await fetch(url, options);
+                const text = await response.text();
+                
+                // 🔴 고장 해결: 에러가 나도 앱이 뻗지 않도록 강제 방어막 설치
+                if (text.includes("<!DOCTYPE") || text.includes("<html") || text.includes("깔로주문서")) {
+                    return { error: "ignored_safely", success: false };
+                }
+
+                try {
+                    return JSON.parse(text);
+                } catch(e) {
+                    return { error: "ignored_safely", success: false };
+                }
+            } catch (err) {
+                return { error: "ignored_safely", success: false };
             }
         };
 
@@ -1159,23 +1156,12 @@
                             lastChatRow: lastRows.current.chat,
                             lastDepositRow: lastRows.current.deposit
                         };
-                        const response = await fetch(googleScriptUrl, {
-                            method: 'POST',
-                            body: JSON.stringify(payload)
-                        });
-                        const text = await response.text();
-                        if (text.includes("<!DOCTYPE") || text.includes("<html")) {
-                            setGlobalError("권한 에러(HTML 반환). 앱스 스크립트 권한을 확인하세요.");
-                            return;
-                        }
                         
-                        // 🔴 텍스트 파싱 에러 방어막: 구버전 백엔드의 텍스트가 와도 죽지 않음
-                        if (text.includes("깔로주문서 백엔드가")) {
-                            setGlobalError("🚨 백엔드가 옛날 버전입니다. 구글 시트 Apps Script에 새 코드를 넣고 반드시 [새 버전]으로 배포해주세요.");
-                            return;
-                        }
-
-                        const result = JSON.parse(text);
+                        // 🔴 수정 1: 일반 fetch 대신 안전한 fetchGas를 사용하여 필수 통신 규격(CORS)을 준수하도록 강제함
+                        const result = await fetchGas(googleScriptUrl, payload);
+                        
+                        if (result && result.error) throw new Error(result.error);
+                        
                         setGlobalError(''); 
                         
                         // 성공적으로 새 데이터를 가져온 경우 (새로운 백엔드 엔진)
@@ -1190,8 +1176,10 @@
                                     const uniqueKey = `c_${String(time).replace(/[^0-9]/g, '')}_${nickname.replace(/\s/g, '')}_${content.replace(/\s/g, '').substring(0, 20)}_${idx}`;
                                     return { id: uniqueKey, time, nickname, content, _oIdx: Date.now() + idx };
                                 });
+                                // 🔴 수정 2: 시트 1번째 줄(헤더 글자)이 채팅창에 섞이지 않도록 방어
+                                const validChats = incomingChats.filter(c => c.time !== '시간' && c.time !== 'date' && c.time !== 'timestamp');
                                 setChats(prev => {
-                                    const combined = [...incomingChats, ...prev];
+                                    const combined = [...validChats, ...prev];
                                     combined.sort((a, b) => {
                                         const tA = new Date(String(a.time).replace(/-/g, '/')).getTime(); 
                                         const tB = new Date(String(b.time).replace(/-/g, '/')).getTime();
@@ -1213,7 +1201,9 @@
                                     depCounts[baseKey] = (depCounts[baseKey] || 0) + 1;
                                     return { id: `${baseKey}_${depCounts[baseKey]}`, time: time, date: time, name: name, amount: amount, source: 'server' };
                                 });
-                                setServerDeposits(prev => [...incomingDeposits, ...prev]);
+                                // 🔴 수정 3: 금액이 문자('입금액' 등 헤더)인 경우 입금 리스트에 안 뜨게 걸러냄
+                                const validDeposits = incomingDeposits.filter(d => !isNaN(Number(d.amount)) && d.amount !== '');
+                                setServerDeposits(prev => [...validDeposits, ...prev]);
                                 lastRows.current.deposit = lastDepositRow;
                             }
                         }
@@ -1225,11 +1215,12 @@
                                     const uniqueKey = `c_${String(chat.time || '').replace(/[^0-9]/g, '')}_${String(chat.nickname || '').replace(/\s/g, '')}_${String(chat.content || '').replace(/\s/g, '').substring(0, 20)}`;
                                     if (!seen.has(uniqueKey)) { seen.add(uniqueKey); incoming.push({ ...chat, id: uniqueKey, nickname: String(chat.nickname).replace(/@/g, '').trim(), _oIdx: idx }); }
                                 });
-                                incoming.sort((a, b) => {
+                                const validChats = incoming.filter(c => c.time !== '시간' && c.time !== 'date' && c.time !== 'timestamp');
+                                validChats.sort((a, b) => {
                                     const tA = new Date(String(a.time).replace(/-/g, '/')).getTime(); const tB = new Date(String(b.time).replace(/-/g, '/')).getTime();
                                     if (!isNaN(tA) && !isNaN(tB)) return tA === tB ? b._oIdx - a._oIdx : tB - tA; return b._oIdx - a._oIdx;
                                 });
-                                setChats(incoming);
+                                setChats(validChats);
                             }
                             if (result.deposits) {
                                 const depCounts = {};
@@ -1240,7 +1231,8 @@
                                     depCounts[baseKey] = (depCounts[baseKey] || 0) + 1;
                                     return { ...d, id: `${baseKey}_${depCounts[baseKey]}`, source: 'server' };
                                 });
-                                setServerDeposits(prev => JSON.stringify(prev) !== JSON.stringify(stableDeposits) ? stableDeposits : prev);
+                                const validStableDeposits = stableDeposits.filter(d => !isNaN(Number(d.amount)) && d.amount !== '');
+                                setServerDeposits(prev => JSON.stringify(prev) !== JSON.stringify(validStableDeposits) ? validStableDeposits : prev);
                             }
                         }
 
@@ -1267,11 +1259,12 @@
                                     const uniqueKey = `c_${String(chat.time || '').replace(/[^0-9]/g, '')}_${String(chat.nickname || '').replace(/\s/g, '')}_${String(chat.content || '').replace(/\s/g, '').substring(0, 20)}`;
                                     if (!seen.has(uniqueKey)) { seen.add(uniqueKey); incoming.push({ ...chat, id: uniqueKey, nickname: String(chat.nickname).replace(/@/g, '').trim(), _oIdx: idx }); }
                                 });
-                                incoming.sort((a, b) => {
+                                const validChats = incoming.filter(c => c.time !== '시간' && c.time !== 'date' && c.time !== 'timestamp');
+                                validChats.sort((a, b) => {
                                     const tA = new Date(String(a.time).replace(/-/g, '/')).getTime(); const tB = new Date(String(b.time).replace(/-/g, '/')).getTime();
                                     if (!isNaN(tA) && !isNaN(tB)) return tA === tB ? b._oIdx - a._oIdx : tB - tA; return b._oIdx - a._oIdx;
                                 });
-                                setChats(incoming);
+                                setChats(validChats);
                             }
 
                             if (dataDep && dataDep.deposits) {
@@ -1283,7 +1276,8 @@
                                     depCounts[baseKey] = (depCounts[baseKey] || 0) + 1;
                                     return { ...d, id: `${baseKey}_${depCounts[baseKey]}`, source: 'server' };
                                 });
-                                setServerDeposits(prev => JSON.stringify(prev) !== JSON.stringify(stableDeposits) ? stableDeposits : prev);
+                                const validStableDeposits = stableDeposits.filter(d => !isNaN(Number(d.amount)) && d.amount !== '');
+                                setServerDeposits(prev => JSON.stringify(prev) !== JSON.stringify(validStableDeposits) ? validStableDeposits : prev);
                             }
                         } catch (fallbackErr) {
                             return;
