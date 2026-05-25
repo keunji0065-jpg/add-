@@ -45,6 +45,10 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo, useRef, useCallback, memo } = React;
 
+        const urlParams = new URLSearchParams(window.location.search);
+        const WS_ID = urlParams.get('ws') || 'default';
+        const getLsKey = (key) => `${WS_ID}_${key}`;
+
         const FIXED_BANK_ACCOUNT = "카카오뱅크 김선정\n7942 18 01611";
         const EMOJI_LIST = ["💙","💖","💛","💚","💜","🤍","❤️","🖤","🤎","💕","💞","⭐","🌟","✨","🔥","💥","💯","🎠","🐎","🐴","🦢","🐆","🐍","🐊","🐢","🦓","🦄","🦋","💎","💍","👑","💄","💅","🧴","🎀","🎁","🛍️","🛒","🏷️","📦","👜","👝","👛","🎒","💼","👠","👡","👢","👟","🩰","👞","👗","🥻","🧥","👕","👖","👔","🧣","🧤","🧦","🧢","👒","🎩","⌚","🕶️","👓","🐶","🐩","🐱","🐈","🐰","🐇","🐻","🧸","🐼","🐨","🦊","🐯","🦁","🐮","🐷","🐸","🐵","🐧","🐥","🦉","🐾","🌸","🌼","🍀","🌹","🌻","🌷","🌿","🍁","🌴","🌵","🍎","🍓","🍒","🍑","🍋","🍊","🍉","🍇","🍍","🥑","🥕","🍔","🍟","🍕","🍰","🍩","🍪","🍫","🍬","🍭","☕","🧋","🧃","🍷","🥂","🍻","✅","✔️","❌","❗","❓","📢","🔔","🌈","💰","💸","💳","🧾","🪙","🚗","🚚","✈️","📱","💻","🎉","🎈"];
 
@@ -127,6 +131,12 @@
             if (text.includes("<!DOCTYPE") || text.includes("<html")) {
                 throw new Error("권한 에러(HTML 반환). 앱스 스크립트 배포 시 접근 권한이 '모든 사용자'인지 확인하세요.");
             }
+            
+            // 🔴 텍스트 파싱 에러 방어막: 옛날 백엔드 코드의 텍스트가 와도 앱이 죽지 않도록 방어
+            if (text.includes("깔로주문서 백엔드가")) {
+                throw new Error("백엔드가 구버전입니다. 구글 시트 Apps Script를 '새 버전'으로 다시 배포해주세요.");
+            }
+            
             try {
                 const data = JSON.parse(text);
                 if (data.error) throw new Error(data.error);
@@ -137,9 +147,10 @@
         };
 
         const useLocalStorage = (key, initialValue) => {
+            const actualKey = getLsKey(key);
             const [storedValue, setStoredValue] = useState(() => {
                 try {
-                    const item = window.localStorage.getItem(key);
+                    const item = window.localStorage.getItem(actualKey);
                     if (!item) return initialValue;
                     const parsed = JSON.parse(item);
                     if (key === 'productInventory' && !Array.isArray(parsed)) {
@@ -151,12 +162,12 @@
 
             useEffect(() => {
                 const timer = setTimeout(() => {
-                    const saveData = () => { try { window.localStorage.setItem(key, JSON.stringify(storedValue)); } catch(e) {} };
+                    const saveData = () => { try { window.localStorage.setItem(actualKey, JSON.stringify(storedValue)); } catch(e) {} };
                     if (window.requestIdleCallback) window.requestIdleCallback(saveData, { timeout: 1000 });
                     else saveData();
                 }, 800);
                 return () => clearTimeout(timer);
-            }, [key, storedValue]);
+            }, [actualKey, storedValue]);
 
             const setValue = useCallback((value) => {
                 try { setStoredValue(prev => value instanceof Function ? value(prev) : value); } catch (error) {}
@@ -711,7 +722,7 @@
             const [expandedInventoryItem, setExpandedInventoryItem] = useState(null);
             
             const [chats, setChats] = useState([]);
-            const [hiddenChatIds, setHiddenChatIds] = useState(() => { const saved = localStorage.getItem('hiddenChatIds'); return saved ? JSON.parse(saved) : []; });
+            const [hiddenChatIds, setHiddenChatIds] = useState(() => { const saved = localStorage.getItem(getLsKey('hiddenChatIds')); return saved ? JSON.parse(saved) : []; });
             const [showKeywordOnly, setShowKeywordOnly] = useState(false);
             const [keywordInput, setKeywordInput] = useState('');
 
@@ -742,7 +753,10 @@
             const orderListRef = useRef(null);
             const chatScrollRef = useRef(null); 
 
-            useEffect(() => { localStorage.setItem('hiddenChatIds', JSON.stringify([...hiddenChatIds])); }, [hiddenChatIds]);
+            // 🔴 렉 방지 핵심: 마지막으로 읽은 줄 번호를 기억하는 메모리 (화면 렌더링에 영향 없음)
+            const lastRows = useRef({ chat: 0, deposit: 0 });
+
+            useEffect(() => { localStorage.setItem(getLsKey('hiddenChatIds'), JSON.stringify([...hiddenChatIds])); }, [hiddenChatIds]);
 
             const getLevenshteinDistance = (a, b) => {
                 if (!a || !b) return 0;
@@ -786,10 +800,10 @@
             }, []);
 
             const [ignoredAutoMatch, setIgnoredAutoMatch] = useState(() => {
-                const saved = localStorage.getItem('ignoredAutoMatch');
+                const saved = localStorage.getItem(getLsKey('ignoredAutoMatch'));
                 return saved ? new Set(JSON.parse(saved)) : new Set();
             });
-            useEffect(() => { localStorage.setItem('ignoredAutoMatch', JSON.stringify([...ignoredAutoMatch])); }, [ignoredAutoMatch]);
+            useEffect(() => { localStorage.setItem(getLsKey('ignoredAutoMatch'), JSON.stringify([...ignoredAutoMatch])); }, [ignoredAutoMatch]);
 
             const handleRematchAll = useCallback(() => {
                 openModal("모든 입금 매칭을 초기화하고 처음부터 다시 자동 매칭하시겠습니까?\n\n(수동으로 매칭/해제했던 내역과 현재 주문서에 강제로 입력된 입금액이 모두 0으로 초기화된 후, 현재 입금 리스트를 바탕으로 재계산됩니다.)", 'confirm', () => {
@@ -1138,44 +1152,147 @@
             const fetchData = useCallback(async () => {
                 if (!googleScriptUrl || !googleScriptUrl.startsWith('http')) return;
                 try {
-                    const separator = googleScriptUrl.includes('?') ? '&' : '?';
-                    const fetchUrl = `${googleScriptUrl}${separator}action=get_all&t=${Date.now()}`;
-                    
+                    // 1. 렉 없는 증분 동기화 (POST 방식 - get_new_data)
                     try {
-                        const dataDep = await fetchGas(fetchUrl);
-                        setGlobalError(''); 
+                        const payload = {
+                            action: 'get_new_data',
+                            lastChatRow: lastRows.current.chat,
+                            lastDepositRow: lastRows.current.deposit
+                        };
+                        const response = await fetch(googleScriptUrl, {
+                            method: 'POST',
+                            body: JSON.stringify(payload)
+                        });
+                        const text = await response.text();
+                        if (text.includes("<!DOCTYPE") || text.includes("<html")) {
+                            setGlobalError("권한 에러(HTML 반환). 앱스 스크립트 권한을 확인하세요.");
+                            return;
+                        }
                         
-                        if (dataDep && dataDep.chats) {
-                            const rawChats = dataDep.chats; const seen = new Set(); const incoming = [];
-                            rawChats.forEach((chat, idx) => {
-                                const uniqueKey = `c_${String(chat.time || '').replace(/[^0-9]/g, '')}_${String(chat.nickname || '').replace(/\s/g, '')}_${String(chat.content || '').replace(/\s/g, '').substring(0, 20)}`;
-                                if (!seen.has(uniqueKey)) { seen.add(uniqueKey); incoming.push({ ...chat, id: uniqueKey, nickname: String(chat.nickname).replace(/@/g, '').trim(), _oIdx: idx }); }
-                            });
-                            incoming.sort((a, b) => {
-                                const tA = new Date(String(a.time).replace(/-/g, '/')).getTime(); const tB = new Date(String(b.time).replace(/-/g, '/')).getTime();
-                                if (!isNaN(tA) && !isNaN(tB)) return tA === tB ? b._oIdx - a._oIdx : tB - tA; return b._oIdx - a._oIdx;
-                            });
-                            setChats(incoming);
+                        // 🔴 텍스트 파싱 에러 방어막: 구버전 백엔드의 텍스트가 와도 죽지 않음
+                        if (text.includes("깔로주문서 백엔드가")) {
+                            setGlobalError("🚨 백엔드가 옛날 버전입니다. 구글 시트 Apps Script에 새 코드를 넣고 반드시 [새 버전]으로 배포해주세요.");
+                            return;
                         }
 
-                        if (dataDep && dataDep.deposits) {
-                            const depCounts = {};
-                            const stableDeposits = dataDep.deposits.map((d, i) => {
-                                if (d.id) return { ...d, source: 'server' }; 
-                                if (d.uid) return { ...d, id: d.uid, source: 'server' };
-                                const baseKey = `dep_${d.name}_${d.amount}_${String(d.time || d.date || '').replace(/[^0-9]/g, '')}`;
-                                depCounts[baseKey] = (depCounts[baseKey] || 0) + 1;
-                                return { ...d, id: `${baseKey}_${depCounts[baseKey]}`, source: 'server' };
-                            });
-                            setServerDeposits(prev => JSON.stringify(prev) !== JSON.stringify(stableDeposits) ? stableDeposits : prev);
+                        const result = JSON.parse(text);
+                        setGlobalError(''); 
+                        
+                        // 성공적으로 새 데이터를 가져온 경우 (새로운 백엔드 엔진)
+                        if (result.status === 'success' && result.data) {
+                            const { newChats, lastChatRow, newDeposits, lastDepositRow } = result.data;
+                            
+                            if (newChats && newChats.length > 0) {
+                                const incomingChats = newChats.map((row, idx) => {
+                                    const time = row[0];
+                                    const nickname = String(row[1] || '').replace(/@/g, '').trim();
+                                    const content = String(row[2] || '');
+                                    const uniqueKey = `c_${String(time).replace(/[^0-9]/g, '')}_${nickname.replace(/\s/g, '')}_${content.replace(/\s/g, '').substring(0, 20)}_${idx}`;
+                                    return { id: uniqueKey, time, nickname, content, _oIdx: Date.now() + idx };
+                                });
+                                setChats(prev => {
+                                    const combined = [...incomingChats, ...prev];
+                                    combined.sort((a, b) => {
+                                        const tA = new Date(String(a.time).replace(/-/g, '/')).getTime(); 
+                                        const tB = new Date(String(b.time).replace(/-/g, '/')).getTime();
+                                        if (!isNaN(tA) && !isNaN(tB)) return tA === tB ? b._oIdx - a._oIdx : tB - tA; 
+                                        return b._oIdx - a._oIdx;
+                                    });
+                                    return combined;
+                                });
+                                lastRows.current.chat = lastChatRow;
+                            }
+
+                            if (newDeposits && newDeposits.length > 0) {
+                                const depCounts = {};
+                                const incomingDeposits = newDeposits.map((row, idx) => {
+                                    const time = row[0];
+                                    const name = String(row[1] || '');
+                                    const amount = row[2];
+                                    const baseKey = `dep_${name}_${amount}_${String(time || '').replace(/[^0-9]/g, '')}`;
+                                    depCounts[baseKey] = (depCounts[baseKey] || 0) + 1;
+                                    return { id: `${baseKey}_${depCounts[baseKey]}`, time: time, date: time, name: name, amount: amount, source: 'server' };
+                                });
+                                setServerDeposits(prev => [...incomingDeposits, ...prev]);
+                                lastRows.current.deposit = lastDepositRow;
+                            }
                         }
+                        // 만약 기존 백엔드(GET get_all) 응답이라면 (구버전 호환)
+                        else if (result.chats || result.deposits) {
+                            if (result.chats) {
+                                const rawChats = result.chats; const seen = new Set(); const incoming = [];
+                                rawChats.forEach((chat, idx) => {
+                                    const uniqueKey = `c_${String(chat.time || '').replace(/[^0-9]/g, '')}_${String(chat.nickname || '').replace(/\s/g, '')}_${String(chat.content || '').replace(/\s/g, '').substring(0, 20)}`;
+                                    if (!seen.has(uniqueKey)) { seen.add(uniqueKey); incoming.push({ ...chat, id: uniqueKey, nickname: String(chat.nickname).replace(/@/g, '').trim(), _oIdx: idx }); }
+                                });
+                                incoming.sort((a, b) => {
+                                    const tA = new Date(String(a.time).replace(/-/g, '/')).getTime(); const tB = new Date(String(b.time).replace(/-/g, '/')).getTime();
+                                    if (!isNaN(tA) && !isNaN(tB)) return tA === tB ? b._oIdx - a._oIdx : tB - tA; return b._oIdx - a._oIdx;
+                                });
+                                setChats(incoming);
+                            }
+                            if (result.deposits) {
+                                const depCounts = {};
+                                const stableDeposits = result.deposits.map((d, i) => {
+                                    if (d.id) return { ...d, source: 'server' }; 
+                                    if (d.uid) return { ...d, id: d.uid, source: 'server' };
+                                    const baseKey = `dep_${d.name}_${d.amount}_${String(d.time || d.date || '').replace(/[^0-9]/g, '')}`;
+                                    depCounts[baseKey] = (depCounts[baseKey] || 0) + 1;
+                                    return { ...d, id: `${baseKey}_${depCounts[baseKey]}`, source: 'server' };
+                                });
+                                setServerDeposits(prev => JSON.stringify(prev) !== JSON.stringify(stableDeposits) ? stableDeposits : prev);
+                            }
+                        }
+
                     } catch (e) {
-                        setGlobalError(`🚨 통신 오류: ${e.message}`);
-                        return;
+                        // POST 요청이 실패하면 구버전 GET 방식(get_all)으로 안전하게 폴백
+                        const separator = googleScriptUrl.includes('?') ? '&' : '?';
+                        const fetchUrl = `${googleScriptUrl}${separator}action=get_all&t=${Date.now()}`;
+                        try {
+                            const dataDep = await fetchGas(fetchUrl);
+                            
+                            // 🔴 에러 객체가 돌아왔을 경우 처리
+                            if (dataDep && dataDep.error) {
+                                if (dataDep.error !== "ignored_safely") {
+                                    setGlobalError(`🚨 통신 오류: ${dataDep.error}`);
+                                }
+                                return;
+                            }
+                            
+                            setGlobalError(''); 
+                            
+                            if (dataDep && dataDep.chats) {
+                                const rawChats = dataDep.chats; const seen = new Set(); const incoming = [];
+                                rawChats.forEach((chat, idx) => {
+                                    const uniqueKey = `c_${String(chat.time || '').replace(/[^0-9]/g, '')}_${String(chat.nickname || '').replace(/\s/g, '')}_${String(chat.content || '').replace(/\s/g, '').substring(0, 20)}`;
+                                    if (!seen.has(uniqueKey)) { seen.add(uniqueKey); incoming.push({ ...chat, id: uniqueKey, nickname: String(chat.nickname).replace(/@/g, '').trim(), _oIdx: idx }); }
+                                });
+                                incoming.sort((a, b) => {
+                                    const tA = new Date(String(a.time).replace(/-/g, '/')).getTime(); const tB = new Date(String(b.time).replace(/-/g, '/')).getTime();
+                                    if (!isNaN(tA) && !isNaN(tB)) return tA === tB ? b._oIdx - a._oIdx : tB - tA; return b._oIdx - a._oIdx;
+                                });
+                                setChats(incoming);
+                            }
+
+                            if (dataDep && dataDep.deposits) {
+                                const depCounts = {};
+                                const stableDeposits = dataDep.deposits.map((d, i) => {
+                                    if (d.id) return { ...d, source: 'server' }; 
+                                    if (d.uid) return { ...d, id: d.uid, source: 'server' };
+                                    const baseKey = `dep_${d.name}_${d.amount}_${String(d.time || d.date || '').replace(/[^0-9]/g, '')}`;
+                                    depCounts[baseKey] = (depCounts[baseKey] || 0) + 1;
+                                    return { ...d, id: `${baseKey}_${depCounts[baseKey]}`, source: 'server' };
+                                });
+                                setServerDeposits(prev => JSON.stringify(prev) !== JSON.stringify(stableDeposits) ? stableDeposits : prev);
+                            }
+                        } catch (fallbackErr) {
+                            return;
+                        }
                     }
 
                     try {
-                        const dataOrd = await fetchGas(`${googleScriptUrl}${separator}action=get_approved_orders&t=${Date.now()}`);
+                        const payloadOrd = { action: 'get_approved_orders', t: Date.now() };
+                        const dataOrd = await fetchGas(googleScriptUrl, payloadOrd);
                         if (dataOrd && dataOrd.success && dataOrd.approved_orders && dataOrd.approved_orders.length > 0) {
                             const rowIndices = [];
                             setOrders(prev => {
@@ -1318,12 +1435,20 @@
             const fetchAddresses = useCallback(async () => {
                 if (!googleScriptUrl || !googleScriptUrl.startsWith('http')) return;
                 try {
-                    const separator = googleScriptUrl.includes('?') ? '&' : '?';
                     const cleanRawSheetId = getCleanSheetId(rawSheetId);
-                    let url = `${googleScriptUrl}${separator}action=get_addresses&t=${Date.now()}`;
-                    if (cleanRawSheetId) { url += `&raw_sheet_id=${cleanRawSheetId}`; }
+                    const payloadAddr = { action: 'get_addresses', t: Date.now() };
+                    if (cleanRawSheetId) { payloadAddr.raw_sheet_id = cleanRawSheetId; }
 
-                    const data = await fetchGas(url);
+                    const data = await fetchGas(googleScriptUrl, payloadAddr);
+                    
+                    // 🔴 방어막: 파싱된 데이터 안에 에러가 들어있으면 무시
+                    if (data && data.error) {
+                        if (data.error !== "ignored_safely") {
+                            setGlobalError(`🚨 주소록 에러: ${data.error}`);
+                        }
+                        return;
+                    }
+                    
                     let rawData = data.addresses || data.data || data;
                     
                     if (rawData && Array.isArray(rawData) && rawData.length > 0) {
@@ -1346,7 +1471,10 @@
                         });
                         setAddresses(filtered); 
                     }
-                } catch(e) { console.error("주소록 가져오기 실패", e); }
+                } catch(e) { 
+                    console.error("주소록 가져오기 실패", e); 
+                    setGlobalError(`🚨 주소록 오류: ${e.message}`);
+                }
             }, [googleScriptUrl, rawSheetId, setAddresses, addressCutoffDate]);
 
             useEffect(() => { fetchAddresses(); const interval = setInterval(fetchAddresses, 10000); return () => clearInterval(interval); }, [fetchAddresses]);
@@ -2167,12 +2295,12 @@
                 const groups = {}; 
                 orders.forEach(o => { if (!groups[o.customer]) groups[o.customer] = []; groups[o.customer].push(o); });
                 
-                const templateConfigStr = localStorage.getItem('templateConfig');
+                const templateConfigStr = localStorage.getItem(getLsKey('templateConfig'));
                 const templateConfig = templateConfigStr ? JSON.parse(templateConfigStr) : { emoji: '💙', paidMsg: '😍 완납 확인! 감사합니다 😍', unpaidPrefix: '[미입금]\n총 입금하실 금액\n👉', overpaidMsg: '과납 금액이 있습니다.\n환불 또는 적립 여부를 알려주세요!', addrNotice: '※ 배송지 변경 시 채팅으로 변경할 주소를 남겨주세요!', surveyNotice: '방송마다 1회 하단의 주문서(배송지입력) 필수!!', alwaysRequestAddress: false };
                 
                 const overpaidMsg = templateConfig.overpaidMsg || '과납 금액이 있습니다.\n환불 또는 적립 여부를 알려주세요!';
-                const bankStr = localStorage.getItem('bankAccount') || "카카오뱅크 김선정\n7942 18 01611";
-                const sentAddressRequestsStr = localStorage.getItem('sentAddressRequests');
+                const bankStr = localStorage.getItem(getLsKey('bankAccount')) || "카카오뱅크 김선정\n7942 18 01611";
+                const sentAddressRequestsStr = localStorage.getItem(getLsKey('sentAddressRequests'));
                 const sentAddressRequests = sentAddressRequestsStr ? new Set(JSON.parse(sentAddressRequestsStr)) : new Set();
                 
                 const data = []; 
@@ -2389,19 +2517,19 @@
             const [cashReceipts, setCashReceipts] = useLocalStorage('cashReceipts', {});
             const [isDarkMode, setIsDarkMode] = useLocalStorage('darkMode', false);
             
-            const [matchedDeposits, setMatchedDeposits] = useState(() => { const s = localStorage.getItem('matchedDeposits'); return s ? new Set(JSON.parse(s)) : new Set(); });
-            const [sentAddressRequests, setSentAddressRequests] = useState(() => { const s = localStorage.getItem('sentAddressRequests'); return s ? new Set(JSON.parse(s)) : new Set(); });
-            const [deletedDepositIds, setDeletedDepositIds] = useState(() => { const s = localStorage.getItem('deletedDepositIds'); return s ? new Set(JSON.parse(s)) : new Set(); });
-            const [checkedOrders, setCheckedOrders] = useState(() => { const s = localStorage.getItem('checkedOrders'); return s ? new Set(JSON.parse(s)) : new Set(); });
-            const [clickedChats, setClickedChats] = useState(() => { const s = localStorage.getItem('clickedChats'); return s ? new Set(JSON.parse(s)) : new Set(); });
-            const [keywords, setKeywords] = useState(() => { try { const s = localStorage.getItem('keywords_v3'); if (s) { const parsed = JSON.parse(s); if (Array.isArray(parsed)) return parsed; } } catch(e) {} return ['주문', '번']; });
+            const [matchedDeposits, setMatchedDeposits] = useState(() => { const s = localStorage.getItem(getLsKey('matchedDeposits')); return s ? new Set(JSON.parse(s)) : new Set(); });
+            const [sentAddressRequests, setSentAddressRequests] = useState(() => { const s = localStorage.getItem(getLsKey('sentAddressRequests')); return s ? new Set(JSON.parse(s)) : new Set(); });
+            const [deletedDepositIds, setDeletedDepositIds] = useState(() => { const s = localStorage.getItem(getLsKey('deletedDepositIds')); return s ? new Set(JSON.parse(s)) : new Set(); });
+            const [checkedOrders, setCheckedOrders] = useState(() => { const s = localStorage.getItem(getLsKey('checkedOrders')); return s ? new Set(JSON.parse(s)) : new Set(); });
+            const [clickedChats, setClickedChats] = useState(() => { const s = localStorage.getItem(getLsKey('clickedChats')); return s ? new Set(JSON.parse(s)) : new Set(); });
+            const [keywords, setKeywords] = useState(() => { try { const s = localStorage.getItem(getLsKey('keywords_v3')); if (s) { const parsed = JSON.parse(s); if (Array.isArray(parsed)) return parsed; } } catch(e) {} return ['주문', '번']; });
             
-            useEffect(() => { localStorage.setItem('matchedDeposits', JSON.stringify([...matchedDeposits])); }, [matchedDeposits]);
-            useEffect(() => { localStorage.setItem('sentAddressRequests', JSON.stringify([...sentAddressRequests])); }, [sentAddressRequests]);
-            useEffect(() => { localStorage.setItem('deletedDepositIds', JSON.stringify([...deletedDepositIds])); }, [deletedDepositIds]);
-            useEffect(() => { localStorage.setItem('checkedOrders', JSON.stringify([...checkedOrders])); }, [checkedOrders]);
-            useEffect(() => { localStorage.setItem('clickedChats', JSON.stringify([...clickedChats])); }, [clickedChats]);
-            useEffect(() => { localStorage.setItem('keywords_v3', JSON.stringify(keywords)); }, [keywords]);
+            useEffect(() => { localStorage.setItem(getLsKey('matchedDeposits'), JSON.stringify([...matchedDeposits])); }, [matchedDeposits]);
+            useEffect(() => { localStorage.setItem(getLsKey('sentAddressRequests'), JSON.stringify([...sentAddressRequests])); }, [sentAddressRequests]);
+            useEffect(() => { localStorage.setItem(getLsKey('deletedDepositIds'), JSON.stringify([...deletedDepositIds])); }, [deletedDepositIds]);
+            useEffect(() => { localStorage.setItem(getLsKey('checkedOrders'), JSON.stringify([...checkedOrders])); }, [checkedOrders]);
+            useEffect(() => { localStorage.setItem(getLsKey('clickedChats'), JSON.stringify([...clickedChats])); }, [clickedChats]);
+            useEffect(() => { localStorage.setItem(getLsKey('keywords_v3'), JSON.stringify(keywords)); }, [keywords]);
             
             const [depositorNames, setDepositorNames] = useLocalStorage('depositorNames', {});
             const [addressMapping, setAddressMapping] = useLocalStorage('addressMapping', {});
@@ -2414,7 +2542,7 @@
             
             const [isSettingsOpen, setIsSettingsOpen] = useState(false);
             const [isVipModalOpen, setIsVipModalOpen] = useState(false);
-            const [googleScriptUrl, setGoogleScriptUrl] = useLocalStorage('googleScriptUrl', 'https://script.google.com/macros/s/AKfycby7ow3lRZwjnvs5FnnIyHJzX-r3Lcsz2IgryJlN5CnIU7co9UZPS_sB2tQ-wdg2_FIt/exec');
+            const [googleScriptUrl, setGoogleScriptUrl] = useLocalStorage('googleScriptUrl', 'https://script.google.com/macros/s/AKfycbwmml7FKsPycDPv9ofeoUBqSIvW9okOzAFQuWAaC1zNDCNmGRh3lxxC0803eVNyCSJ0/exec');
             const [inventoryScriptUrl, setInventoryScriptUrl] = useLocalStorage('inventoryScriptUrl', 'https://script.google.com/macros/s/AKfycbwLp11GqCSjWLjLJe4nC6G3rBzVdh8DKM6SE0qRp9Lpg3xU45170iMNpOsY3YweyDB-/exec');
             const [employeeSheetId, setEmployeeSheetId] = useLocalStorage('employeeSheetId', '1vsXebx4B3vOkP6L6GT6ZJ6uUScBOsank1J_DBH4Zzx0');
             const [rawSheetId, setRawSheetId] = useLocalStorage('rawSheetId', '1ywl4gRvswQpvIYtPVbSROzz7a5elbLieYhqMZmt191U');
@@ -2428,7 +2556,7 @@
             
             const handleResetAllData = useCallback(() => {
                 openModal("방송 데이터를 완전히 초기화하시겠습니까?\n(입금내역, 주문서, 재고 기록이 영구 삭제됩니다.\n※ 주소록 및 VIP 명단은 절대 지워지지 않습니다!)", 'confirm', () => {
-                    const keysToRemove = ['youtubeOrders', 'cardPayments', 'cashReceipts', 'shippingOverrides', 'matchedDeposits', 'sentAddressRequests', 'deletedDepositIds', 'checkedOrders', 'productInventory', 'productHistory', 'ignoredAutoMatch'];
+                    const keysToRemove = ['youtubeOrders', 'cardPayments', 'cashReceipts', 'shippingOverrides', 'matchedDeposits', 'sentAddressRequests', 'deletedDepositIds', 'checkedOrders', 'productInventory', 'productHistory', 'ignoredAutoMatch'].map(getLsKey);
                     keysToRemove.forEach(k => localStorage.removeItem(k));
                     window.location.reload();
                 });
@@ -2492,7 +2620,12 @@
             return (
                 <div className="flex flex-col h-screen overflow-hidden text-slate-800 dark:text-slate-200">
                     <header className="h-12 bg-slate-900 dark:bg-slate-950 text-white flex items-center justify-between px-4 shrink-0 shadow-md z-50 border-b border-slate-700">
-                        <div className="font-bold text-lg flex items-center gap-2 transition-transform hover:scale-105 duration-200 cursor-pointer text-slate-100"><Icon name="lightning" className="text-slate-400" weight="fill"/> 깔로 주문서 PRO <span className="text-[10px] font-normal border border-slate-600 rounded px-1.5 py-0.5 ml-1 bg-slate-800 text-slate-300">통합 완전판</span></div>
+                        <div className="font-bold text-lg flex items-center gap-2 transition-transform hover:scale-105 duration-200 cursor-pointer text-slate-100">
+                            <Icon name="lightning" className="text-slate-400" weight="fill"/> 깔로 주문서 PRO 
+                            <span className="text-[10px] font-normal border border-slate-600 rounded px-1.5 py-0.5 ml-1 bg-slate-800 text-slate-300">
+                                {WS_ID === 'default' ? '통합 완전판' : `채널: ${WS_ID}`}
+                            </span>
+                        </div>
                         <div className="flex items-center gap-2">
                             <div className="flex bg-slate-800 dark:bg-slate-900 rounded p-1 gap-1">
                                 {[{ id: 'live', label: '라이브관제', icon: 'monitor-play' }, { id: 'manage', label: '주문관리', icon: 'file-xls' }].map(tab => (
