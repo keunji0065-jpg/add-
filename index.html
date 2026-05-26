@@ -351,13 +351,13 @@
         const SettingsField = ({ label, value, onChange, placeholder, type="text" }) => (
             <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{label}</label>
-                <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} className="w-full border dark:border-slate-600 rounded px-2 py-1.5 text-xs bg-slate-50 dark:bg-slate-900 dark:text-white outline-none" />
+                <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} className="w-full border dark:border-slate-600 rounded px-2 py-1.5 text-xs bg-slate-50 dark:bg-slate-900 dark:text-white focus:ring-1 focus:ring-slate-400 outline-none" />
             </div>
         );
 
         const SettingsModalContent = ({ 
             googleScriptUrl, setGoogleScriptUrl, inventoryScriptUrl, setInventoryScriptUrl, depositScriptUrl, setDepositScriptUrl,
-            rawSheetId, setRawSheetId, employeeSheetId, setEmployeeSheetId, broadcastName, setBroadcastName,
+            rawSheetId, setRawSheetId, orderSheetId, setOrderSheetId, employeeSheetId, setEmployeeSheetId, broadcastName, setBroadcastName,
             quickShipping, setQuickShipping, jejuShipping, setJejuShipping, freeShippingThreshold, setFreeShippingThreshold, 
             templateConfig, setTemplateConfig, bankAccount, setBankAccount, quickMessages, setQuickMessages, 
             setIsSettingsOpen, addressCutoffDate, setAddressCutoffDate, workspaceName, setWorkspaceName
@@ -371,6 +371,7 @@
                             <SettingsField label="💡 구글 시트 백업용 탭 이름" value={workspaceName} onChange={setWorkspaceName} placeholder="예: 봄신상(1)" />
                         </div>
                         <SettingsField label="메인 구글 앱스 스크립트 URL" value={googleScriptUrl} onChange={setGoogleScriptUrl} />
+                        <SettingsField label="주문서 백업 시트 ID" value={orderSheetId} onChange={setOrderSheetId} placeholder="주문서 데이터를 저장할 시트 ID" />
                         <SettingsField label="고객용 상품 스크립트 URL (선택/자동저장용)" value={inventoryScriptUrl} onChange={setInventoryScriptUrl} />
                         <SettingsField label="입금 알림 스크립트 URL" value={depositScriptUrl} onChange={setDepositScriptUrl} />
                         <SettingsField label="고객 폼 시트 ID 또는 주소록 스크립트 URL" value={rawSheetId} onChange={setRawSheetId} placeholder="배포된 스크립트 URL (https://...) 통째로 붙여넣기" />
@@ -677,7 +678,7 @@
         // ==========================================
         // LiveTab
         // ==========================================
-        const LiveTab = ({ orders, setOrders, productHistory, setProductHistory, quickShipping, jejuShipping, freeShippingThreshold, shippingOverrides, setShippingOverrides, bankAccount, googleScriptUrl, inventoryScriptUrl, depositScriptUrl, employeeSheetId, rawSheetId, addresses, setAddresses, cardPayments, setCardPayments, matchedDeposits, setMatchedDeposits, depositorNames, setDepositorNames, clickedChats, setClickedChats, openModal, keywords, setKeywords, sentAddressRequests, setSentAddressRequests, deletedDepositIds, setDeletedDepositIds, checkedOrders, setCheckedOrders, addressMapping, setAddressMapping, templateConfig, specialCustomers, setSpecialCustomers, inventory, setInventory, quickMessages, handleResetAllData, broadcastName, setGlobalError, addressCutoffDate, cashReceipts, setCashReceipts }) => {
+        const LiveTab = ({ orders, setOrders, productHistory, setProductHistory, quickShipping, jejuShipping, freeShippingThreshold, shippingOverrides, setShippingOverrides, bankAccount, googleScriptUrl, inventoryScriptUrl, depositScriptUrl, employeeSheetId, rawSheetId, orderSheetId, addresses, setAddresses, cardPayments, setCardPayments, matchedDeposits, setMatchedDeposits, depositorNames, setDepositorNames, clickedChats, setClickedChats, openModal, keywords, setKeywords, sentAddressRequests, setSentAddressRequests, deletedDepositIds, setDeletedDepositIds, checkedOrders, setCheckedOrders, addressMapping, setAddressMapping, templateConfig, specialCustomers, setSpecialCustomers, inventory, setInventory, quickMessages, handleResetAllData, broadcastName, setGlobalError, addressCutoffDate, cashReceipts, setCashReceipts }) => {
             const [serverDeposits, setServerDeposits] = useState([]);
             const [manualDeposits, setManualDeposits] = useState([]);
             const [selectedNick, setSelectedNick] = useState(null);
@@ -785,6 +786,39 @@
                     openModal("입금 매칭이 초기화되었습니다!\n잠시 후 순차적으로 자동 재매칭됩니다.", 'alert');
                 });
             }, [openModal, setOrders, setMatchedDeposits]);
+
+            const handleForceSave = async () => {
+                if (!googleScriptUrl) return openModal("구글 스크립트 URL이 설정되지 않았습니다.", "alert");
+                if (!orderSheetId) return openModal("설정에서 '주문서 백업 시트 ID'를 먼저 입력해주세요.", "alert");
+                setIsSaving(true);
+                try {
+                    const customerTotals = {};
+                    orders.filter(o => !o.isCancelled).forEach(o => { customerTotals[o.customer] = (customerTotals[o.customer] || 0) + Number(o.price); });
+
+                    const saveList = orders.filter(o=>!o.isCancelled).map(o => { 
+                        let addrRes = addressLookup.get(o.customer); let addr = addrRes.data || {}; 
+                        const currentShipping = getCalculatedShipping(o.customer, customerTotals[o.customer] || 0); 
+                        const isCard = cardPayments[o.customer] ? true : false; 
+                        return { nickname: o.customer, product: o.product, qty: o.quantity, price: o.price, deposit: o.deposit, shipping: currentShipping, grandTotal: 0, address: addr.address || '', zipcode: addr.zipcode ? "'" + addr.zipcode : '', phone: addr.phone ? "'" + addr.phone : '', realname: addr.realname || '', memo: addr.memo || '', isCard: isCard }; 
+                    }); 
+                    
+                    if (broadcastName) {
+                        saveList.unshift({ nickname: '___WORKSPACE_META___', product: broadcastName, qty: 0, price: 0, deposit: 0, shipping: 0, grandTotal: 0, address: '', zipcode: '', phone: '', realname: '', memo: '', isCard: false });
+                    }
+
+                    const actualSheetId = getCleanSheetId(orderSheetId); 
+                    const res = await fetchGas(googleScriptUrl, { action: 'save_orders', sheet_id: actualSheetId, data: saveList }); 
+                    if (res && res.success !== false) {
+                        openModal("시트에 주문서가 성공적으로 저장되었습니다!", "alert");
+                    } else {
+                        openModal("시트 저장에 실패했습니다. (스크립트 권한 문제 확인)", "alert");
+                    }
+                } catch(e) {
+                    openModal("오류 발생: " + e.message, "alert");
+                } finally {
+                    setIsSaving(false);
+                }
+            };
 
             const inventoryRef = useRef(inventory);
             const productHistoryRef = useRef(productHistory);
@@ -1555,7 +1589,7 @@
                 }
 
                 try { 
-                    const actualSheetId = getCleanSheetId(rawSheetId); 
+                    const actualSheetId = getCleanSheetId(orderSheetId); 
                     if(actualSheetId) {
                          await fetchGas(googleScriptUrl, { action: 'save_orders', sheet_id: actualSheetId, data: saveList }); 
                     }
@@ -1581,7 +1615,7 @@
                         fetchGas(googleScriptUrl, { action: 'save_addresses_batch', data: addressBatch }).catch(e=>console.log(e));
                     }
                 } catch(e) { } finally { setIsSaving(false); } 
-            }, [orders, cardPayments, getCalculatedShipping, googleScriptUrl, addressLookup, rawSheetId, broadcastName]);
+            }, [orders, cardPayments, getCalculatedShipping, googleScriptUrl, addressLookup, orderSheetId, broadcastName]);
 
             const autoSaveRef = useRef(); useEffect(() => { autoSaveRef.current = autoSaveToGoogleSheet; }, [autoSaveToGoogleSheet]);
             useEffect(() => { const saveInterval = setInterval(() => { if (autoSaveRef.current) autoSaveRef.current(); }, 60000); return () => clearInterval(saveInterval); }, []); 
@@ -1967,9 +2001,9 @@
                         <div className="p-2 bg-slate-100 dark:bg-slate-800 border-b dark:border-slate-700 flex flex-col gap-2">
                              <div className="font-bold text-slate-800 dark:text-slate-200 flex items-center justify-between"><div className="flex items-center gap-2"><span className="flex items-center gap-1"><Icon name="youtube-logo" weight="fill" className="text-red-500"/> 라이브 채팅</span><button onClick={() => setShowKeywordOnly(!showKeywordOnly)} className={`flex items-center justify-center w-6 h-6 rounded-full transition-all ${showKeywordOnly ? 'bg-slate-700 text-white shadow-sm' : 'bg-white dark:bg-slate-700 text-slate-400 dark:text-slate-300 border border-slate-300 dark:border-slate-600 hover:text-slate-600 dark:hover:text-slate-100'}`}><Icon name="target" weight={showKeywordOnly ? "fill" : "bold"} size={14} /></button></div><span className="text-xs text-slate-500 dark:text-slate-400">{filteredChats.length}건</span></div>
                              <div className="flex gap-2">
-                                 <div className="relative flex-1"><Icon name="magnifying-glass" className="absolute left-1.5 top-1/2 -translate-y-1/2 text-slate-400 text-[10px]"/><input type="text" placeholder="검색" value={chatSearch} onChange={e => setChatSearch(e.target.value)} className="w-full text-[10px] pl-5 py-1.5 border dark:border-slate-600 rounded outline-none bg-white dark:bg-slate-900 focus:ring-1 focus:ring-slate-400" /></div>
+                                 <div className="relative flex-1"><Icon name="magnifying-glass" className="absolute left-1.5 top-1/2 -translate-y-1/2 text-slate-400 text-[10px]"/><input type="text" placeholder="검색" value={chatSearch} onChange={e => setChatSearch(e.target.value)} onKeyDown={e => { if(e.key==='Escape'){ setChatSearch(''); e.target.blur(); } }} className="w-full text-[10px] pl-5 py-1.5 border dark:border-slate-600 rounded outline-none bg-white dark:bg-slate-900 focus:ring-1 focus:ring-slate-400" /></div>
                                  <form onSubmit={handleAddKeyword} className="flex gap-1 w-[45%]">
-                                     <input type="text" value={keywordInput} onChange={(e) => setKeywordInput(e.target.value)} placeholder="키워드" className="w-full text-[10px] border dark:border-slate-600 rounded px-1.5 py-1.5 bg-white dark:bg-slate-900 outline-none focus:ring-1 focus:ring-slate-400" />
+                                     <input type="text" value={keywordInput} onChange={(e) => setKeywordInput(e.target.value)} onKeyDown={e => { if(e.key==='Escape'){ setKeywordInput(''); e.target.blur(); } }} placeholder="키워드" className="w-full text-[10px] border dark:border-slate-600 rounded px-1.5 py-1.5 bg-white dark:bg-slate-900 outline-none focus:ring-1 focus:ring-slate-400" />
                                      <button type="submit" className="bg-slate-600 hover:bg-slate-700 text-white px-1.5 rounded text-[10px] font-bold transition-colors">＋</button>
                                      {(keywords || []).length > 0 && <button type="button" onClick={() => openModal('키워드를 모두 삭제하시겠습니까?', 'confirm', () => setKeywords([]))} className="bg-red-500 hover:bg-red-600 text-white px-1.5 rounded text-[10px] font-bold whitespace-nowrap transition-colors shadow-sm">비우기</button>}
                                  </form>
@@ -2013,8 +2047,14 @@
                         </div>
                         <div className="p-2 flex flex-col gap-2 bg-white dark:bg-slate-800 border-b dark:border-slate-700 z-20 shadow-sm">
                             <div className="flex justify-between items-center">
-                                <span className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1"><Icon name="package" weight="fill"/> 주문서 <span className="text-xs font-normal text-slate-500">({filteredGroupedOrders.length}명 / {totalItemsCount}건)</span></span>
+                                <span className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1">
+                                    <Icon name="package" weight="fill"/> 주문서 <span className="text-xs font-normal text-slate-500">({filteredGroupedOrders.length}명 / {totalItemsCount}건)</span>
+                                    {isSaving && <Icon name="spinner" className="animate-spin text-blue-500 ml-2" />}
+                                </span>
                                 <div className="flex items-center gap-1.5">
+                                    <button onClick={handleForceSave} disabled={isSaving} className={`px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1 shadow-sm transition-colors ${isSaving ? 'bg-slate-400 text-slate-200 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 text-white'}`} title="구글 시트에 즉시 저장">
+                                        <Icon name="floppy-disk" weight="fill" /> 수동 저장
+                                    </button>
                                     <button onClick={handleSendToEmployee} disabled={isSendingEmp} className={`px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1 shadow-sm transition-colors ${isSendingEmp ? 'bg-slate-400 text-slate-200 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 text-white'}`} title="확정된 주문을 직원 시트로 쏩니다">
                                         {isSendingEmp ? <Icon name="spinner" className="animate-spin" /> : <Icon name="paper-plane-right" weight="fill" />} 송장 전송
                                     </button>
@@ -2038,7 +2078,7 @@
                                 </form>
                                 <div className="w-[20%] relative h-full flex items-center min-w-[80px]">
                                     <Icon name="magnifying-glass" className="absolute left-1.5 top-1/2 -translate-y-1/2 text-slate-400 text-[10px]"/>
-                                    <input type="text" placeholder="주문자/상품 검색" value={orderSearch} onChange={e => setOrderSearch(e.target.value)} className="w-full h-full pl-6 pr-1 py-1.5 border dark:border-slate-600 rounded text-[10px] outline-none focus:ring-1 focus:ring-slate-500 bg-white dark:bg-slate-800 dark:text-white shadow-sm" />
+                                    <input type="text" placeholder="주문자/상품 검색" value={orderSearch} onChange={e => setOrderSearch(e.target.value)} onKeyDown={e => { if(e.key==='Escape'){ setOrderSearch(''); e.target.blur(); } }} className="w-full h-full pl-6 pr-1 py-1.5 border dark:border-slate-600 rounded text-[10px] outline-none focus:ring-1 focus:ring-slate-500 bg-white dark:bg-slate-800 dark:text-white shadow-sm" />
                                 </div>
                             </div>
                         </div>
@@ -2080,7 +2120,7 @@
                                 <div className="flex gap-1"><input type="text" value={newDepositName} onChange={(e)=>setNewDepositName(e.target.value)} placeholder="입금자" className="w-[50%] text-[10px] border dark:border-slate-600 rounded px-1 py-1 bg-transparent outline-none focus:ring-1 focus:ring-slate-500" /><input type="text" value={newDepositAmount ? Number(newDepositAmount).toLocaleString() : ''} onChange={(e)=>{ const val = e.target.value.replace(/,/g, ''); if(!isNaN(val)) setNewDepositAmount(val); }} placeholder="금액" className="w-[50%] text-[10px] border dark:border-slate-600 rounded px-1 py-1 bg-transparent text-right font-bold outline-none focus:ring-1 focus:ring-slate-500" /></div>
                                 <button type="submit" className="bg-slate-700 text-white text-[10px] font-bold py-1 rounded hover:bg-slate-800 transition-colors shadow-sm">추가</button>
                             </form>
-                            <div className="relative"><Icon name="magnifying-glass" className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-400 text-[10px]"/><input type="text" placeholder="검색" value={depositSearch} onChange={e => setDepositSearch(e.target.value)} className="w-full text-[10px] pl-6 pr-6 py-1.5 border dark:border-slate-600 rounded focus:ring-1 focus:ring-slate-500 outline-none bg-white dark:bg-slate-900" />{depositSearch && <button onClick={()=>setDepositSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><Icon name="x-circle" weight="fill" size={12}/></button>}</div>
+                            <div className="relative"><Icon name="magnifying-glass" className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-400 text-[10px]"/><input type="text" placeholder="검색" value={depositSearch} onChange={e => setDepositSearch(e.target.value)} onKeyDown={e => { if(e.key==='Escape'){ setDepositSearch(''); e.target.blur(); } }} className="w-full text-[10px] pl-6 pr-6 py-1.5 border dark:border-slate-600 rounded focus:ring-1 focus:ring-slate-500 outline-none bg-white dark:bg-slate-900" />{depositSearch && <button onClick={()=>setDepositSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><Icon name="x-circle" weight="fill" size={12}/></button>}</div>
                             {selectedNick && <div className="text-[10px] text-slate-700 dark:text-slate-300 bg-slate-200 dark:bg-slate-700 p-1 rounded text-center font-bold animate-pulse border border-slate-300 dark:border-slate-600 truncate">👇 '{selectedNick}' 대기</div>}
                         </div>
                         <div className="flex-1 overflow-y-auto p-1 space-y-1 bg-slate-50 dark:bg-slate-900">
@@ -2115,7 +2155,7 @@
                                 </div>
                             </div>
                             <div className="text-[9px] text-slate-600 dark:text-slate-400 bg-slate-200 dark:bg-slate-700 p-1 rounded border dark:border-slate-600 text-center flex items-center justify-center gap-1"><Icon name="arrows-clockwise" className={addrSyncStatus === "동기화 진행중..." ? "animate-spin" : ""} /> {addrSyncStatus}</div>
-                            <div className="relative"><Icon name="magnifying-glass" className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-400 text-[10px]"/><input type="text" placeholder="이름/연락처 검색" value={addressSearch} onChange={e => setAddressSearch(e.target.value)} className="w-full text-[10px] pl-6 pr-6 py-1.5 border dark:border-slate-600 rounded focus:ring-1 focus:ring-slate-500 outline-none bg-white dark:bg-slate-900" />{addressSearch && <button onClick={()=>setAddressSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><Icon name="x-circle" weight="fill" size={12}/></button>}</div>
+                            <div className="relative"><Icon name="magnifying-glass" className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-400 text-[10px]"/><input type="text" placeholder="이름/연락처 검색" value={addressSearch} onChange={e => setAddressSearch(e.target.value)} onKeyDown={e => { if(e.key==='Escape'){ setAddressSearch(''); e.target.blur(); } }} className="w-full text-[10px] pl-6 pr-6 py-1.5 border dark:border-slate-600 rounded focus:ring-1 focus:ring-slate-500 outline-none bg-white dark:bg-slate-900" />{addressSearch && <button onClick={()=>setAddressSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><Icon name="x-circle" weight="fill" size={12}/></button>}</div>
                         </div>
                         <div className="flex-1 overflow-y-auto p-1 space-y-1 bg-slate-50 dark:bg-slate-900">
                             {visibleAddresses.map((addr, idx) => {
@@ -2535,6 +2575,7 @@
             const [depositScriptUrl, setDepositScriptUrl] = useLocalStorage('depositScriptUrl', 'https://script.google.com/macros/s/AKfycbwe1zE6N57FS6f4FUQEcjBGwgReThllpKuZ1gFEXhYzjo13cMRpWlkHC-U3LQUbLiMa/exec');
             const [employeeSheetId, setEmployeeSheetId] = useLocalStorage('employeeSheetId', '1vsXebx4B3vOkP6L6GT6ZJ6uUScBOsank1J_DBH4Zzx0');
             const [rawSheetId, setRawSheetId] = useLocalStorage('rawSheetId', '1ywl4gRvswQpvIYtPVbSROzz7a5elbLieYhqMZmt191U');
+            const [orderSheetId, setOrderSheetId] = useLocalStorage('orderSheetId', '1FWAY03SaggiUGwaUDHIJciLv5i1dMOgT8asxev');
             const [broadcastName, setBroadcastName] = useLocalStorage('broadcastName', '오늘의방송');
             const [modalConfig, setModalConfig] = useState({ isOpen: false, type: 'alert', message: '', onConfirm: null, initialValue: '' });
             const [globalError, setGlobalError] = useState('');
@@ -2635,7 +2676,7 @@
                     {isSettingsOpen && (
                         <SettingsModalContent 
                             googleScriptUrl={googleScriptUrl} setGoogleScriptUrl={setGoogleScriptUrl} inventoryScriptUrl={inventoryScriptUrl} setInventoryScriptUrl={setInventoryScriptUrl} depositScriptUrl={depositScriptUrl} setDepositScriptUrl={setDepositScriptUrl}
-                            rawSheetId={rawSheetId} setRawSheetId={setRawSheetId} employeeSheetId={employeeSheetId} setEmployeeSheetId={setEmployeeSheetId} broadcastName={broadcastName} setBroadcastName={setBroadcastName}
+                            rawSheetId={rawSheetId} setRawSheetId={setRawSheetId} orderSheetId={orderSheetId} setOrderSheetId={setOrderSheetId} employeeSheetId={employeeSheetId} setEmployeeSheetId={setEmployeeSheetId} broadcastName={broadcastName} setBroadcastName={setBroadcastName}
                             quickShipping={quickShipping} setQuickShipping={setQuickShipping} jejuShipping={jejuShipping} setJejuShipping={setJejuShipping} freeShippingThreshold={freeShippingThreshold} setFreeShippingThreshold={setFreeShippingThreshold}
                             templateConfig={templateConfig} setTemplateConfig={setTemplateConfig} bankAccount={bankAccount} setBankAccount={setBankAccount} quickMessages={quickMessages} setQuickMessages={setQuickMessages}
                             setIsSettingsOpen={setIsSettingsOpen} addressCutoffDate={addressCutoffDate} setAddressCutoffDate={setAddressCutoffDate} workspaceName={broadcastName} setWorkspaceName={setBroadcastName}
@@ -2643,7 +2684,7 @@
                     )}
                     
                     <main className="flex-1 overflow-hidden bg-slate-200 dark:bg-slate-950 p-2 relative">
-                        {activeTab === 'live' && <LiveTab {...{ orders, setOrders, productHistory, setProductHistory, quickShipping, jejuShipping, freeShippingThreshold, shippingOverrides, setShippingOverrides, bankAccount, googleScriptUrl, inventoryScriptUrl, depositScriptUrl, employeeSheetId, rawSheetId, addresses, setAddresses, cardPayments, setCardPayments, matchedDeposits, setMatchedDeposits, depositorNames, setDepositorNames, clickedChats, setClickedChats, openModal, keywords, setKeywords, sentAddressRequests, setSentAddressRequests, deletedDepositIds, setDeletedDepositIds, checkedOrders, setCheckedOrders, addressMapping, setAddressMapping, templateConfig, specialCustomers, setSpecialCustomers, inventory, setInventory, quickMessages, handleResetAllData, broadcastName, setGlobalError, addressCutoffDate, cashReceipts, setCashReceipts }} />}
+                        {activeTab === 'live' && <LiveTab {...{ orders, setOrders, productHistory, setProductHistory, quickShipping, jejuShipping, freeShippingThreshold, shippingOverrides, setShippingOverrides, bankAccount, googleScriptUrl, inventoryScriptUrl, depositScriptUrl, employeeSheetId, rawSheetId, orderSheetId, addresses, setAddresses, cardPayments, setCardPayments, matchedDeposits, setMatchedDeposits, depositorNames, setDepositorNames, clickedChats, setClickedChats, openModal, keywords, setKeywords, sentAddressRequests, setSentAddressRequests, deletedDepositIds, setDeletedDepositIds, checkedOrders, setCheckedOrders, addressMapping, setAddressMapping, templateConfig, specialCustomers, setSpecialCustomers, inventory, setInventory, quickMessages, handleResetAllData, broadcastName, setGlobalError, addressCutoffDate, cashReceipts, setCashReceipts }} />}
                         {activeTab === 'manage' && <OrderManagementTab {...{ orders, shippingOverrides, quickShipping, jejuShipping, freeShippingThreshold, broadcastName, addresses, handleExportBackup, handleImportBackup, addressMapping, cardPayments, specialCustomers, openModal, cashReceipts, inventory, productHistory }} />}
                     </main>
                 </div>
