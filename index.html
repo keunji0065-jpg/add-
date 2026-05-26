@@ -6,7 +6,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <title>깔로 주문서 PRO - 통합 완전판</title>
+    <title>깔로 스마트 오더</title>
     
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin="anonymous"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
@@ -129,7 +129,7 @@
                 const text = await response.text();
                 
                 // 🔴 고장 해결: 에러가 나도 앱이 뻗지 않도록 강제 방어막 설치
-                if (text.includes("<!DOCTYPE") || text.includes("<html") || text.includes("깔로주문서")) {
+                if (text.includes("<!DOCTYPE") || text.includes("<html") || text.includes("깔로주문서") || text.includes("깔로 스마트 오더")) {
                     return { error: "ignored_safely", success: false };
                 }
 
@@ -1011,7 +1011,7 @@
             }, [allDeposits, depositSearch, selectedNick, deletedDepositIds, matchedDeposits, depositorNames, addressLookup]);
             
             const dashboardStats = useMemo(() => {
-                let totalSales = 0, totalDeposit = 0, totalUnpaid = 0, totalCardExpected = 0, missingAddressCount = 0;
+                let totalSales = 0, totalDeposit = 0, totalUnpaid = 0, totalOverpaid = 0, totalCardExpected = 0, missingAddressCount = 0;
                 const groups = {};
                 orders.forEach(o => { if (!groups[o.customer]) groups[o.customer] = []; groups[o.customer].push(o); });
                 Object.entries(groups).forEach(([nick, items]) => {
@@ -1035,9 +1035,11 @@
                     if (finalBalance > 0) { 
                         if (isCard) totalCardExpected += finalBalance; 
                         else totalUnpaid += finalBalance; 
+                    } else if (finalBalance < 0 && !isCard) {
+                        totalOverpaid += Math.abs(finalBalance);
                     }
                 });
-                return { totalSales, totalDeposit, totalUnpaid, totalCardExpected, missingAddressCount };
+                return { totalSales, totalDeposit, totalUnpaid, totalOverpaid, totalCardExpected, missingAddressCount };
             }, [orders, cardPayments, getCalculatedShipping, addressLookup]);
 
             const customerPaidStatus = useMemo(() => {
@@ -1096,6 +1098,7 @@
                     const finalBal = baseBal + (isCard && baseBal > 0 ? baseBal * 0.1 : 0);
                     
                     if (filterStatus === 'unpaid') return !isCard && finalBal > 0 && activeProd > 0;
+                    if (filterStatus === 'overpaid') return !isCard && finalBal < 0;
                     if (filterStatus === 'paid') return !isCard && finalBal <= 0 && activeProd > 0;
                     return true;
                 });
@@ -1972,7 +1975,7 @@
                             ))}
                         </div>
                         <div className="p-2 bg-slate-100 dark:bg-slate-800 border-b dark:border-slate-700 flex flex-col gap-2">
-                             <div className="font-bold text-slate-800 dark:text-slate-200 flex items-center justify-between"><div className="flex items-center gap-2"><span className="flex items-center gap-1"><Icon name="youtube-logo" weight="fill" className="text-red-500"/> 라이브 댓글</span><button onClick={() => setShowKeywordOnly(!showKeywordOnly)} className={`flex items-center justify-center w-6 h-6 rounded-full transition-all ${showKeywordOnly ? 'bg-slate-700 text-white shadow-sm' : 'bg-white dark:bg-slate-700 text-slate-400 dark:text-slate-300 border border-slate-300 dark:border-slate-600 hover:text-slate-600 dark:hover:text-slate-100'}`}><Icon name="target" weight={showKeywordOnly ? "fill" : "bold"} size={14} /></button></div><span className="text-xs text-slate-500 dark:text-slate-400">{filteredChats.length}건</span></div>
+                             <div className="font-bold text-slate-800 dark:text-slate-200 flex items-center justify-between"><div className="flex items-center gap-2"><span className="flex items-center gap-1"><Icon name="youtube-logo" weight="fill" className="text-red-500"/> 라이브 채팅</span><button onClick={() => setShowKeywordOnly(!showKeywordOnly)} className={`flex items-center justify-center w-6 h-6 rounded-full transition-all ${showKeywordOnly ? 'bg-slate-700 text-white shadow-sm' : 'bg-white dark:bg-slate-700 text-slate-400 dark:text-slate-300 border border-slate-300 dark:border-slate-600 hover:text-slate-600 dark:hover:text-slate-100'}`}><Icon name="target" weight={showKeywordOnly ? "fill" : "bold"} size={14} /></button></div><span className="text-xs text-slate-500 dark:text-slate-400">{filteredChats.length}건</span></div>
                              <div className="flex gap-2">
                                  <div className="relative flex-1"><Icon name="magnifying-glass" className="absolute left-1.5 top-1/2 -translate-y-1/2 text-slate-400 text-[10px]"/><input type="text" placeholder="검색" value={chatSearch} onChange={e => setChatSearch(e.target.value)} className="w-full text-[10px] pl-5 py-1.5 border dark:border-slate-600 rounded outline-none bg-white dark:bg-slate-900 focus:ring-1 focus:ring-slate-400" /></div>
                                  <form onSubmit={handleAddKeyword} className="flex gap-1 w-[45%]">
@@ -2007,6 +2010,7 @@
                               {id:'no-kakao', label:'카톡없음', val:orders.filter(o=>!o.isCancelled && !checkedOrders.has(o.customer)).length, isCurrency:false},
                               {id:'paid', label:'완납', val:dashboardStats.totalDeposit, isCurrency:true}, 
                               {id:'unpaid', label:'미수금', val:dashboardStats.totalUnpaid, isCurrency:true}, 
+                              {id:'overpaid', label:'과납', val:dashboardStats.totalOverpaid, isCurrency:true},
                               {id:'card', label:'카드예정', val:dashboardStats.totalCardExpected, isCurrency:true}
                             ].map(s => (
                                 <div key={s.id} onClick={s.onClick || (()=>setFilterStatus(s.id))} className={`bg-white dark:bg-slate-800 p-1 rounded border-2 cursor-pointer shadow-sm transition-colors flex flex-col justify-center overflow-hidden ${s.colSpan === 2 ? 'col-span-2' : ''} ${filterStatus===s.id ? 'border-slate-600 dark:border-slate-400' : 'border-transparent hover:border-slate-300 dark:hover:border-slate-600'}`}>
@@ -2615,7 +2619,7 @@
                 <div className="flex flex-col h-screen overflow-hidden text-slate-800 dark:text-slate-200">
                     <header className="h-12 bg-slate-900 dark:bg-slate-950 text-white flex items-center justify-between px-4 shrink-0 shadow-md z-50 border-b border-slate-700">
                         <div className="font-bold text-lg flex items-center gap-2 transition-transform hover:scale-105 duration-200 cursor-pointer text-slate-100">
-                            <Icon name="lightning" className="text-slate-400" weight="fill"/> 깔로 주문서 PRO 
+                            <Icon name="lightning" className="text-slate-400" weight="fill"/> 깔로 스마트 오더 
                             <span className="text-[10px] font-normal border border-slate-600 rounded px-1.5 py-0.5 ml-1 bg-slate-800 text-slate-300">
                                 {WS_ID === 'default' ? '통합 완전판' : `채널: ${WS_ID}`}
                             </span>
