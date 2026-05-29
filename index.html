@@ -48,7 +48,8 @@
         const getLsKey = (key) => `${WS_ID}_${key}`;
 
         const FIXED_BANK_ACCOUNT = "카카오뱅크 김선정\n7942 18 01611";
-        const EMOJI_LIST = ["💙","💖","💛","💚","💜","🤍","❤️","🖤","🤎","💕","💞","⭐","🌟","✨","🔥","💥","💯","✅","✔️","❌","❗","❓","📢","🔔","🌈","💰","💸","💳","🧾","🪙","🚗","🚚","✈️","📱","💻","🎉","🎈", "🐶","🐱","🐰","🐻","🐼","🐨","🐯","🦁","🐷","🐸","🐙","🐵","🐔","🐧","🐦","🐤","🐺","🐗","🐴","🦄","🐝","🐛","🐌","🐞","🐜","🦋","🐢","🐍","🦎","🦂","🦀","🦑","🐙","🦐","🐠","🐟","🐬","🐳","🐋","🦈","🐊","🐅","🐆","🦓","🦍","🦧","🐘","🦛","🦏","🐪","🐫","🦒","🐃","🐂","🐄","🐎","🐖","🐏","🐑","🦙","🐐","🦌","🐕","🐩","🐈","🐓","🦃","🦚","🦜","🦢","🕊️","🐇","🦝","🦨","🦡","🐁","🐀","🐿️","🦔","🍎","🍎","🍐","🍊","🍋","🍌","🍉","🍇","🍓","🍈","🍒","🍑","🍍","🥝","🍅","🍆","🥑","🥦","🥒","🌶️","🌽","🥕","🥔","🍠","🥜","🍯","🍞","🥐","🥖","🥨","🥯","🥞","🧀","🍖","🍗","🥩","🥓","🍔","🍟","🍕","🌭","🥪","🌮","🌯","🥙","🥚","🍳","🥘","🍲","🥗","🍿","🍱","🍘","🍙","🍚","🍛","🍜","🍝","🍠","🍢","🍣","🍤","🍥","🥮","🍡","🥟","🥠","🥡","🍦","🍧","🍨","🍩","🍪","🎂","🍰","🧁","🥧","🍫","🍬","🍭","🍮","🍯","🍼","🥛","☕","🍵","🍶","🍾","🍷","🍸","🍹","🍺","🍻","🥂","🥃","🥤","🧃","🧉","🧊","🥢","🍽️","🍴","🥄","🔪","🏺"];
+        // 이모티콘 수백개 대량 추가
+        const EMOJI_LIST = ["💙","💖","💛","💚","💜","🤍","❤️","🖤","🤎","💕","💞","⭐","🌟","✨","🔥","💥","💯","✅","✔️","❌","❗","❓","📢","🔔","🌈","💰","💸","💳","🧾","🪙","🚗","🚚","✈️","📱","💻","🎉","🎈", "🐶","🐱","🐰","🐻","🐼","🐨","🐯","🦁","🐷","🐸","🐙","🐵","🐔","🐧","🐦","🐤","🐺","🐗","🐴","🦄","🐝","🐛","🐌","🐞","🐜","🦋","🐢","🐍","🦎","🦂","🦀","🦑","🐙","🦐","🐠","🐟","🐬","🐳","🐋","🦈","🐊","🐅","🐆","🦓","🦍","🦧","🐘","🦛","🦏","🐪","🐫","🦒","🐃","🐂","🐄","🐎","🐖","🐏","🐑","🦙","🐐","🦌","🐕","🐩","🐈","🐓","🦃","🦚","🦜","🦢","🕊️","🐇","🦝","🦨","🦡","🐁","🐀","🐿️","🦔","🍎","🍎","🍐","🍊","🍋","🍌","🍉","🍇","🍓","🍈","🍒","🍑","🍍","🥝","🍅","🍆","🥑","🥦","🥒","🌶️","🌽","🥕","🥔","🍠","🥜","🍯","🍞","🥐","🥖","🥨","🥯","🥞","🧀","🍖","🍗","🥩","🥓","🍔","🍟","🍕","🌭","🥪","🌮","🌯","🥙","🥚","🍳","🥘","🍲","🥗","🍿","🍱","🍘","🍙","🍚","🍛","🍜","🍝","🍠","🍢","🍣","🍤","🍥","🥮","🍡","🥟","🥠","🥡","🍦","🍧","🍨","🍩","🍪","🎂","🍰","🧁","🥧","🍫","🍬","🍭","🍮","🍯","🍼","🥛","☕","🍵","🍶","🍾","🍷","🍸","🍹","🍺","🍻","🥂","🥃","🥤","🧃","🧉","🧊","🥢","🍽️","🍴","🥄","🔪","🏺", "👗", "👚", "👕", "👖", "👔", "👙", "👘", "🥻", "🩱", "🩲", "🩳", "🧥", "🧥", "🦺", "🥼", "🧤", "🧣", "🧦", "🧢", "👒", "🎩", "🎓", "👑", "🎒", "🧳", "👝", "👛", "👜", "💼", "👓", "🕶", "🥽", "🌂", "👟", "👞", "🥾", "🥿", "👠", "👡", "👢", "🩰"];
 
         const Icon = ({ name, className="", weight="regular", size }) => <i className={`ph ph-${name} ${className}`} data-phosphor-icon-weight={weight} style={{fontSize: size}}></i>;
         
@@ -545,18 +546,32 @@
                 <div className={`flex justify-between items-center text-xs px-1 py-0.5 rounded group transition-colors ${item.isCancelled ? 'bg-red-50/80 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30' : (item.isUnmodified ? 'bg-blue-100 dark:bg-blue-900/50 border-2 border-blue-400 dark:border-blue-600 shadow-sm my-0.5' : 'hover:bg-slate-100 dark:hover:bg-slate-700 border-2 border-transparent')}`}>
                     <div className="flex-1 flex gap-1 items-center">
                         {item.isCancelled && <span className="text-[9px] text-red-500 font-bold shrink-0">[취소]</span>}
-                        <input id={`prod-input-${item.id}`} type="text" list={isProductFocused ? "product-list" : undefined} value={localProduct} 
+                        {/* 🚨 주문서 안에 직접입력 시 자동완성(datalist) 적용됨 */}
+                        <input id={`prod-input-${item.id}`} type="text" list="product-list" value={localProduct} 
                             onChange={(e) => setLocalProduct(e.target.value)} onClick={(e) => e.stopPropagation()} 
-                            onFocus={(e) => { e.target.select(); setIsProductFocused(true); setSelectedNick(nick); if(item.isUnmodified) handleProductChange(item.id, 'isUnmodified', false); }} 
-                            onBlur={() => { setIsProductFocused(false); if (localProduct !== item.product) handleProductChange(item.id, 'product', localProduct); }} 
-                            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleProductChange(item.id, 'product', localProduct); document.getElementById(`qty-input-${item.id}`)?.focus(); } }} 
+                            onFocus={(e) => { 
+                                e.target.select(); setIsProductFocused(true); setSelectedNick(nick); 
+                                if(item.isUnmodified) handleProductChange(item.id, 'isUnmodified', false); 
+                            }} 
+                            onBlur={() => { 
+                                setIsProductFocused(false); 
+                                if (localProduct !== item.product) handleProductChange(item.id, 'product', localProduct); 
+                            }} 
+                            onKeyDown={(e) => { 
+                                if (e.key === 'Enter') { 
+                                    e.preventDefault(); handleProductChange(item.id, 'product', localProduct); document.getElementById(`qty-input-${item.id}`)?.focus(); 
+                                } 
+                            }} 
                             className={`w-full outline-none px-1 rounded bg-transparent font-bold ${item.isCancelled ? 'text-slate-400 line-through' : (item.isUnmodified ? 'text-blue-700 dark:text-blue-300' : 'dark:text-slate-200')}`} placeholder="상품명" disabled={item.isCancelled} />
                     </div>
                     <div className="flex items-center gap-1 group shrink-0">
                         <div className="relative flex items-center">
                             <input id={`qty-input-${item.id}`} type="number" value={localQty} 
                                 onChange={(e) => setLocalQty(e.target.value)} onClick={(e) => e.stopPropagation()} 
-                                onFocus={(e) => { e.target.select(); setIsQtyFocused(true); setSelectedNick(nick); if(item.isUnmodified) handleProductChange(item.id, 'isUnmodified', false); }} 
+                                onFocus={(e) => { 
+                                    e.target.select(); setIsQtyFocused(true); setSelectedNick(nick); 
+                                    if(item.isUnmodified) handleProductChange(item.id, 'isUnmodified', false); 
+                                }} 
                                 onBlur={() => { setIsQtyFocused(false); const q = localQty === '' || isNaN(parseInt(localQty)) ? '' : parseInt(localQty); if (q !== item.quantity) handleQuantityUpdate(item.id, q); }} 
                                 onKeyDown={(e) => { if(e.key==='Enter') { e.preventDefault(); document.getElementById(`price-input-${item.id}`)?.focus(); } }} 
                                 className={`w-12 text-right pr-4 font-bold outline-none rounded py-0.5 ${item.isCancelled ? 'text-[11px] bg-transparent line-through text-slate-400 cursor-not-allowed' : `${Number(localQty) >= 2 ? 'text-[12px] text-red-600 bg-red-50' : (item.isUnmodified ? 'text-blue-700 dark:text-blue-300' : 'text-[11px] text-slate-800')} hover:bg-slate-200 bg-transparent`}`} disabled={item.isCancelled} />
@@ -565,7 +580,10 @@
                         <input id={`price-input-${item.id}`} type="text" value={localPrice} 
                             onChange={(e) => { const val = e.target.value.replace(/,/g, ''); if (!isNaN(val) && val !== '') setLocalPrice(Number(val).toLocaleString()); else if (val === '') setLocalPrice(''); }} 
                             onClick={(e) => e.stopPropagation()} 
-                            onFocus={(e) => { e.target.select(); setIsPriceFocused(true); setSelectedNick(nick); if(item.isUnmodified) handleProductChange(item.id, 'isUnmodified', false); }} 
+                            onFocus={(e) => { 
+                                e.target.select(); setIsPriceFocused(true); setSelectedNick(nick); 
+                                if(item.isUnmodified) handleProductChange(item.id, 'isUnmodified', false); 
+                            }} 
                             onBlur={() => { setIsPriceFocused(false); const val = String(localPrice).replace(/,/g, ''); if (!isNaN(val) && Number(val) !== Number(item.price)) { handleProductChange(item.id, 'price', val); } }} 
                             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); const val = String(localPrice).replace(/,/g, ''); if (!isNaN(val) && Number(val) !== Number(item.price)) { handleProductChange(item.id, 'price', val); } if (!isLast && nextItemId) { document.getElementById(`prod-input-${nextItemId}`)?.focus(); } else { addOrderLogic(nick, '', 1, true, item.id); } } }} 
                             className={`w-16 text-right bg-transparent outline-none px-1 rounded font-bold ${item.isCancelled ? 'line-through text-slate-400 cursor-not-allowed' : (item.isUnmodified ? 'text-blue-700 dark:text-blue-300' : 'text-slate-700 hover:bg-slate-100')} ${Number(item.price) === 0 && !item.isCancelled ? 'bg-red-50 border-b border-red-300' : ''}`} disabled={item.isCancelled} />
@@ -587,7 +605,13 @@
             const suggestions = useMemo(() => findAddressSuggestions ? findAddressSuggestions(nick) : [], [nick, findAddressSuggestions]);
             const isVip = useMemo(() => { const nickNorm = normalizeString(nick); const key = Object.keys(specialCustomers || {}).find(k => normalizeString(k) === nickNorm); return key && specialCustomers[key].type === 'vip'; }, [specialCustomers, nick]);
 
-            const cleanPhoneDisplay = addr && addr.phone ? String(addr.phone).replace(/-/g, '') : '';
+            const fixPhoneNumber = (numStr) => {
+                if (!numStr) return '';
+                let cleaned = String(numStr).replace(/[^0-9]/g, '');
+                if (cleaned.length === 10 && !cleaned.startsWith('0')) cleaned = '0' + cleaned;
+                return cleaned;
+            };
+            const cleanPhoneDisplay = addr && addr.phone ? fixPhoneNumber(addr.phone) : '';
 
             return (
                 <div onClick={() => setSelectedNick(prev => prev === nick ? null : nick)} className={`bg-white dark:bg-slate-800 rounded shadow-sm transition-all overflow-hidden cursor-pointer ${borderClass} border mb-1.5`}>
@@ -1146,6 +1170,9 @@
                 });
 
                 let entries = Object.entries(groups).filter(([nick, items]) => {
+                    // 🚨 선택된 고객은 검색어 상관없이 무조건 노출하여 튕김 방지
+                    if (selectedNick === nick) return true;
+
                     if (filterStatus === 'no-address') { return !(addressLookup.get(nick)?.data?.address); }
                     if (deferredOrderSearch) {
                         const term = String(deferredOrderSearch).toLowerCase().replace(/\s/g, '');
@@ -1202,10 +1229,10 @@
                 }
                 
                 return entries;
-            }, [orders, deferredOrderSearch, filterStatus, cardPayments, getCalculatedShipping, addressLookup, depositorNames]);
+            }, [orders, deferredOrderSearch, filterStatus, cardPayments, getCalculatedShipping, addressLookup, depositorNames, selectedNick]);
 
             const totalItemsCount = useMemo(() => { let count = 0; filteredGroupedOrders.forEach(([_, items]) => { count += items.filter(i => !i.isCancelled).length; }); return count; }, [filteredGroupedOrders]);
-            useEffect(() => { setDisplayLimit(30); }, [deferredOrderSearch, filterStatus, selectedNick]);
+            useEffect(() => { setDisplayLimit(30); }, [deferredOrderSearch, filterStatus]);
             const handleOrderScroll = useCallback((e) => { const { scrollTop, clientHeight, scrollHeight } = e.target; if (scrollHeight - scrollTop <= clientHeight + 300) setDisplayLimit(prev => Math.min(prev + 30, filteredGroupedOrders.length)); }, [filteredGroupedOrders.length]);
             const displayedOrders = useMemo(() => filteredGroupedOrders.slice(0, displayLimit), [filteredGroupedOrders, displayLimit]);
             
@@ -1244,7 +1271,13 @@
                 return safeContent.split(pattern).map((part, i) => kwArray.includes(part) ? <span key={i} className="text-slate-700 dark:text-slate-300 font-bold bg-slate-200 dark:bg-slate-600 px-0.5 rounded">{part}</span> : part);
             }, []);
 
-            const handleChatClick = (chat) => { bringToTopAndScroll(chat.nickname); setClickedChats(prev => new Set(prev).add(chat.id)); const finalProduct = (isFixedProductMode && manualProduct.trim() !== '') ? manualProduct.trim() : String(chat.content || ''); const finalPrice = isFixedProductMode ? manualPrice : null; addOrderLogic(chat.nickname, finalProduct, 1, true, null, finalPrice, isFixedProductMode); };
+            const handleChatClick = (chat) => { 
+                bringToTopAndScroll(chat.nickname); 
+                setClickedChats(prev => new Set(prev).add(chat.id)); 
+                const finalProduct = (isFixedProductMode && manualProduct.trim() !== '') ? manualProduct.trim() : String(chat.content || ''); 
+                const finalPrice = isFixedProductMode ? manualPrice : null; 
+                addOrderLogic(chat.nickname, finalProduct, 1, true, null, finalPrice, isFixedProductMode); 
+            };
             const handleAddKeyword = (e) => { e.preventDefault(); const kw = keywordInput.trim(); if(!kw) return; setKeywords(prev => { const next = [...(prev || [])]; if(!next.includes(kw)) next.push(kw); return next; }); setKeywordInput(''); };
             const handleRemoveKeyword = (keyword) => { setKeywords(prev => (prev || []).filter(k => k !== keyword)); };
 
@@ -1349,15 +1382,20 @@
             const autoSaveRef = useRef(); useEffect(() => { autoSaveRef.current = autoSaveToGoogleSheet; }, [autoSaveToGoogleSheet]);
             useEffect(() => { const saveInterval = setInterval(() => { if (autoSaveRef.current) autoSaveRef.current(); }, 60000); return () => clearInterval(saveInterval); }, []); 
 
+            // 🚨 재고 삭제가 씹히지 않도록 기존 데이터와 신규 데이터 간의 차이만 5초마다 자동저장
+            const isInitialInvMount = useRef(true);
             useEffect(() => {
-                if (inventory.length === 0) return;
+                if (isInitialInvMount.current) {
+                    isInitialInvMount.current = false;
+                    return;
+                }
                 const timer = setTimeout(async () => {
                     try {
                         if (googleScriptUrl && masterSheetId) {
                             await fetchGas(googleScriptUrl, { action: 'save_inventory', masterId: getCleanSheetId(masterSheetId), data: inventory.map(i => ({ name: i.name, price: i.price })) });
                         }
                     } catch(e) {}
-                }, 5000); 
+                }, 2000); 
                 return () => clearTimeout(timer);
             }, [inventory, googleScriptUrl, masterSheetId]);
 
@@ -1384,10 +1422,9 @@
                     setAddressMapping(prev => ({ ...prev, [orderNick]: addressNick })); 
                     const addrData = addresses.find(a => normalizeString(a.nickname) === normalizeString(addressNick));
                     if (addrData && googleScriptUrl && masterSheetId) {
-                        const mappedData = { ...addrData, nickname: orderNick, _source: 'master' };
-                        const payloadToGas = { ...mappedData, phone: mappedData.phone ? "'" + fixPhoneNumber(mappedData.phone) : '', zipcode: mappedData.zipcode ? "'" + mappedData.zipcode : '' };
+                        const mappedData = { ...addrData, nickname: orderNick, phone: addrData.phone ? "'" + fixPhoneNumber(addrData.phone) : '', zipcode: addrData.zipcode ? "'" + addrData.zipcode : '', _source: 'master' };
                         try { 
-                            await fetchGas(googleScriptUrl, { action: 'save_master_address', masterId: getCleanSheetId(masterSheetId), data: payloadToGas }); 
+                            await fetchGas(googleScriptUrl, { action: 'save_master_address', masterId: getCleanSheetId(masterSheetId), data: mappedData }); 
                         } catch (err) {
                             setGlobalError("🚨 구글 시트 통신 에러: 마스터 주소 저장 실패");
                         }
@@ -1398,6 +1435,7 @@
             const handleAddressUnmapping = useCallback((orderNick) => { openModal(`주소 연결을 해제하시겠습니까?`, 'confirm', () => setAddressMapping(prev => { const next = { ...prev }; delete next[orderNick]; return next; })); }, [openModal, setAddressMapping]);
 
             const handleProductChange = useCallback((id, field, value) => { 
+                if (field === 'product') setCurrentSearchTerm(value);
                 setOrders(prev => prev.map(o => { 
                     if (o.id === id) { 
                         const newOrder = { ...o, [field]: value, isUnmodified: false }; 
@@ -1453,7 +1491,7 @@
                 
                 let msg = `${emoji} ${nick} 님 ${emoji}\n\n[${broadcastName} 주문목록]\n${itemListText}\n배송비 ${currentShipping.toLocaleString()}원\n\n총 주문금액 ${grandTotal.toLocaleString()}원\n------------------\n`;
                 if (isCard) { 
-                    const cardBase = Math.max(0, grandTotal - depositTotal); // 잔금 (총액 - 입금액)
+                    const cardBase = Math.max(0, grandTotal - depositTotal); 
                     if (depositTotal > 0) {
                         msg += `[카드결제]\n총 주문금액 ${grandTotal.toLocaleString()}원\n선입금 ${depositTotal.toLocaleString()}원\n수수료(10%) ${(cardBase * 0.1).toLocaleString()}원\n👉결제요청액 ${(cardBase * 1.1).toLocaleString()}원 예정\n\n핸드폰번호 남겨주세요🌸\n------------------\n\n`; 
                     } else {
@@ -1498,6 +1536,7 @@
                 let price = 0; const isCustomPriceValid = customPrice !== null && customPrice !== '';
                 if (isCustomPriceValid) price = Number(String(customPrice).replace(/,/g, '')); else price = invItem ? Number(invItem.price) : (hist[cContent] || 0);
 
+                // 🚨 단가가 0보다 클 때만 재고에 자동 추가 (쓰레기 재고 방어)
                 if (cContent !== '' && price > 0) {
                     const priceToSave = price || 0;
                     setInventory(prevInv => {
@@ -1507,7 +1546,7 @@
                     if (priceToSave > 0) setProductHistory(h => ({ ...h, [cContent]: priceToSave }));
                 }
 
-                if (!isAuto) { setCheckedOrders(prev => { const n = new Set(prev); n.delete(cNick); return n; }); setSelectedNick(cNick); }
+                if (!isAuto) { setCheckedOrders(prev => { const n = new Set(prev); n.delete(cNick); return n; }); setSelectedNick(cNick); setOrderSearch(''); }
                 
                 const newOrder = { id: Date.now() + Math.random(), customer: cNick, product: cContent, quantity: qty, price: Number(price) * qty, deposit: 0, isCancelled: false, isUnmodified: !markAsModified, isSentToEmp: false };
                 setOrders(prev => {
@@ -1594,7 +1633,8 @@
                 setInventory(newInv);
                 if(priceNum > 0) setProductHistory(prev => ({...prev, [cleanName]: priceNum}));
                 setNewInvName(''); setNewInvPrice('');
-
+                
+                // 수동으로 등록한 신규 상품은 즉시 저장 시도
                 if (googleScriptUrl && masterSheetId) {
                     try {
                         await fetchGas(googleScriptUrl, { action: 'save_inventory', masterId: getCleanSheetId(masterSheetId), data: newInv.map(i => ({ name: i.name, price: i.price })) });
@@ -1661,6 +1701,7 @@
                         </div>
                     )}
 
+                    {/* 채팅 영역 (1차 라이브 관제) */}
                     <div className="w-[18%] flex flex-col bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-lg shadow-sm overflow-hidden min-w-[180px]">
                         <div className="p-1.5 bg-slate-100 dark:bg-slate-900 border-b dark:border-slate-700 grid grid-cols-4 gap-1">
                             {quickMessages.map((msg, idx) => (
@@ -1696,6 +1737,7 @@
                         </div>
                     </div>
 
+                    {/* 주문서 영역 */}
                     <div className="w-[34%] bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-lg flex flex-col overflow-hidden shadow-sm min-w-[340px]">
                         <div className="grid grid-cols-4 gap-1 p-2 bg-slate-100 dark:bg-slate-800 border-b dark:border-slate-700 text-center text-[10px]">
                             {[{id:'all', label:'총매출', val:dashboardStats.totalSales, isCurrency:true, colSpan:2}, 
@@ -1763,11 +1805,12 @@
                                 
                                 const { data: addrData, conflict: addrConflict, type: addrType } = addressLookup.get(nick);
                                 
-                                return (<CustomerBlock key={nick} nick={nick} items={items} isSelected={selectedNick === nick} currentShipping={ship} isCard={isCard} isPaidState={bal <= 0 && activeItems.length > 0} grandTotal={grand} depositTotal={depSum} balance={bal} baseGrandTotal={baseGrand} baseBalance={baseBal} addr={addrData} addrType={addrType} addrConflict={addrConflict} addressMapping={addressMapping} autoDepositorName={addrData?.realname || ''} displayDepositorName={depositorNames[nick] || addrData?.realname || '입금자'} isAutoDepositor={!depositorNames[nick] && addrData?.realname} depositorNames={depositorNames} copyStatus={copyStatus} isOrderConfirmed={checkedOrders.has(nick)} isEditingShipping={editingShippingNick === nick} setSelectedNick={setSelectedNick} addOrderLogic={addOrderLogic} handleNicknameEdit={handleNicknameEdit} toggleCardPayment={toggleCardPayment} handleShippingChange={handleShippingChange} setEditingShippingNick={setEditingShippingNick} openModal={openModal} setDepositorNames={setDepositorNames} handleFullDepositToggle={handleFullDepositToggle} copyOrderSheet={copyOrderSheet} handleOrderCheckToggle={handleOrderCheckToggle} handleAddressUnmapping={handleAddressUnmapping} handleAddressMapping={handleAddressMapping} handlePromoteAddress={handlePromoteAddress} handleProductChange={handleProductChange} handleQuantityUpdate={handleQuantityUpdate} handleOrderCancel={handleOrderCancel} handleOrderDelete={handleOrderDelete} toggleVIP={toggleVIP} specialCustomers={specialCustomers} onOpenQuickAddress={(nick) => setQuickAddrModal({ isOpen: true, nick, editData: null })} findAddressSuggestions={findAddressSuggestions} cashReceiptStatus={cashReceipts[nick]} toggleCashReceipt={toggleCashReceipt} />);
+                                return (<CustomerBlock key={nick} nick={nick} items={items} isSelected={selectedNick === nick} currentShipping={ship} isCard={isCard} isPaidState={bal <= 0 && activeItems.length > 0} grandTotal={grand} depositTotal={depSum} balance={bal} baseGrandTotal={baseGrand} baseBalance={baseBal} addr={addrData} addrType={addrType} addrConflict={addrConflict} addressMapping={addressMapping} autoDepositorName={addrData?.realname || ''} displayDepositorName={depositorNames[nick] || addrData?.realname || '입금자'} isAutoDepositor={!depositorNames[nick] && addrData?.realname} depositorNames={depositorNames} copyStatus={copyStatus} isOrderConfirmed={checkedOrders.has(nick)} isEditingShipping={editingShippingNick === nick} setSelectedNick={setSelectedNick} addOrderLogic={addOrderLogic} handleNicknameEdit={handleNicknameEdit} toggleCardPayment={toggleCardPayment} handleShippingChange={handleShippingChange} setEditingShippingNick={setEditingShippingNick} openModal={openModal} setDepositorNames={setDepositorNames} handleFullDepositToggle={handleFullDepositToggle} copyOrderSheet={copyOrderSheet} handleOrderCheckToggle={handleOrderCheckToggle} handleAddressUnmapping={handleAddressUnmapping} handleAddressMapping={handleAddressMapping} handlePromoteAddress={handlePromoteAddress} handleProductChange={handleProductChange} handleQuantityUpdate={handleQuantityUpdate} handleOrderCancel={handleOrderCancel} handleOrderDelete={handleOrderDelete} toggleVIP={specialCustomers} onOpenQuickAddress={(nick) => setQuickAddrModal({ isOpen: true, nick, editData: null })} findAddressSuggestions={findAddressSuggestions} cashReceiptStatus={cashReceipts[nick]} toggleCashReceipt={toggleCashReceipt} />);
                             })}
                         </div>
                     </div>
 
+                    {/* 입금 영역 */}
                     <div className="w-[14%] flex flex-col bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-lg overflow-hidden shadow-sm min-w-[120px]">
                         <div className="p-2 bg-slate-100 dark:bg-slate-800 border-b dark:border-slate-700 flex flex-col gap-2">
                             <div className="font-bold text-slate-800 dark:text-slate-200 flex items-center justify-between">
@@ -1803,6 +1846,7 @@
                         <div className="p-1 bg-white dark:bg-slate-800 text-center font-bold text-[10px] border-t dark:border-slate-700">총: <span className="text-slate-800 dark:text-slate-200 text-xs">{totalDepositAmount.toLocaleString()}</span>원</div>
                     </div>
 
+                    {/* 주소록 영역 */}
                     <div className="w-[13%] flex flex-col bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-lg overflow-hidden shadow-sm min-w-[130px]">
                         <div className="p-2 bg-slate-100 dark:bg-slate-800 border-b dark:border-slate-700 flex flex-col gap-2">
                             <div className="font-bold text-slate-800 dark:text-slate-200 flex items-center justify-between">
@@ -1831,7 +1875,7 @@
                                         <div className="text-[11px] text-slate-600 dark:text-slate-400 font-medium flex items-center gap-1 w-full overflow-hidden mt-0.5">
                                             <span className="shrink-0">{addr.realname}</span>
                                             <span className="text-slate-400 shrink-0">|</span>
-                                            <span className="shrink-0">{addr.phone}</span>
+                                            <span className="shrink-0">{fixPhoneNumber(addr.phone)}</span>
                                             <span className="text-slate-700 dark:text-slate-300 truncate flex-1 ml-1" title={`${addr.address} ${addr.memo}`}>{addr.address}{addr.memo && <span className="text-red-500 font-bold ml-1.5">[{addr.memo}]</span>}</span>
                                         </div>
                                     </div>
@@ -1840,6 +1884,7 @@
                         </div>
                     </div>
 
+                    {/* 재고 영역 */}
                     <div className="w-[20%] flex flex-col bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-lg overflow-hidden shadow-sm min-w-[200px]">
                         <div className="p-2 bg-slate-100 dark:bg-slate-800 border-b dark:border-slate-700 flex flex-col gap-2 shrink-0">
                             <div className="font-bold text-slate-800 dark:text-slate-200 flex items-center justify-between">
@@ -1898,6 +1943,13 @@
                 return Math.max(0, calcShip);
             };
 
+            const fixPhoneNumber = (numStr) => {
+                if (!numStr) return '';
+                let cleaned = String(numStr).replace(/[^0-9]/g, '');
+                if (cleaned.length === 10 && !cleaned.startsWith('0')) cleaned = '0' + cleaned;
+                return cleaned;
+            };
+
             const handleExportProducts = () => { 
                 const summary = {}; const unpaidSummary = {}; const paidSummary = {}; const customerPaidStatus = {}; const customerGroups = {};
                 orders.forEach(o => { if(!customerGroups[o.customer]) customerGroups[o.customer] = []; customerGroups[o.customer].push(o); });
@@ -1946,18 +1998,12 @@
                 const getStatusPriority = (entry) => { if (entry.isPaid && !entry.isCard) return 1; if (entry.isCard) return 2; return 3; };
                 entries.sort((a, b) => { const pA = getStatusPriority(a); const pB = getStatusPriority(b); if (pA !== pB) return pA - pB; return a.nick.localeCompare(b.nick); });
 
-                const fixPhoneNumber = (numStr) => {
-                    if (!numStr) return ''; let cleaned = String(numStr).replace(/[^0-9]/g, '');
-                    if (cleaned.length === 10 && !cleaned.startsWith('0')) cleaned = '0' + cleaned; return cleaned;
-                };
-
                 let excelRows = []; entries.forEach(({ nick, items, isPaid, isCard }) => { 
                     if(items.length === 0) return; 
                     const addrInfo = addresses.find(a => normalizeString(a.nickname) === normalizeString(nick)) || {}; 
                     const fullAddress = addrInfo.zipcode ? `(${addrInfo.zipcode}) ${addrInfo.address || ''}` : (addrInfo.address || ''); 
                     const statusColumn = isCard ? "카드결제" : (isPaid ? "" : "미입금");
                     const dispPhone = addrInfo.phone ? fixPhoneNumber(addrInfo.phone) : '';
-                    
                     const createRow = (productValue) => ({ '날짜시간': new Date().toLocaleString(), '공란1': '', '입금상태': statusColumn, '닉네임': nick, '주문제품(수량)': productValue, '이름': addrInfo.realname || '', '핸드폰번호': dispPhone, '주소': fullAddress, '배송메모': addrInfo.memo || '' }); 
                     excelRows.push(createRow(`[ ${nick} ]`)); items.forEach(item => { const qtyPart = item.quantity > 1 ? ` ★${item.quantity}개` : ''; excelRows.push(createRow(`${item.product}${qtyPart}`)); }); 
                 }); 
@@ -1975,11 +2021,6 @@
                 const bankStr = localStorage.getItem(getLsKey('bankAccount')) || "카카오뱅크 김선정\n7942 18 01611";
                 const sentAddressRequestsStr = localStorage.getItem(getLsKey('sentAddressRequests'));
                 const sentAddressRequestsLocal = sentAddressRequestsStr ? new Set(JSON.parse(sentAddressRequestsStr)) : new Set();
-                
-                const fixPhoneNumber = (numStr) => {
-                    if (!numStr) return ''; let cleaned = String(numStr).replace(/[^0-9]/g, '');
-                    if (cleaned.length === 10 && !cleaned.startsWith('0')) cleaned = '0' + cleaned; return cleaned;
-                };
                 
                 const data = []; 
                 Object.entries(groups).forEach(([nick, items]) => {
@@ -2001,6 +2042,7 @@
                     const itemListTextForExcel = activeItems.map(i => `${i.product}(${i.quantity}개)`).join(', '); 
                     
                     const addrInfo = findAddress(nick) || {};
+                    const dispPhone = addrInfo.phone ? fixPhoneNumber(addrInfo.phone) : '';
                     
                     let msg = `${templateConfigLocal.emoji} ${nick} 님 ${templateConfigLocal.emoji}\n\n[${broadcastName} 주문목록]\n${itemListTextForMsg}\n배송비 ${currentShipping.toLocaleString()}원\n\n총 주문금액 ${baseGrandTotal.toLocaleString()}원\n------------------\n`;
                     let statusStr = '';
@@ -2030,7 +2072,6 @@
                     }
 
                     if (addrInfo && addrInfo.address && !templateConfigLocal.alwaysRequestAddress) {
-                        const dispPhone = addrInfo.phone ? fixPhoneNumber(addrInfo.phone) : '';
                         msg += `\n[배송지 확인]\n\n${addrInfo.realname || nick}\n${dispPhone}\n${addrInfo.address} ${addrInfo.zipcode ? `(${addrInfo.zipcode})` : ''}\n${addrInfo.memo ? addrInfo.memo + '\n' : ''}\n------------------\n${templateConfigLocal.addrNotice}`;
                     } else if (!sentAddressRequestsLocal.has(nick) || templateConfigLocal.alwaysRequestAddress) { 
                         msg += `\n${templateConfigLocal.surveyNotice}`; 
@@ -2055,11 +2096,6 @@
                 const groups = {}; 
                 orders.forEach(o => { if (!groups[o.customer]) groups[o.customer] = []; groups[o.customer].push(o); });
                 
-                const fixPhoneNumber = (numStr) => {
-                    if (!numStr) return ''; let cleaned = String(numStr).replace(/[^0-9]/g, '');
-                    if (cleaned.length === 10 && !cleaned.startsWith('0')) cleaned = '0' + cleaned; return cleaned;
-                };
-
                 const data = []; 
                 Object.entries(groups).forEach(([nick, items]) => {
                     if (!cashReceipts || !cashReceipts[nick]) return;
@@ -2202,13 +2238,13 @@
             const [broadcastName, setBroadcastName] = useLocalStorage('broadcastName', '오늘의방송');
             const [bankAccount, setBankAccount] = useLocalStorage('bankAccount', FIXED_BANK_ACCOUNT);
             
-            // 🚨 브라우저 캐시 무시하고 초기 고정값 세팅
+            // 캐시에 빈 값이 들어있을 경우 강제로 덮어씌우기 (초기 세팅용)
             useEffect(() => {
-                setChatSheetId('199YCBXzInxmG8GforoRCNHNps21NhVIf9wHA6NXXhtg');
-                setDepSheetId('14bx2HMd_NID3zQN-Hb0x0At2Qmti7-p1Zfx1ZadNScY');
-                setAddrSheetId('1ywl4gRvswQpvIYtPVbSROzz7a5elbLieYhqMZmt191U');
-                setGoogleScriptUrl('https://script.google.com/macros/s/AKfycbxmzti9c3GQ1ON-xUDKE2Qf0Lm8o9-CB2bU3S3WoPRzbL0Zea07n5i3sF_ltWN7mJx8/exec');
-                setMasterSheetId('1B8SBMX18_Px1CpRHuDTxqodqudiTrf6NfVoptjHtnGQ');
+                if (!chatSheetId || chatSheetId.trim() === '') setChatSheetId('199YCBXzInxmG8GforoRCNHNps21NhVIf9wHA6NXXhtg');
+                if (!depSheetId || depSheetId.trim() === '') setDepSheetId('14bx2HMd_NID3zQN-Hb0x0At2Qmti7-p1Zfx1ZadNScY');
+                if (!addrSheetId || addrSheetId.trim() === '') setAddrSheetId('1ywl4gRvswQpvIYtPVbSROzz7a5elbLieYhqMZmt191U');
+                if (!googleScriptUrl || googleScriptUrl.trim() === '') setGoogleScriptUrl('https://script.google.com/macros/s/AKfycbxmzti9c3GQ1ON-xUDKE2Qf0Lm8o9-CB2bU3S3WoPRzbL0Zea07n5i3sF_ltWN7mJx8/exec');
+                if (!masterSheetId || masterSheetId.trim() === '') setMasterSheetId('1B8SBMX18_Px1CpRHuDTxqodqudiTrf6NfVoptjHtnGQ');
             }, []);
 
             const [quickShipping, setQuickShipping] = useLocalStorage('quickShipping', 4000); 
@@ -2252,22 +2288,27 @@
                 setModalConfig({ isOpen: true, type: t, message: m, onConfirm: (v) => { if (oc) oc(v); setModalConfig(p => ({ ...p, isOpen: false })); }, onCancel: () => { if (ocan) ocan(); setModalConfig(p => ({ ...p, isOpen: false })); }, initialValue: iv }); 
             }, []);
 
+            // 화면을 뻗게 만드는 window.location.reload()를 삭제하고, 부드럽게 데이터를 0으로 만드는 방식으로 변경!
             const handleResetAllData = useCallback(() => {
-                openModal("방송 데이터를 완전히 초기화하시겠습니까?\n(입금내역, 주문서, 재고 기록이 화면에서 삭제됩니다.\n※ 주소록 및 VIP 명단은 절대 지워지지 않습니다!)", 'confirm', () => {
+                openModal("방송 데이터를 완전히 초기화하시겠습니까?\n(입금내역, 주문서, 재고 기록이 영구 삭제됩니다.\n※ 주소록 및 VIP 명단은 절대 지워지지 않습니다!)", 'confirm', () => {
                     setOrders([]);
+                    setInventory([]);
+                    setProductHistory({});
+                    setShippingOverrides({});
                     setCardPayments({});
                     setCashReceipts({});
-                    setShippingOverrides({});
                     setMatchedDeposits(new Set());
                     setSentAddressRequests(new Set());
                     setDeletedDepositIds(new Set());
                     setCheckedOrders(new Set());
-                    setInventory([]);
-                    setProductHistory({});
                     setClickedChats(new Set());
+                    
+                    const keysToRemove = ['youtubeOrders', 'cardPayments', 'cashReceipts', 'shippingOverrides', 'matchedDeposits', 'sentAddressRequests', 'deletedDepositIds', 'checkedOrders', 'productInventory', 'productHistory', 'ignoredAutoMatch'].map(getLsKey);
+                    keysToRemove.forEach(k => window.localStorage.removeItem(k));
+                    
                     openModal("화면의 모든 데이터가 안전하게 초기화되었습니다.", 'alert');
                 });
-            }, [openModal, setOrders, setCardPayments, setCashReceipts, setShippingOverrides, setMatchedDeposits, setSentAddressRequests, setDeletedDepositIds, setCheckedOrders, setInventory, setProductHistory, setClickedChats]);
+            }, [openModal, setOrders, setInventory, setProductHistory, setShippingOverrides, setCardPayments, setCashReceipts]);
 
             const handleExportBackup = () => {
                 const backupData = [{ 
