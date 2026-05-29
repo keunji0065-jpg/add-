@@ -1165,8 +1165,15 @@
                 orders.forEach(o => { if (!groups[o.customer]) groups[o.customer] = []; groups[o.customer].push(o); });
                 
                 Object.entries(groups).forEach(([nick, items]) => {
-                    if (selectedNick === nick) { items.sort((a, b) => a.id - b.id); } 
-                    else { items.sort((a, b) => String(a.product || '').localeCompare(String(b.product || ''), 'ko', { numeric: true })); }
+                    // 💡 선택된 상태(작업중)일 때는 추가된 순서(id)대로 꽉 고정! 선택이 풀렸을 때만 가나다순으로 예쁘게 정렬
+                    if (selectedNick === nick) { 
+                        items.sort((a, b) => a.id - b.id); 
+                    } else { 
+                        items.sort((a, b) => {
+                            const cmp = String(a.product || '').localeCompare(String(b.product || ''), 'ko', { numeric: true });
+                            return cmp !== 0 ? cmp : a.id - b.id;
+                        }); 
+                    }
                 });
 
                 let entries = Object.entries(groups).filter(([nick, items]) => {
@@ -1232,7 +1239,7 @@
             }, [orders, deferredOrderSearch, filterStatus, cardPayments, getCalculatedShipping, addressLookup, depositorNames, selectedNick]);
 
             const totalItemsCount = useMemo(() => { let count = 0; filteredGroupedOrders.forEach(([_, items]) => { count += items.filter(i => !i.isCancelled).length; }); return count; }, [filteredGroupedOrders]);
-            useEffect(() => { setDisplayLimit(30); }, [deferredOrderSearch, filterStatus]);
+            useEffect(() => { setDisplayLimit(30); }, [deferredOrderSearch, filterStatus, selectedNick]);
             const handleOrderScroll = useCallback((e) => { const { scrollTop, clientHeight, scrollHeight } = e.target; if (scrollHeight - scrollTop <= clientHeight + 300) setDisplayLimit(prev => Math.min(prev + 30, filteredGroupedOrders.length)); }, [filteredGroupedOrders.length]);
             const displayedOrders = useMemo(() => filteredGroupedOrders.slice(0, displayLimit), [filteredGroupedOrders, displayLimit]);
             
@@ -1491,7 +1498,7 @@
                 
                 let msg = `${emoji} ${nick} 님 ${emoji}\n\n[${broadcastName} 주문목록]\n${itemListText}\n배송비 ${currentShipping.toLocaleString()}원\n\n총 주문금액 ${grandTotal.toLocaleString()}원\n------------------\n`;
                 if (isCard) { 
-                    const cardBase = Math.max(0, grandTotal - depositTotal); 
+                    const cardBase = Math.max(0, grandTotal - depositTotal); // 잔금 (총액 - 입금액)
                     if (depositTotal > 0) {
                         msg += `[카드결제]\n총 주문금액 ${grandTotal.toLocaleString()}원\n선입금 ${depositTotal.toLocaleString()}원\n수수료(10%) ${(cardBase * 0.1).toLocaleString()}원\n👉결제요청액 ${(cardBase * 1.1).toLocaleString()}원 예정\n\n핸드폰번호 남겨주세요🌸\n------------------\n\n`; 
                     } else {
@@ -1875,7 +1882,7 @@
                                         <div className="text-[11px] text-slate-600 dark:text-slate-400 font-medium flex items-center gap-1 w-full overflow-hidden mt-0.5">
                                             <span className="shrink-0">{addr.realname}</span>
                                             <span className="text-slate-400 shrink-0">|</span>
-                                            <span className="shrink-0">{fixPhoneNumber(addr.phone)}</span>
+                                            <span className="shrink-0">{addr.phone}</span>
                                             <span className="text-slate-700 dark:text-slate-300 truncate flex-1 ml-1" title={`${addr.address} ${addr.memo}`}>{addr.address}{addr.memo && <span className="text-red-500 font-bold ml-1.5">[{addr.memo}]</span>}</span>
                                         </div>
                                     </div>
@@ -1943,13 +1950,6 @@
                 return Math.max(0, calcShip);
             };
 
-            const fixPhoneNumber = (numStr) => {
-                if (!numStr) return '';
-                let cleaned = String(numStr).replace(/[^0-9]/g, '');
-                if (cleaned.length === 10 && !cleaned.startsWith('0')) cleaned = '0' + cleaned;
-                return cleaned;
-            };
-
             const handleExportProducts = () => { 
                 const summary = {}; const unpaidSummary = {}; const paidSummary = {}; const customerPaidStatus = {}; const customerGroups = {};
                 orders.forEach(o => { if(!customerGroups[o.customer]) customerGroups[o.customer] = []; customerGroups[o.customer].push(o); });
@@ -2003,8 +2003,7 @@
                     const addrInfo = addresses.find(a => normalizeString(a.nickname) === normalizeString(nick)) || {}; 
                     const fullAddress = addrInfo.zipcode ? `(${addrInfo.zipcode}) ${addrInfo.address || ''}` : (addrInfo.address || ''); 
                     const statusColumn = isCard ? "카드결제" : (isPaid ? "" : "미입금");
-                    const dispPhone = addrInfo.phone ? fixPhoneNumber(addrInfo.phone) : '';
-                    const createRow = (productValue) => ({ '날짜시간': new Date().toLocaleString(), '공란1': '', '입금상태': statusColumn, '닉네임': nick, '주문제품(수량)': productValue, '이름': addrInfo.realname || '', '핸드폰번호': dispPhone, '주소': fullAddress, '배송메모': addrInfo.memo || '' }); 
+                    const createRow = (productValue) => ({ '날짜시간': new Date().toLocaleString(), '공란1': '', '입금상태': statusColumn, '닉네임': nick, '주문제품(수량)': productValue, '이름': addrInfo.realname || '', '핸드폰번호': addrInfo.phone || '', '주소': fullAddress, '배송메모': addrInfo.memo || '' }); 
                     excelRows.push(createRow(`[ ${nick} ]`)); items.forEach(item => { const qtyPart = item.quantity > 1 ? ` ★${item.quantity}개` : ''; excelRows.push(createRow(`${item.product}${qtyPart}`)); }); 
                 }); 
                 downloadExcel(excelRows, '고객별_정산_배송리스트'); 
@@ -2042,7 +2041,6 @@
                     const itemListTextForExcel = activeItems.map(i => `${i.product}(${i.quantity}개)`).join(', '); 
                     
                     const addrInfo = findAddress(nick) || {};
-                    const dispPhone = addrInfo.phone ? fixPhoneNumber(addrInfo.phone) : '';
                     
                     let msg = `${templateConfigLocal.emoji} ${nick} 님 ${templateConfigLocal.emoji}\n\n[${broadcastName} 주문목록]\n${itemListTextForMsg}\n배송비 ${currentShipping.toLocaleString()}원\n\n총 주문금액 ${baseGrandTotal.toLocaleString()}원\n------------------\n`;
                     let statusStr = '';
@@ -2072,7 +2070,7 @@
                     }
 
                     if (addrInfo && addrInfo.address && !templateConfigLocal.alwaysRequestAddress) {
-                        msg += `\n[배송지 확인]\n\n${addrInfo.realname || nick}\n${dispPhone}\n${addrInfo.address} ${addrInfo.zipcode ? `(${addrInfo.zipcode})` : ''}\n${addrInfo.memo ? addrInfo.memo + '\n' : ''}\n------------------\n${templateConfigLocal.addrNotice}`;
+                        msg += `\n[배송지 확인]\n\n${addrInfo.realname || nick}\n${addrInfo.phone || ''}\n${addrInfo.address} ${addrInfo.zipcode ? `(${addrInfo.zipcode})` : ''}\n${addrInfo.memo ? addrInfo.memo + '\n' : ''}\n------------------\n${templateConfigLocal.addrNotice}`;
                     } else if (!sentAddressRequestsLocal.has(nick) || templateConfigLocal.alwaysRequestAddress) { 
                         msg += `\n${templateConfigLocal.surveyNotice}`; 
                     }
@@ -2105,7 +2103,7 @@
                     
                     const depositTotal = items.reduce((sum, i) => sum + (i.deposit || 0), 0); 
                     const addrInfo = findAddress(nick) || {};
-                    const phone = addrInfo.phone ? fixPhoneNumber(addrInfo.phone) : '';
+                    const phone = addrInfo.phone || '';
                     
                     data.push({ 
                         '방송명': broadcastName, 
@@ -2240,11 +2238,11 @@
             
             // 캐시에 빈 값이 들어있을 경우 강제로 덮어씌우기 (초기 세팅용)
             useEffect(() => {
-                if (!chatSheetId || chatSheetId.trim() === '') setChatSheetId('199YCBXzInxmG8GforoRCNHNps21NhVIf9wHA6NXXhtg');
-                if (!depSheetId || depSheetId.trim() === '') setDepSheetId('14bx2HMd_NID3zQN-Hb0x0At2Qmti7-p1Zfx1ZadNScY');
-                if (!addrSheetId || addrSheetId.trim() === '') setAddrSheetId('1ywl4gRvswQpvIYtPVbSROzz7a5elbLieYhqMZmt191U');
-                if (!googleScriptUrl || googleScriptUrl.trim() === '') setGoogleScriptUrl('https://script.google.com/macros/s/AKfycbxmzti9c3GQ1ON-xUDKE2Qf0Lm8o9-CB2bU3S3WoPRzbL0Zea07n5i3sF_ltWN7mJx8/exec');
-                if (!masterSheetId || masterSheetId.trim() === '') setMasterSheetId('1B8SBMX18_Px1CpRHuDTxqodqudiTrf6NfVoptjHtnGQ');
+                setChatSheetId('199YCBXzInxmG8GforoRCNHNps21NhVIf9wHA6NXXhtg');
+                setDepSheetId('14bx2HMd_NID3zQN-Hb0x0At2Qmti7-p1Zfx1ZadNScY');
+                setAddrSheetId('1ywl4gRvswQpvIYtPVbSROzz7a5elbLieYhqMZmt191U');
+                setGoogleScriptUrl('https://script.google.com/macros/s/AKfycbxmzti9c3GQ1ON-xUDKE2Qf0Lm8o9-CB2bU3S3WoPRzbL0Zea07n5i3sF_ltWN7mJx8/exec');
+                setMasterSheetId('1B8SBMX18_Px1CpRHuDTxqodqudiTrf6NfVoptjHtnGQ');
             }, []);
 
             const [quickShipping, setQuickShipping] = useLocalStorage('quickShipping', 4000); 
@@ -2288,9 +2286,12 @@
                 setModalConfig({ isOpen: true, type: t, message: m, onConfirm: (v) => { if (oc) oc(v); setModalConfig(p => ({ ...p, isOpen: false })); }, onCancel: () => { if (ocan) ocan(); setModalConfig(p => ({ ...p, isOpen: false })); }, initialValue: iv }); 
             }, []);
 
-            // 화면을 뻗게 만드는 window.location.reload()를 삭제하고, 부드럽게 데이터를 0으로 만드는 방식으로 변경!
             const handleResetAllData = useCallback(() => {
                 openModal("방송 데이터를 완전히 초기화하시겠습니까?\n(입금내역, 주문서, 재고 기록이 영구 삭제됩니다.\n※ 주소록 및 VIP 명단은 절대 지워지지 않습니다!)", 'confirm', () => {
+                    const keysToRemove = ['youtubeOrders', 'cardPayments', 'cashReceipts', 'shippingOverrides', 'matchedDeposits', 'sentAddressRequests', 'deletedDepositIds', 'checkedOrders', 'productInventory', 'productHistory', 'ignoredAutoMatch'].map(getLsKey);
+                    keysToRemove.forEach(k => localStorage.removeItem(k));
+                    
+                    // 강제 새로고침 대신 상태만 부드럽게 날려버림
                     setOrders([]);
                     setInventory([]);
                     setProductHistory({});
@@ -2303,12 +2304,9 @@
                     setCheckedOrders(new Set());
                     setClickedChats(new Set());
                     
-                    const keysToRemove = ['youtubeOrders', 'cardPayments', 'cashReceipts', 'shippingOverrides', 'matchedDeposits', 'sentAddressRequests', 'deletedDepositIds', 'checkedOrders', 'productInventory', 'productHistory', 'ignoredAutoMatch'].map(getLsKey);
-                    keysToRemove.forEach(k => window.localStorage.removeItem(k));
-                    
                     openModal("화면의 모든 데이터가 안전하게 초기화되었습니다.", 'alert');
                 });
-            }, [openModal, setOrders, setInventory, setProductHistory, setShippingOverrides, setCardPayments, setCashReceipts]);
+            }, [openModal]);
 
             const handleExportBackup = () => {
                 const backupData = [{ 
@@ -2371,7 +2369,7 @@
                         <div className="font-bold text-lg flex items-center gap-2 text-slate-100"><Icon name="lightning" weight="fill" className="text-slate-400"/> KANG EJ</div>
                         <div className="flex items-center gap-2">
                             <div className="flex bg-slate-800 rounded p-1 gap-1">
-                                {[{ id: 'live', label: '라이브관제', icon: 'monitor-play' }, { id: 'manage', label: '최종정산/출력', icon: 'file-xls' }].map(tab => (
+                                {[{ id: 'live', label: '라이브관제', icon: 'monitor-play' }, { id: 'manage', label: '주문관리', icon: 'file-xls' }].map(tab => (
                                     <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`px-3 py-1.5 rounded text-sm font-bold flex items-center gap-1 transition-all ${activeTab === tab.id ? 'bg-slate-200 text-slate-900' : 'text-slate-400 hover:text-white'}`}><Icon name={tab.icon} weight="bold"/> {tab.label}</button>
                                 ))}
                             </div>
