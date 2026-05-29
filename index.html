@@ -48,10 +48,19 @@
         const getLsKey = (key) => `${WS_ID}_${key}`;
 
         const FIXED_BANK_ACCOUNT = "카카오뱅크 김선정\n7942 18 01611";
-        const EMOJI_LIST = ["💙","💖","💛","💚","💜","🤍","❤️","🖤","🤎","💕","💞","⭐","🌟","✨","🔥","💥","💯","✅","✔️","❌","❗","❓","📢","🔔","🌈","💰","💸","💳","🧾","🪙","🚗","🚚","✈️","📱","💻","🎉","🎈"];
+        const EMOJI_LIST = ["💙","💖","💛","💚","💜","🤍","❤️","🖤","🤎","💕","💞","⭐","🌟","✨","🔥","💥","💯","🎠","🐎","🐴","🦢","🐆","🐍","🐊","🐢","🦓","🦄","🦋","💎","💍","👑","💄","💅","🧴","🎀","🎁","🛍️","🛒","🏷️","📦","👜","👝","👛","🎒","💼","👠","👡","👢","👟","🩰","👞","👗","🥻","🧥","👕","👖","👔","🧣","🧤","🧦","🧢","👒","🎩","⌚","🕶️","👓","🐶","🐩","🐱","🐈","🐰","🐇","🐻","🧸","🐼","🐨","🦊","🐯","🦁","🐮","🐷","🐸","🐵","🐧","🐥","🦉","🐾","🌸","🌼","🍀","🌹","🌻","🌷","🌿","🍁","🌴","🌵","🍎","🍓","🍒","🍑","🍋","🍊","🍉","🍇","🍍","🥑","🥕","🍔","🍟","🍕","🍰","🍩","🍪","🍫","🍬","🍭","☕","🧋","🧃","🍷","🥂","🍻","✅","✔️","❌","❗","❓","📢","🔔","🌈","💰","💸","💳","🧾","🪙","🚗","🚚","✈️","📱","💻","🎉","🎈"];
 
         const Icon = ({ name, className="", weight="regular", size }) => <i className={`ph ph-${name} ${className}`} data-phosphor-icon-weight={weight} style={{fontSize: size}}></i>;
         
+        // ✨ 전화번호 복원기 (0이 빠져있으면 붙여주고 하이픈은 제거)
+        const fixPhoneNumber = (phone) => {
+            if (!phone) return '';
+            let p = String(phone).replace(/[^0-9]/g, '');
+            if (p.length === 10 && !p.startsWith('0')) p = '0' + p; 
+            if (p.length === 9 && !p.startsWith('0')) p = '0' + p; 
+            return p;
+        };
+
         const normalizeString = (str) => String(str || '').replace(/[\s\(\)\[\]\{\}\-\_\.\,\/]/g, '').toLowerCase();
 
         const getCleanSheetId = (idOrUrl) => {
@@ -110,15 +119,11 @@
                 
                 if (text.includes("<!DOCTYPE") || text.includes("<html")) {
                     console.error("보안 차단됨! 응답 원본:", text.substring(0, 150));
-                    return { status: "error", message: "보안차단 (시크릿 창에서 실행하거나 톱니바퀴 URL 확인)" };
+                    return { status: "error", message: "보안차단 (구글 앱스 스크립트 '모든 사용자' 권한 확인)" };
                 }
                 
-                try { 
-                    return JSON.parse(text); 
-                } catch(e) { 
-                    console.error("JSON 파싱 에러:", text.substring(0, 150));
-                    return { status: "error", message: "데이터 변환 실패 (백엔드 오류)" }; 
-                }
+                try { return JSON.parse(text); } 
+                catch(e) { return { status: "error", message: "데이터 변환 실패 (백엔드 오류)" }; }
             } catch (err) {
                 return { status: "error", message: `통신 오류 (${err.message})` };
             }
@@ -571,6 +576,9 @@
             const suggestions = useMemo(() => findAddressSuggestions ? findAddressSuggestions(nick) : [], [nick, findAddressSuggestions]);
             const isVip = useMemo(() => { const nickNorm = normalizeString(nick); const key = Object.keys(specialCustomers || {}).find(k => normalizeString(k) === nickNorm); return key && specialCustomers[key].type === 'vip'; }, [specialCustomers, nick]);
 
+            // ✨ 화면용 전화번호 표시
+            const displayPhone = addr?.phone ? fixPhoneNumber(addr.phone) : '';
+
             return (
                 <div onClick={() => setSelectedNick(prev => prev === nick ? null : nick)} className={`bg-white dark:bg-slate-800 rounded shadow-sm transition-all overflow-hidden cursor-pointer ${borderClass} border mb-1.5`}>
                     <div className={`px-2 py-1 flex justify-between items-start border-b dark:border-slate-700 ${headerBgClass}`}>
@@ -601,7 +609,7 @@
                                 {addr ? (
                                     <div onClick={(e) => { if (addressMapping[nick]) { e.stopPropagation(); handleAddressUnmapping(nick); } }} className={`text-[11px] flex items-center gap-1.5 w-full overflow-hidden mt-1 py-1 rounded transition-colors ${addressMapping[nick] ? 'cursor-pointer hover:bg-red-50 px-1' : ''}`} title={addressMapping[nick] ? "클릭하여 주소 연결 해제" : "자동 연동된 찐주소록"}>
                                         <span className="text-green-700 shrink-0 flex items-center gap-0.5"><Icon name="house-line" weight="fill" /> <span className="font-bold">{addr.realname}</span></span>
-                                        <span className="text-slate-500 shrink-0 font-medium">{addr.phone}</span>
+                                        <span className="text-slate-500 shrink-0 font-medium">{displayPhone}</span>
                                         <span className="text-slate-700 truncate flex-1 ml-1" title={`${addr.address} ${addr.memo}`}>{addr.address}{addr.memo && <span className="text-red-500 font-bold ml-1.5">[{addr.memo}]</span>}</span>
                                         {addressMapping[nick] && <Icon name="link-break" className="shrink-0 text-red-400 ml-1" weight="bold"/>}
                                     </div>
@@ -750,6 +758,153 @@
                     openModal("입금 매칭이 초기화되었습니다!\n잠시 후 순차적으로 자동 재매칭됩니다.", 'alert');
                 });
             }, [openModal, setOrders, setMatchedDeposits]);
+
+            const inventoryRef = useRef(inventory);
+            const productHistoryRef = useRef(productHistory);
+            const clickedChatsRef = useRef(clickedChats);
+            useEffect(() => { inventoryRef.current = inventory; }, [inventory]);
+            useEffect(() => { productHistoryRef.current = productHistory; }, [productHistory]);
+            useEffect(() => { clickedChatsRef.current = clickedChats; }, [clickedChats]);
+
+            // ✨ 전화번호 맨 앞 '0' 보존 로직 추가
+            const handleQuickAddressSubmit = async (addrData) => {
+                if (!addrData.timestamp) addrData.timestamp = new Date().toISOString();
+                
+                // 구글 시트 저장 시 0 날아감 방지
+                const safePhone = addrData.phone ? "'" + addrData.phone.replace(/[^0-9]/g, '') : '';
+                const safeZipcode = addrData.zipcode ? "'" + addrData.zipcode : '';
+                
+                const masterData = { ...addrData, phone: safePhone, zipcode: safeZipcode, _source: 'master' };
+                const localData = { ...addrData, _source: 'master' }; // UI용
+                
+                setAddresses(prev => {
+                    const newAddrs = [...prev];
+                    const targetNickClean = normalizeString(localData.nickname);
+                    const existIdx = newAddrs.findIndex(a => normalizeString(a.nickname) === targetNickClean && a._source === 'master');
+                    if (existIdx !== -1) { newAddrs[existIdx] = { ...newAddrs[existIdx], ...localData }; } 
+                    else { const filtered = newAddrs.filter(a => normalizeString(a.nickname) !== targetNickClean || a._source !== 'raw'); filtered.push(localData); return filtered; }
+                    return newAddrs;
+                });
+                setQuickAddrModal({ isOpen: false, nick: '', editData: null });
+                setAddressMapping(prevMap => ({ ...prevMap, [localData.nickname]: localData.nickname }));
+
+                if (googleScriptUrl && masterSheetId) {
+                    try { await fetchGas(googleScriptUrl, { action: 'save_master_address', masterId: getCleanSheetId(masterSheetId), data: masterData }); } catch (err) { setGlobalError("🚨 구글 시트 통신 오류: 마스터 주소 저장 실패"); }
+                }
+            };
+
+            const addressLookup = useMemo(() => {
+                const masterMap = {}; const rawMap = {}; const exactNickMap = {}; const koBaseMap = {}; const realNameMap = {};
+                addresses.forEach(a => {
+                    const cleanNick = normalizeString(a.nickname);
+                    const ts = parseSafeDate(a.timestamp).getTime();
+                    
+                    if (a._source === 'master') { 
+                        if (!masterMap[cleanNick] || ts > parseSafeDate(masterMap[cleanNick].timestamp).getTime()) { masterMap[cleanNick] = a; } 
+                    } else { 
+                        if (!rawMap[cleanNick] || ts > parseSafeDate(rawMap[cleanNick].timestamp).getTime()) { rawMap[cleanNick] = a; } 
+                    }
+
+                    const targetAddr = masterMap[cleanNick] || rawMap[cleanNick] || a;
+                    
+                    if (!exactNickMap[cleanNick]) exactNickMap[cleanNick] = [];
+                    if (!exactNickMap[cleanNick].includes(targetAddr)) exactNickMap[cleanNick].push(targetAddr);
+
+                    const cleanReal = normalizeString(a.realname);
+                    if (cleanReal) {
+                        if (!realNameMap[cleanReal]) realNameMap[cleanReal] = [];
+                        if (!realNameMap[cleanReal].includes(targetAddr)) realNameMap[cleanReal].push(targetAddr);
+                    }
+
+                    const ko = extractKo(a.nickname);
+                    if (ko && ko.length >= 2) {
+                        if (!koBaseMap[ko]) koBaseMap[ko] = [];
+                        if (!koBaseMap[ko].includes(targetAddr)) koBaseMap[ko].push(targetAddr);
+                    }
+                });
+
+                return {
+                    get: (nick) => {
+                        if (!nick) return { data: null, conflict: null, type: 'none' };
+                        const mappedTarget = addressMapping[nick];
+                        if (mappedTarget) {
+                            const mNick = normalizeString(mappedTarget);
+                            const mAddr = masterMap[mNick] || rawMap[mNick];
+                            if (mAddr) return { data: mAddr, conflict: null, type: mAddr._source || 'mapped' };
+                        }
+
+                        const cleanNick = normalizeString(nick);
+                        const exactMatches = exactNickMap[cleanNick] || realNameMap[cleanNick];
+                        if (exactMatches && exactMatches.length === 1) {
+                            const addr = exactMatches[0];
+                            const mAddr = masterMap[normalizeString(addr.nickname)] || rawMap[normalizeString(addr.nickname)] || addr;
+                            const master = masterMap[normalizeString(mAddr.nickname)];
+                            const raw = rawMap[normalizeString(mAddr.nickname)];
+                            let conflict = null;
+                            if (master && raw && parseSafeDate(raw.timestamp).getTime() > parseSafeDate(master.timestamp).getTime()) { 
+                                if (raw.address !== master.address || raw.phone !== master.phone || raw.realname !== master.realname) { conflict = raw; } 
+                            }
+                            return { data: master || raw || mAddr, conflict: conflict, type: master ? 'master' : 'raw' };
+                        }
+
+                        const koNick = extractKo(nick);
+                        if (koNick && koNick.length >= 2) {
+                            const koMatches = koBaseMap[koNick];
+                            if (koMatches && koMatches.length === 1) {
+                                const addr = koMatches[0];
+                                const master = masterMap[normalizeString(addr.nickname)];
+                                const raw = rawMap[normalizeString(addr.nickname)];
+                                let conflict = null;
+                                if (master && raw && parseSafeDate(raw.timestamp).getTime() > parseSafeDate(master.timestamp).getTime()) {
+                                    if (raw.address !== master.address || raw.phone !== master.phone || raw.realname !== master.realname) { conflict = raw; }
+                                }
+                                return { data: master || raw || addr, conflict: conflict, type: master ? 'master' : 'raw' };
+                            }
+                        }
+
+                        return { data: null, conflict: null, type: 'none' };
+                    }
+                };
+            }, [addresses, addressMapping]);
+
+            const handlePromoteAddress = useCallback((orderNick, rawData) => {
+                const diffMsg = `기존에 저장된 주소 정보와 다릅니다.\n\n[새로 입력된 정보]\n이름: ${rawData.realname}\n연락처: ${rawData.phone}\n주소: ${rawData.address}\n\n이 새로운 정보로 찐주소록을 덮어씌울까요?`;
+                openModal(diffMsg, 'confirm', () => { handleQuickAddressSubmit({ ...rawData, nickname: orderNick }); openModal("새 주소로 찐주소록이 업데이트 되었습니다!", "alert"); });
+            }, [openModal]);
+
+            const toggleVIP = useCallback((nick) => {
+                setSpecialCustomers(prev => {
+                    const next = { ...prev }; const nickNorm = normalizeString(nick);
+                    const existingKey = Object.keys(next).find(k => normalizeString(k) === nickNorm);
+                    if (existingKey && next[existingKey].type === 'vip') { delete next[existingKey]; } 
+                    else { next[nick] = { type: 'vip', memo: '', purchaseCount: 0, noShowCount: 0 }; }
+                    return next;
+                });
+            }, [setSpecialCustomers]);
+
+            const getCalculatedShipping = useCallback((nick, productTotal) => {
+                if (shippingOverrides[nick] !== undefined) return Number(shippingOverrides[nick]);
+                const nickNorm = normalizeString(nick);
+                const specialKey = Object.keys(specialCustomers || {}).find(k => normalizeString(k) === nickNorm);
+                if (specialKey && specialCustomers[specialKey].type === 'vip') return 0; 
+                const addrRes = addressLookup.get(nick);
+                const isJeju = addrRes && addrRes.data && addrRes.data.address && addrRes.data.address.includes('제주');
+                let calcShip = (freeShippingThreshold > 0 && productTotal >= freeShippingThreshold) ? 0 : Number(quickShipping);
+                if (isJeju) { calcShip += (Number(jejuShipping) - Number(quickShipping)); }
+                return Math.max(0, calcShip);
+            }, [shippingOverrides, specialCustomers, addressLookup, quickShipping, jejuShipping, freeShippingThreshold]);
+
+            const findAddressSuggestions = useCallback((nick) => {
+                if (!nick) return []; const cleanNick = normalizeString(nick); if (cleanNick.length < 2) return []; 
+                const results = [];
+                for (let i = 0; i < addresses.length; i++) {
+                    const a = addresses[i]; const cleanAddrNick = normalizeString(a.nickname);
+                    if (cleanAddrNick !== cleanNick && (cleanAddrNick.includes(cleanNick) || cleanNick.includes(cleanAddrNick))) {
+                        results.push(a.nickname); if (results.length >= 3) break; 
+                    }
+                }
+                return results;
+            }, [addresses]);
 
             const formatTimeOnly = useCallback((val) => { 
                 if (!val) return ''; const strVal = String(val); const dt = new Date(strVal.replace(/-/g, '/'));
@@ -916,152 +1071,9 @@
                 } catch(e) {
                     setSyncStatus("네트워크 에러 발생");
                 }
-            }, [googleScriptUrl, chatSheetId, depSheetId, addrSheetId, masterSheetId, setAddresses, setInventory, setGlobalError, formatTimeOnly]);
+            }, [googleScriptUrl, chatSheetId, depSheetId, addrSheetId, masterSheetId, setAddresses, setInventory, setGlobalError]);
             
             useEffect(() => { fetchAllData(); const interval = setInterval(fetchAllData, 5000); return () => clearInterval(interval); }, [fetchAllData]);
-
-            const inventoryRef = useRef(inventory);
-            const productHistoryRef = useRef(productHistory);
-            const clickedChatsRef = useRef(clickedChats);
-            useEffect(() => { inventoryRef.current = inventory; }, [inventory]);
-            useEffect(() => { productHistoryRef.current = productHistory; }, [productHistory]);
-            useEffect(() => { clickedChatsRef.current = clickedChats; }, [clickedChats]);
-
-            const handleQuickAddressSubmit = async (addrData) => {
-                if (!addrData.timestamp) addrData.timestamp = new Date().toISOString();
-                const masterData = { ...addrData, _source: 'master' };
-                setAddresses(prev => {
-                    const newAddrs = [...prev];
-                    const targetNickClean = normalizeString(masterData.nickname);
-                    const existIdx = newAddrs.findIndex(a => normalizeString(a.nickname) === targetNickClean && a._source === 'master');
-                    if (existIdx !== -1) { newAddrs[existIdx] = { ...newAddrs[existIdx], ...masterData }; } 
-                    else { const filtered = newAddrs.filter(a => normalizeString(a.nickname) !== targetNickClean || a._source !== 'raw'); filtered.push(masterData); return filtered; }
-                    return newAddrs;
-                });
-                setQuickAddrModal({ isOpen: false, nick: '', editData: null });
-                setAddressMapping(prevMap => ({ ...prevMap, [masterData.nickname]: masterData.nickname }));
-
-                if (googleScriptUrl && masterSheetId) {
-                    try { 
-                        // 전화번호 보존 처리 (')
-                        const payloadData = { ...masterData, phone: masterData.phone ? "'" + String(masterData.phone).replace(/'/g, '') : '', zipcode: masterData.zipcode ? "'" + String(masterData.zipcode).replace(/'/g, '') : '' };
-                        await fetchGas(googleScriptUrl, { action: 'save_master_address', masterId: getCleanSheetId(masterSheetId), data: payloadData }); 
-                    } catch (err) { setGlobalError("🚨 구글 시트 통신 오류: 마스터 주소 저장 실패"); }
-                }
-            };
-
-            const addressLookup = useMemo(() => {
-                const masterMap = {}; const rawMap = {}; const exactNickMap = {}; const koBaseMap = {}; const realNameMap = {};
-                addresses.forEach(a => {
-                    const cleanNick = normalizeString(a.nickname);
-                    const ts = parseSafeDate(a.timestamp).getTime();
-                    
-                    if (a._source === 'master') { 
-                        if (!masterMap[cleanNick] || ts > parseSafeDate(masterMap[cleanNick].timestamp).getTime()) { masterMap[cleanNick] = a; } 
-                    } else { 
-                        if (!rawMap[cleanNick] || ts > parseSafeDate(rawMap[cleanNick].timestamp).getTime()) { rawMap[cleanNick] = a; } 
-                    }
-
-                    const targetAddr = masterMap[cleanNick] || rawMap[cleanNick] || a;
-                    
-                    if (!exactNickMap[cleanNick]) exactNickMap[cleanNick] = [];
-                    if (!exactNickMap[cleanNick].includes(targetAddr)) exactNickMap[cleanNick].push(targetAddr);
-
-                    const cleanReal = normalizeString(a.realname);
-                    if (cleanReal) {
-                        if (!realNameMap[cleanReal]) realNameMap[cleanReal] = [];
-                        if (!realNameMap[cleanReal].includes(targetAddr)) realNameMap[cleanReal].push(targetAddr);
-                    }
-
-                    const ko = extractKo(a.nickname);
-                    if (ko && ko.length >= 2) {
-                        if (!koBaseMap[ko]) koBaseMap[ko] = [];
-                        if (!koBaseMap[ko].includes(targetAddr)) koBaseMap[ko].push(targetAddr);
-                    }
-                });
-
-                return {
-                    get: (nick) => {
-                        if (!nick) return { data: null, conflict: null, type: 'none' };
-                        const mappedTarget = addressMapping[nick];
-                        if (mappedTarget) {
-                            const mNick = normalizeString(mappedTarget);
-                            const mAddr = masterMap[mNick] || rawMap[mNick];
-                            if (mAddr) return { data: mAddr, conflict: null, type: mAddr._source || 'mapped' };
-                        }
-
-                        const cleanNick = normalizeString(nick);
-                        const exactMatches = exactNickMap[cleanNick] || realNameMap[cleanNick];
-                        if (exactMatches && exactMatches.length === 1) {
-                            const addr = exactMatches[0];
-                            const mAddr = masterMap[normalizeString(addr.nickname)] || rawMap[normalizeString(addr.nickname)] || addr;
-                            const master = masterMap[normalizeString(mAddr.nickname)];
-                            const raw = rawMap[normalizeString(mAddr.nickname)];
-                            let conflict = null;
-                            if (master && raw && parseSafeDate(raw.timestamp).getTime() > parseSafeDate(master.timestamp).getTime()) { 
-                                if (raw.address !== master.address || raw.phone !== master.phone || raw.realname !== master.realname) { conflict = raw; } 
-                            }
-                            return { data: master || raw || mAddr, conflict: conflict, type: master ? 'master' : 'raw' };
-                        }
-
-                        const koNick = extractKo(nick);
-                        if (koNick && koNick.length >= 2) {
-                            const koMatches = koBaseMap[koNick];
-                            if (koMatches && koMatches.length === 1) {
-                                const addr = koMatches[0];
-                                const master = masterMap[normalizeString(addr.nickname)];
-                                const raw = rawMap[normalizeString(addr.nickname)];
-                                let conflict = null;
-                                if (master && raw && parseSafeDate(raw.timestamp).getTime() > parseSafeDate(master.timestamp).getTime()) {
-                                    if (raw.address !== master.address || raw.phone !== master.phone || raw.realname !== master.realname) { conflict = raw; }
-                                }
-                                return { data: master || raw || addr, conflict: conflict, type: master ? 'master' : 'raw' };
-                            }
-                        }
-
-                        return { data: null, conflict: null, type: 'none' };
-                    }
-                };
-            }, [addresses, addressMapping]);
-
-            const handlePromoteAddress = useCallback((orderNick, rawData) => {
-                const diffMsg = `기존에 저장된 주소 정보와 다릅니다.\n\n[새로 입력된 정보]\n이름: ${rawData.realname}\n연락처: ${rawData.phone}\n주소: ${rawData.address}\n\n이 새로운 정보로 찐주소록을 덮어씌울까요?`;
-                openModal(diffMsg, 'confirm', () => { handleQuickAddressSubmit({ ...rawData, nickname: orderNick }); openModal("새 주소로 찐주소록이 업데이트 되었습니다!", "alert"); });
-            }, [openModal, handleQuickAddressSubmit]);
-
-            const toggleVIP = useCallback((nick) => {
-                setSpecialCustomers(prev => {
-                    const next = { ...prev }; const nickNorm = normalizeString(nick);
-                    const existingKey = Object.keys(next).find(k => normalizeString(k) === nickNorm);
-                    if (existingKey && next[existingKey].type === 'vip') { delete next[existingKey]; } 
-                    else { next[nick] = { type: 'vip', memo: '', purchaseCount: 0, noShowCount: 0 }; }
-                    return next;
-                });
-            }, [setSpecialCustomers]);
-
-            const getCalculatedShipping = useCallback((nick, productTotal) => {
-                if (shippingOverrides[nick] !== undefined) return Number(shippingOverrides[nick]);
-                const nickNorm = normalizeString(nick);
-                const specialKey = Object.keys(specialCustomers || {}).find(k => normalizeString(k) === nickNorm);
-                if (specialKey && specialCustomers[specialKey].type === 'vip') return 0; 
-                const addrRes = addressLookup.get(nick);
-                const isJeju = addrRes && addrRes.data && addrRes.data.address && addrRes.data.address.includes('제주');
-                let calcShip = (freeShippingThreshold > 0 && productTotal >= freeShippingThreshold) ? 0 : Number(quickShipping);
-                if (isJeju) { calcShip += (Number(jejuShipping) - Number(quickShipping)); }
-                return Math.max(0, calcShip);
-            }, [shippingOverrides, specialCustomers, addressLookup, quickShipping, jejuShipping, freeShippingThreshold]);
-
-            const findAddressSuggestions = useCallback((nick) => {
-                if (!nick) return []; const cleanNick = normalizeString(nick); if (cleanNick.length < 2) return []; 
-                const results = [];
-                for (let i = 0; i < addresses.length; i++) {
-                    const a = addresses[i]; const cleanAddrNick = normalizeString(a.nickname);
-                    if (cleanAddrNick !== cleanNick && (cleanAddrNick.includes(cleanNick) || cleanNick.includes(cleanAddrNick))) {
-                        results.push(a.nickname); if (results.length >= 3) break; 
-                    }
-                }
-                return results;
-            }, [addresses]);
 
             const allDeposits = useMemo(() => [...manualDeposits, ...serverDeposits], [manualDeposits, serverDeposits]);
             const allDepositsRef = useRef(allDeposits);
@@ -1170,6 +1182,9 @@
                 });
 
                 let entries = Object.entries(groups).filter(([nick, items]) => {
+                    // ✨ 검색 상태라도 선택된 고객(수정 중)은 무조건 화면에 표시!
+                    if (selectedNick === nick) return true;
+                    
                     if (filterStatus === 'no-address') { return !(addressLookup.get(nick)?.data?.address); }
                     if (deferredOrderSearch) {
                         const term = String(deferredOrderSearch).toLowerCase().replace(/\s/g, '');
@@ -1204,6 +1219,10 @@
                 });
 
                 entries.sort((a, b) => {
+                    // ✨ 핵심 추가: 현재 클릭해서 작업 중인 고객은 무조건 '최상단'으로 초강력 고정!
+                    if (a[0] === selectedNick) return -1;
+                    if (b[0] === selectedNick) return 1;
+
                     if (deferredOrderSearch) {
                         const term = String(deferredOrderSearch).toLowerCase().replace(/\s/g, '');
                         const aN = String(a[0]).toLowerCase().replace(/\s/g, ''); 
@@ -1226,7 +1245,7 @@
                 }
                 
                 return entries;
-            }, [orders, deferredOrderSearch, filterStatus, cardPayments, getCalculatedShipping, addressLookup, depositorNames]);
+            }, [orders, deferredOrderSearch, filterStatus, cardPayments, getCalculatedShipping, addressLookup, depositorNames, selectedNick]);
 
             const totalItemsCount = useMemo(() => { let count = 0; filteredGroupedOrders.forEach(([_, items]) => { count += items.filter(i => !i.isCancelled).length; }); return count; }, [filteredGroupedOrders]);
             useEffect(() => { setDisplayLimit(30); }, [deferredOrderSearch, filterStatus, selectedNick]);
@@ -1355,7 +1374,10 @@
                     let addrRes = addressLookup.get(o.customer); let addr = addrRes.data || {}; 
                     const currentShipping = getCalculatedShipping(o.customer, customerTotals[o.customer] || 0); 
                     const isCard = cardPayments[o.customer] ? true : false; 
-                    return { nickname: o.customer, product: o.product, qty: o.quantity, price: o.price, deposit: o.deposit, shipping: currentShipping, address: addr.address || '', zipcode: addr.zipcode ? "'" + addr.zipcode : '', phone: addr.phone ? "'" + addr.phone : '', realname: addr.realname || '', memo: addr.memo || '', isCard: isCard }; 
+                    // 시트에 저장할 때 0 날아감 방지용 홑따옴표 추가
+                    const safePhone = addr.phone ? "'" + addr.phone.replace(/[^0-9]/g, '') : '';
+                    const safeZipcode = addr.zipcode ? "'" + addr.zipcode : '';
+                    return { nickname: o.customer, product: o.product, qty: o.quantity, price: o.price, deposit: o.deposit, shipping: currentShipping, address: addr.address || '', zipcode: safeZipcode, phone: safePhone, realname: addr.realname || '', memo: addr.memo || '', isCard: isCard }; 
                 }); 
                 
                 if (broadcastName) {
@@ -1498,7 +1520,9 @@
                 }
                 
                 if (addr && addr.address && !alwaysRequestAddress) {
-                    msg += `\n[배송지 확인]\n\n${addr.realname || nick}\n${addr.phone || ''}\n${addr.address} ${addr.zipcode ? `(${addr.zipcode})` : ''}\n${addr.memo ? addr.memo + '\n' : ''}\n------------------\n${addrNotice}`;
+                    // 카톡 복사 시에도 전화번호 예쁘게 보정
+                    const displayPhone = addr.phone ? fixPhoneNumber(addr.phone) : '';
+                    msg += `\n[배송지 확인]\n\n${addr.realname || nick}\n${displayPhone}\n${addr.address} ${addr.zipcode ? `(${addr.zipcode})` : ''}\n${addr.memo ? addr.memo + '\n' : ''}\n------------------\n${addrNotice}`;
                 } else if (!sentAddressRequests.has(nick) || alwaysRequestAddress) { 
                     msg += `\n${surveyNotice}`; setSentAddressRequests(prev => new Set(prev).add(nick)); 
                 }
@@ -1858,7 +1882,7 @@
                                         <div className="text-[11px] text-slate-600 dark:text-slate-400 font-medium flex items-center gap-1 w-full overflow-hidden mt-0.5">
                                             <span className="shrink-0">{addr.realname}</span>
                                             <span className="text-slate-400 shrink-0">|</span>
-                                            <span className="shrink-0">{addr.phone}</span>
+                                            <span className="shrink-0">{fixPhoneNumber(addr.phone)}</span>
                                             <span className="text-slate-700 dark:text-slate-300 truncate flex-1 ml-1" title={`${addr.address} ${addr.memo}`}>{addr.address}{addr.memo && <span className="text-red-500 font-bold ml-1.5">[{addr.memo}]</span>}</span>
                                         </div>
                                     </div>
@@ -1979,7 +2003,7 @@
                     const addrInfo = addresses.find(a => normalizeString(a.nickname) === normalizeString(nick)) || {}; 
                     const fullAddress = addrInfo.zipcode ? `(${addrInfo.zipcode}) ${addrInfo.address || ''}` : (addrInfo.address || ''); 
                     const statusColumn = isCard ? "카드결제" : (isPaid ? "" : "미입금");
-                    const createRow = (productValue) => ({ '날짜시간': new Date().toLocaleString(), '공란1': '', '입금상태': statusColumn, '닉네임': nick, '주문제품(수량)': productValue, '이름': addrInfo.realname || '', '핸드폰번호': addrInfo.phone || '', '주소': fullAddress, '배송메모': addrInfo.memo || '' }); 
+                    const createRow = (productValue) => ({ '날짜시간': new Date().toLocaleString(), '공란1': '', '입금상태': statusColumn, '닉네임': nick, '주문제품(수량)': productValue, '이름': addrInfo.realname || '', '핸드폰번호': fixPhoneNumber(addrInfo.phone) || '', '주소': fullAddress, '배송메모': addrInfo.memo || '' }); 
                     excelRows.push(createRow(`[ ${nick} ]`)); items.forEach(item => { const qtyPart = item.quantity > 1 ? ` ★${item.quantity}개` : ''; excelRows.push(createRow(`${item.product}${qtyPart}`)); }); 
                 }); 
                 downloadExcel(excelRows, '고객별_정산_배송리스트'); 
@@ -2046,7 +2070,7 @@
                     }
 
                     if (addrInfo && addrInfo.address && !templateConfigLocal.alwaysRequestAddress) {
-                        msg += `\n[배송지 확인]\n\n${addrInfo.realname || nick}\n${addrInfo.phone || ''}\n${addrInfo.address} ${addrInfo.zipcode ? `(${addrInfo.zipcode})` : ''}\n${addrInfo.memo ? addrInfo.memo + '\n' : ''}\n------------------\n${templateConfigLocal.addrNotice}`;
+                        msg += `\n[배송지 확인]\n\n${addrInfo.realname || nick}\n${fixPhoneNumber(addrInfo.phone) || ''}\n${addrInfo.address} ${addrInfo.zipcode ? `(${addrInfo.zipcode})` : ''}\n${addrInfo.memo ? addrInfo.memo + '\n' : ''}\n------------------\n${templateConfigLocal.addrNotice}`;
                     } else if (!sentAddressRequestsLocal.has(nick) || templateConfigLocal.alwaysRequestAddress) { 
                         msg += `\n${templateConfigLocal.surveyNotice}`; 
                     }
@@ -2079,13 +2103,12 @@
                     
                     const depositTotal = items.reduce((sum, i) => sum + (i.deposit || 0), 0); 
                     const addrInfo = findAddress(nick) || {};
-                    const phone = addrInfo.phone || '';
                     
                     data.push({ 
                         '방송명': broadcastName, 
                         '닉네임': nick, 
                         '금액': depositTotal, 
-                        '전화번호': phone 
+                        '전화번호': fixPhoneNumber(addrInfo.phone) || ''
                     });
                 });
                 
@@ -2212,7 +2235,7 @@
             const [broadcastName, setBroadcastName] = useLocalStorage('broadcastName', '오늘의방송');
             const [bankAccount, setBankAccount] = useLocalStorage('bankAccount', FIXED_BANK_ACCOUNT);
             
-            // 캐시에 빈 값이 들어있을 경우 강제로 덮어씌우기 (초기 세팅용)
+            // 🚨 브라우저를 처음 켜도 대표님 ID가 강제로 들어가도록 하는 강력한 세팅 로직
             useEffect(() => {
                 setChatSheetId('199YCBXzInxmG8GforoRCNHNps21NhVIf9wHA6NXXhtg');
                 setDepSheetId('14bx2HMd_NID3zQN-Hb0x0At2Qmti7-p1Zfx1ZadNScY');
@@ -2262,13 +2285,27 @@
                 setModalConfig({ isOpen: true, type: t, message: m, onConfirm: (v) => { if (oc) oc(v); setModalConfig(p => ({ ...p, isOpen: false })); }, onCancel: () => { if (ocan) ocan(); setModalConfig(p => ({ ...p, isOpen: false })); }, initialValue: iv }); 
             }, []);
 
+            // ✨ 화면 하얗게 뻗는 현상 없는 안전한 초기화 로직
             const handleResetAllData = useCallback(() => {
                 openModal("방송 데이터를 완전히 초기화하시겠습니까?\n(입금내역, 주문서, 재고 기록이 영구 삭제됩니다.\n※ 주소록 및 VIP 명단은 절대 지워지지 않습니다!)", 'confirm', () => {
                     const keysToRemove = ['youtubeOrders', 'cardPayments', 'cashReceipts', 'shippingOverrides', 'matchedDeposits', 'sentAddressRequests', 'deletedDepositIds', 'checkedOrders', 'productInventory', 'productHistory', 'ignoredAutoMatch'].map(getLsKey);
                     keysToRemove.forEach(k => localStorage.removeItem(k));
-                    window.location.reload();
+                    
+                    // React State 즉시 빈 상태로 변경 (새로고침 없이 화면 초기화)
+                    setOrders([]);
+                    setCardPayments({});
+                    setCashReceipts({});
+                    setShippingOverrides({});
+                    setMatchedDeposits(new Set());
+                    setSentAddressRequests(new Set());
+                    setDeletedDepositIds(new Set());
+                    setCheckedOrders(new Set());
+                    setInventory([]);
+                    setProductHistory({});
+                    
+                    openModal("데이터가 성공적으로 초기화되었습니다.", "alert");
                 });
-            }, [openModal]);
+            }, [openModal, setOrders, setCardPayments, setCashReceipts, setShippingOverrides, setMatchedDeposits, setSentAddressRequests, setDeletedDepositIds, setCheckedOrders, setInventory, setProductHistory]);
 
             const handleExportBackup = () => {
                 const backupData = [{ 
