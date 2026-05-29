@@ -48,12 +48,12 @@
         const getLsKey = (key) => `${WS_ID}_${key}`;
 
         const FIXED_BANK_ACCOUNT = "카카오뱅크 김선정\n7942 18 01611";
-        const EMOJI_LIST = ["💙","💖","💛","💚","💜","🤍","❤️","🖤","🤎","💕","💞","⭐","🌟","✨","🔥","💥","💯","✅","✔️","❌","❗","❓","📢","🔔","🌈","💰","💸","💳","🧾","🪙","🚗","🚚","✈️","📱","💻","🎉","🎈"];
+        const EMOJI_LIST = ["💙","💖","💛","💚","💜","🤍","❤️","🖤","🤎","💕","💞","⭐","🌟","✨","🔥","💥","💯","✅","✔️","❌","❗","❓","📢","🔔","🌈","💰","💸","💳","🧾","🪙","🚗","🚚","✈️","📱","💻","🎉","🎈","👗","👕","👖","👔","🧥","🧦","👗","👙","👘","👠","👡","👢","👞","👟","🥾","🥿","🎒","👜","👛","💼","🕶️","👓","🧣","🧤","💍","🌂","☂️","🐶","🐱","🐭","🐹","🐰","🦊","🐻","🐼","🐨","🐯","🦁","🐮","🐷","🐸","🐵","🐔","🐧","🐦","🐤","🐺","🐗","🐴","🦄","🐝","🐛","🦋","🐌","🐞","🐜","🦟","🐢","🐍","🦎","🦖","🐙","🦑","🦞","🦀","🐡","🐠","🐟","🐬","🐳","🐋","🦈","🐊","🐅","🐆","🦓","🦍","🦧","🐘","🦛","🦏","🐪","🐫","🦒","🦘","🐃","🐂","🐄","🐎","🐖","🐏","🐑","🦙","🐐","🦌","🐕","🐩","🦮","🐕‍🦺","🐈","🐈‍⬛","🐓","🦃","🦚","🦜","🦢","🦩","🕊️","🐇","🦝","🦨","🦡","🦦","🦥","🐁","🐀","🐿️","🦔","🍏","🍎","🍐","🍊","🍋","🍌","🍉","🍇","🍓","🍈","🍒","🍑","🥭","🍍","🥥","🥝","🍅","🍆","🥑","🥦","🥬","🥒","🌶️","🌽","🥕","🧄","🧅","🥔","🍠","🥐","🍞","🥖","🥨","🥯","🧀","🥚","🍳","🧈","🥞","🧇","🥓","🥩","🍗","🍖","🌭","🍔","🍟","🍕","🥪","🥙","🌮","🌯","🥗","🥘","🥫","🍝","🍜","🍲","🍛","🍣","🍱","🥟","🦪","🍤","🍙","🍚","🍘","🍥","🥠","🥮","🍢","🍡","🍧","🍨","🍦","🥧","🧁","🍰","🎂","🍮","🍭","🍬","🍫","🍿","🍩","🍪","🌰","🥜","🍯","🥛","🍼","☕","🍵","🧃","🥤","🍶","🍺","🍻","🥂","🍷","🥃","🍸","🍹","🧉","🍾","🧊","🥄","🍴","🍽️","🥣","🥡","🥢","🧂"];
 
         const Icon = ({ name, className="", weight="regular", size }) => <i className={`ph ph-${name} ${className}`} data-phosphor-icon-weight={weight} style={{fontSize: size}}></i>;
         
         const normalizeString = (str) => String(str || '').replace(/[\s\(\)\[\]\{\}\-\_\.\,\/]/g, '').toLowerCase();
-
+        
         const getCleanSheetId = (idOrUrl) => {
             if (!idOrUrl) return '';
             const match = idOrUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
@@ -98,6 +98,13 @@
             return new Date(0);
         };
 
+        const fixPhoneNumber = (numStr) => {
+            if (!numStr) return '';
+            let cleaned = String(numStr).replace(/[^0-9]/g, '');
+            if (cleaned.length === 10 && !cleaned.startsWith('0')) cleaned = '0' + cleaned;
+            return cleaned;
+        };
+
         const fetchGas = async (url, payload = null) => {
             const options = { method: payload ? 'POST' : 'GET', redirect: "follow" };
             if (payload) {
@@ -110,15 +117,11 @@
                 
                 if (text.includes("<!DOCTYPE") || text.includes("<html")) {
                     console.error("보안 차단됨! 응답 원본:", text.substring(0, 150));
-                    return { status: "error", message: "보안차단 (시크릿 창에서 실행하거나 톱니바퀴 URL 확인)" };
+                    return { status: "error", message: "보안차단 (앱스스크립트 권한을 '모든 사용자'로 새 배포 하세요)" };
                 }
                 
-                try { 
-                    return JSON.parse(text); 
-                } catch(e) { 
-                    console.error("JSON 파싱 에러:", text.substring(0, 150));
-                    return { status: "error", message: "데이터 변환 실패 (백엔드 오류)" }; 
-                }
+                try { return JSON.parse(text); } 
+                catch(e) { return { status: "error", message: "데이터 변환 실패 (백엔드 오류)" }; }
             } catch (err) {
                 return { status: "error", message: `통신 오류 (${err.message})` };
             }
@@ -158,6 +161,9 @@
                     const cell_address = {c:C, r:R}; const cell_ref = XLSX.utils.encode_cell(cell_address);
                     if(!ws[cell_ref]) continue; if(!ws[cell_ref].s) ws[cell_ref].s = {};
                     ws[cell_ref].s.alignment = { wrapText: true, vertical: 'top' };
+                    if(ws[cell_ref].v && String(ws[cell_ref].v).startsWith('010')) {
+                        ws[cell_ref].t = 's';
+                    }
                 }
             }
             ws['!cols'] = [{wch: 15}, {wch: 40}, {wch: 15}, {wch: 15}, {wch: 15}, {wch: 60}];
@@ -216,7 +222,7 @@
 
             useEffect(() => {
                 if (isOpen) {
-                    if (initialData) { setFormData({ realname: initialData.realname || '', phone: initialData.phone || '', zipcode: initialData.zipcode || '', address: initialData.address || '', detailAddress: '', memo: initialData.memo || '' }); } 
+                    if (initialData) { setFormData({ realname: initialData.realname || '', phone: fixPhoneNumber(initialData.phone) || '', zipcode: initialData.zipcode || '', address: initialData.address || '', detailAddress: '', memo: initialData.memo || '' }); } 
                     else { setFormData({ realname: '', phone: '', zipcode: '', address: '', detailAddress: '', memo: '' }); }
                 }
             }, [isOpen, initialData]);
@@ -242,7 +248,7 @@
                 e.preventDefault(); 
                 const notify = (msg) => openModal ? openModal(msg, "alert") : alert(msg);
                 if (!formData.realname.trim()) return notify("수령인 이름을 입력해주세요.");
-                const cleanPhone = formData.phone.replace(/[^0-9]/g, '');
+                const cleanPhone = fixPhoneNumber(formData.phone);
                 if (!cleanPhone) return notify("유효한 연락처(숫자)를 입력해주세요.");
                 if (!formData.address.trim()) return notify("배송 주소를 검색해서 입력해주세요.");
                 const zipStr = formData.zipcode ? `(${formData.zipcode}) ` : '';
@@ -388,12 +394,19 @@
                 if (!newName) { openModal('상품명을 입력해주세요.', 'alert'); return; }
                 if (newName !== item.name && inventory.some(i => i.name === newName && i.id !== item.id)) { openModal('이미 동일한 이름의 상품이 있습니다.', 'alert'); setLocalName(item.name); return; }
 
+                const oldNameClean = cleanForMatch(item.name);
+
                 const newInv = inventory.map(i => i.id === item.id ? { ...i, name: newName, price: newPrice } : i);
                 setInventory(newInv);
-                saveInventoryToServer(newInv); // 🚨 수정 즉시 서버 저장
+                saveInventoryToServer(newInv); 
                 
                 if (newName !== item.name || newPrice !== item.price) {
-                    setOrders(prev => prev.map(o => { if (o.product === item.name) { return { ...o, product: newName, price: (Number(o.quantity) || 0) * newPrice }; } return o; }));
+                    setOrders(prev => prev.map(o => { 
+                        if (cleanForMatch(o.product) === oldNameClean) { 
+                            return { ...o, product: newName, price: (Number(o.quantity) || 0) * newPrice, isUnmodified: false }; 
+                        } 
+                        return o; 
+                    }));
                     setProductHistory(prev => { const next = {...prev}; if (newName !== item.name) { next[newName] = newPrice; } else { next[item.name] = newPrice; } return next; });
                 }
                 setIsEditing(false);
@@ -403,7 +416,7 @@
                 openModal(`'${item.name}' 항목을 재고 목록에서 삭제하시겠습니까?\n(기존 주문 내역은 유지됩니다)`, 'confirm', () => { 
                     const newInv = inventory.filter(i => i.id !== item.id);
                     setInventory(newInv);
-                    saveInventoryToServer(newInv); // 🚨 삭제 즉시 서버 저장 (좀비 현상 방지)
+                    saveInventoryToServer(newInv); 
                 }); 
             };
 
@@ -495,27 +508,22 @@
             const [localProduct, setLocalProduct] = useState(item.product); 
             const [localQty, setLocalQty] = useState(item.quantity === '' ? '' : item.quantity); 
             const [localPrice, setLocalPrice] = useState(item.price === '' || item.price === 0 ? '' : Number(item.price).toLocaleString());
-            const [isProductFocused, setIsProductFocused] = useState(false); 
-            const [isQtyFocused, setIsQtyFocused] = useState(false); 
-            const [isPriceFocused, setIsPriceFocused] = useState(false);
             
-            useEffect(() => { if (!isProductFocused) setLocalProduct(item.product); }, [item.product, isProductFocused]); 
-            useEffect(() => { if (!isQtyFocused) setLocalQty(item.quantity === '' ? '' : item.quantity); }, [item.quantity, isQtyFocused]); 
-            useEffect(() => { if (!isPriceFocused) setLocalPrice(item.price === '' || item.price === 0 ? '' : Number(item.price).toLocaleString()); }, [item.price, isPriceFocused]);
+            useEffect(() => { setLocalProduct(item.product); }, [item.product]); 
+            useEffect(() => { setLocalQty(item.quantity === '' ? '' : item.quantity); }, [item.quantity]); 
+            useEffect(() => { setLocalPrice(item.price === '' || item.price === 0 ? '' : Number(item.price).toLocaleString()); }, [item.price]);
             
             return (
                 <div className={`flex justify-between items-center text-xs px-1 py-0.5 rounded group transition-colors ${item.isCancelled ? 'bg-red-50/80 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30' : (item.isUnmodified ? 'bg-blue-100 dark:bg-blue-900/50 border-2 border-blue-400 dark:border-blue-600 shadow-sm my-0.5' : 'hover:bg-slate-100 dark:hover:bg-slate-700 border-2 border-transparent')}`}>
                     <div className="flex-1 flex gap-1 items-center">
                         {item.isCancelled && <span className="text-[9px] text-red-500 font-bold shrink-0">[취소]</span>}
-                        {/* 🚨 자동완성 항상 활성화되도록 수정됨 */}
                         <input id={`prod-input-${item.id}`} type="text" list="product-list" value={localProduct} 
                             onChange={(e) => setLocalProduct(e.target.value)} onClick={(e) => e.stopPropagation()} 
                             onFocus={(e) => { 
-                                e.target.select(); setIsProductFocused(true); setSelectedNick(nick); 
+                                e.target.select(); setSelectedNick(nick); 
                                 if(item.isUnmodified) handleProductChange(item.id, 'isUnmodified', false); 
                             }} 
                             onBlur={() => { 
-                                setIsProductFocused(false); 
                                 if (localProduct !== item.product) handleProductChange(item.id, 'product', localProduct); 
                             }} 
                             onKeyDown={(e) => { 
@@ -530,22 +538,22 @@
                             <input id={`qty-input-${item.id}`} type="number" value={localQty} 
                                 onChange={(e) => setLocalQty(e.target.value)} onClick={(e) => e.stopPropagation()} 
                                 onFocus={(e) => { 
-                                    e.target.select(); setIsQtyFocused(true); setSelectedNick(nick); 
+                                    e.target.select(); setSelectedNick(nick); 
                                     if(item.isUnmodified) handleProductChange(item.id, 'isUnmodified', false); 
                                 }} 
-                                onBlur={() => { setIsQtyFocused(false); const q = localQty === '' || isNaN(parseInt(localQty)) ? '' : parseInt(localQty); if (q !== item.quantity) handleQuantityUpdate(item.id, q); }} 
+                                onBlur={() => { const q = localQty === '' || isNaN(parseInt(localQty)) ? '' : parseInt(localQty); if (q !== item.quantity) handleQuantityUpdate(item.id, q); }} 
                                 onKeyDown={(e) => { if(e.key==='Enter') { e.preventDefault(); document.getElementById(`price-input-${item.id}`)?.focus(); } }} 
-                                className={`w-12 text-right pr-4 font-bold outline-none rounded py-0.5 ${item.isCancelled ? 'text-[11px] bg-transparent line-through text-slate-400 cursor-not-allowed' : `${Number(localQty) >= 2 ? 'text-[12px] text-red-600 bg-red-50' : (item.isUnmodified ? 'text-blue-700 dark:text-blue-300' : 'text-[11px] text-slate-800')} hover:bg-slate-200 bg-transparent`}`} disabled={item.isCancelled} />
+                                className={`w-12 text-right pr-4 font-bold outline-none rounded py-0.5 ${item.isCancelled ? 'text-[11px] bg-transparent line-through text-slate-400 cursor-not-allowed' : `${Number(localQty) >= 2 ? 'text-[12px] text-red-600 bg-red-50' : (item.isUnmodified ? 'text-blue-700 dark:text-blue-300' : 'text-[11px] text-slate-800 dark:text-slate-200')} hover:bg-slate-200 bg-transparent`}`} disabled={item.isCancelled} />
                             <span className={`absolute right-1 pointer-events-none ${Number(localQty) >= 2 && !item.isCancelled ? 'text-[10px] text-red-600 font-bold' : (item.isUnmodified ? 'text-blue-500' : 'text-[10px] text-slate-500')}`}>개</span>
                         </div>
                         <input id={`price-input-${item.id}`} type="text" value={localPrice} 
                             onChange={(e) => { const val = e.target.value.replace(/,/g, ''); if (!isNaN(val) && val !== '') setLocalPrice(Number(val).toLocaleString()); else if (val === '') setLocalPrice(''); }} 
                             onClick={(e) => e.stopPropagation()} 
                             onFocus={(e) => { 
-                                e.target.select(); setIsPriceFocused(true); setSelectedNick(nick); 
+                                e.target.select(); setSelectedNick(nick); 
                                 if(item.isUnmodified) handleProductChange(item.id, 'isUnmodified', false); 
                             }} 
-                            onBlur={() => { setIsPriceFocused(false); const val = String(localPrice).replace(/,/g, ''); if (!isNaN(val) && Number(val) !== Number(item.price)) { handleProductChange(item.id, 'price', val); } }} 
+                            onBlur={() => { const val = String(localPrice).replace(/,/g, ''); if (!isNaN(val) && Number(val) !== Number(item.price)) { handleProductChange(item.id, 'price', val); } }} 
                             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); const val = String(localPrice).replace(/,/g, ''); if (!isNaN(val) && Number(val) !== Number(item.price)) { handleProductChange(item.id, 'price', val); } if (!isLast && nextItemId) { document.getElementById(`prod-input-${nextItemId}`)?.focus(); } else { addOrderLogic(nick, '', 1, true, item.id); } } }} 
                             className={`w-16 text-right bg-transparent outline-none px-1 rounded font-bold ${item.isCancelled ? 'line-through text-slate-400 cursor-not-allowed' : (item.isUnmodified ? 'text-blue-700 dark:text-blue-300' : 'text-slate-700 hover:bg-slate-100')} ${Number(item.price) === 0 && !item.isCancelled ? 'bg-red-50 border-b border-red-300' : ''}`} disabled={item.isCancelled} />
                         <button onClick={(e)=>{e.stopPropagation(); handleOrderCancel(item.id); setSelectedNick(nick);}} className={`ml-1 ${item.isCancelled ? "text-slate-500" : "text-slate-300 hover:text-red-500"}`} title={item.isCancelled ? "취소 철회" : "주문 취소"}><Icon name={item.isCancelled ? "arrow-u-up-left" : "prohibit"} weight="bold"/></button>
@@ -566,13 +574,7 @@
             const suggestions = useMemo(() => findAddressSuggestions ? findAddressSuggestions(nick) : [], [nick, findAddressSuggestions]);
             const isVip = useMemo(() => { const nickNorm = normalizeString(nick); const key = Object.keys(specialCustomers || {}).find(k => normalizeString(k) === nickNorm); return key && specialCustomers[key].type === 'vip'; }, [specialCustomers, nick]);
 
-            const fixPhoneNumber = (numStr) => {
-                if (!numStr) return '';
-                let cleaned = String(numStr).replace(/[^0-9]/g, '');
-                if (cleaned.length === 10 && !cleaned.startsWith('0')) cleaned = '0' + cleaned;
-                return cleaned;
-            };
-            const cleanPhoneDisplay = addr && addr.phone ? fixPhoneNumber(addr.phone) : '';
+            const cleanPhoneDisplay = fixPhoneNumber(addr?.phone);
 
             return (
                 <div onClick={() => setSelectedNick(prev => prev === nick ? null : nick)} className={`bg-white dark:bg-slate-800 rounded shadow-sm transition-all overflow-hidden cursor-pointer ${borderClass} border mb-1.5`}>
@@ -707,13 +709,6 @@
             useEffect(() => { productHistoryRef.current = productHistory; }, [productHistory]);
             useEffect(() => { clickedChatsRef.current = clickedChats; }, [clickedChats]);
 
-            const fixPhoneNumber = (numStr) => {
-                if (!numStr) return '';
-                let cleaned = String(numStr).replace(/[^0-9]/g, '');
-                if (cleaned.length === 10 && !cleaned.startsWith('0')) cleaned = '0' + cleaned;
-                return cleaned;
-            };
-
             const bringToTopAndScroll = useCallback((rawNick) => {
                 if (!rawNick) return;
                 const cNick = String(rawNick).replace(/@/g, '').trim();
@@ -750,9 +745,8 @@
 
             const saveInventoryToServer = useCallback(async (newInvList) => {
                 if (googleScriptUrl && masterSheetId) {
-                    try {
-                        await fetchGas(googleScriptUrl, { action: 'save_inventory', masterId: getCleanSheetId(masterSheetId), data: newInvList.map(i => ({ name: i.name, price: i.price })) });
-                    } catch (e) { console.error("재고 저장 실패", e); }
+                    try { await fetchGas(googleScriptUrl, { action: 'save_inventory', masterId: getCleanSheetId(masterSheetId), data: newInvList.map(i => ({ name: i.name, price: i.price })) }); } 
+                    catch (e) {}
                 }
             }, [googleScriptUrl, masterSheetId]);
 
@@ -908,7 +902,7 @@
                     if (res && res.status === 'success') {
                         let statusMsg = "동기화: ";
                         
-                        // 1. 채팅 (2차원 배열)
+                        // 1. 채팅
                         if (res.chats && Array.isArray(res.chats)) {
                             let chatRows = res.chats;
                             if (chatRows.length > 0 && chatRows[0].some(c => typeof c === 'string' && (c.includes('날짜') || c.includes('닉네임') || c.includes('내용')))) {
@@ -928,7 +922,7 @@
                             else { statusMsg += `채팅(없음) `; }
                         } else { statusMsg += `채팅(연결실패) `; }
 
-                        // 2. 입금 (2차원 배열 스마트 위치파악)
+                        // 2. 입금
                         if (res.deposits && Array.isArray(res.deposits)) {
                             let depRows = res.deposits;
                             if (depRows.length > 0 && depRows[0].some(c => typeof c === 'string' && (c.includes('이름') || c.includes('금액') || c.includes('닉네임')))) {
@@ -962,7 +956,7 @@
                             else { statusMsg += `입금(없음) `; }
                         } else { statusMsg += `입금(연결실패) `; }
 
-                        // 3. 새주소 (2차원 배열 파싱)
+                        // 3. 새주소
                         let mergedAddr = [];
                         if (res.rawAddresses && Array.isArray(res.rawAddresses)) {
                             if (res.rawAddresses.length > 1) {
@@ -1168,6 +1162,9 @@
                         if (aN.startsWith(term) && !bN.startsWith(term)) return -1; if (!aN.startsWith(term) && bN.startsWith(term)) return 1;
                     }
                     
+                    if (selectedNick === a[0]) return -1;
+                    if (selectedNick === b[0]) return 1;
+                    
                     const aIdx = sortOrderCache.current.indexOf(a[0]); 
                     const bIdx = sortOrderCache.current.indexOf(b[0]);
                     if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
@@ -1182,7 +1179,7 @@
                 }
                 
                 return entries;
-            }, [orders, deferredOrderSearch, filterStatus, cardPayments, getCalculatedShipping, addressLookup, depositorNames]);
+            }, [orders, deferredOrderSearch, filterStatus, cardPayments, getCalculatedShipping, addressLookup, depositorNames, selectedNick]);
 
             const totalItemsCount = useMemo(() => { let count = 0; filteredGroupedOrders.forEach(([_, items]) => { count += items.filter(i => !i.isCancelled).length; }); return count; }, [filteredGroupedOrders]);
             useEffect(() => { setDisplayLimit(30); }, [deferredOrderSearch, filterStatus, selectedNick]);
@@ -1224,7 +1221,12 @@
                 return safeContent.split(pattern).map((part, i) => kwArray.includes(part) ? <span key={i} className="text-slate-700 dark:text-slate-300 font-bold bg-slate-200 dark:bg-slate-600 px-0.5 rounded">{part}</span> : part);
             }, []);
 
-            const handleChatClick = (chat) => { bringToTopAndScroll(chat.nickname); setClickedChats(prev => new Set(prev).add(chat.id)); const finalProduct = (isFixedProductMode && manualProduct.trim() !== '') ? manualProduct.trim() : String(chat.content || ''); const finalPrice = isFixedProductMode ? manualPrice : null; addOrderLogic(chat.nickname, finalProduct, 1, true, null, finalPrice, isFixedProductMode); };
+            const handleChatClick = (chat) => { 
+                setClickedChats(prev => new Set(prev).add(chat.id)); 
+                const finalProduct = (isFixedProductMode && manualProduct.trim() !== '') ? manualProduct.trim() : String(chat.content || ''); 
+                const finalPrice = isFixedProductMode ? manualPrice : null; 
+                addOrderLogic(chat.nickname, finalProduct, 1, true, null, finalPrice, isFixedProductMode); 
+            };
             const handleAddKeyword = (e) => { e.preventDefault(); const kw = keywordInput.trim(); if(!kw) return; setKeywords(prev => { const next = [...(prev || [])]; if(!next.includes(kw)) next.push(kw); return next; }); setKeywordInput(''); };
             const handleRemoveKeyword = (keyword) => { setKeywords(prev => (prev || []).filter(k => k !== keyword)); };
 
@@ -1366,39 +1368,58 @@
 
             const handleProductChange = useCallback((id, field, value) => { 
                 if (field === 'product') setCurrentSearchTerm(value);
-                setOrders(prev => prev.map(o => { 
-                    if (o.id === id) { 
-                        const newOrder = { ...o, [field]: value, isUnmodified: false }; 
-                        if(field === 'product') { 
-                            const cleanVal = String(value).trim(); const inv = inventoryRef.current; const hist = productHistoryRef.current;
-                            const invItem = Array.isArray(inv) ? inv.find(i => String(i.name).trim() === cleanVal) : null;
-                            const uPrice = invItem ? Number(invItem.price) : (hist[cleanVal] || 0);
-                            newOrder.price = (Number(newOrder.quantity) || 0) * uPrice; 
-                        } 
-                        if (field === 'price' && o.product && String(o.product).trim() !== '') { 
-                            const cleanProd = String(o.product).trim(); const valNum = String(value).replace(/,/g, '');
-                            const uPrice = o.quantity > 0 ? Number(valNum) / o.quantity : 0; 
-                            if (uPrice > 0) {
-                                setProductHistory(h => ({ ...h, [cleanProd]: uPrice })); 
-                                setInventory(prevInv => {
-                                    if (!Array.isArray(prevInv)) return prevInv;
-                                    const exists = prevInv.find(i => String(i.name).trim() === cleanProd);
-                                    if (!exists) {
-                                        const newInv = [{ id: `inv_${Date.now()}_${Math.random()}`, name: cleanProd, price: uPrice }, ...prevInv];
-                                        saveInventoryToServer(newInv);
-                                        return newInv;
-                                    }
-                                    const updatedInv = prevInv.map(i => String(i.name).trim() === cleanProd ? { ...i, price: uPrice } : i);
-                                    saveInventoryToServer(updatedInv);
-                                    return updatedInv;
-                                });
-                            }
-                        } 
-                        return newOrder; 
+                
+                setOrders(prev => {
+                    let updatedOrders = [...prev];
+                    const targetOrder = updatedOrders.find(o => o.id === id);
+                    if (!targetOrder) return prev;
+
+                    if (field === 'product') {
+                        const cleanVal = String(value).trim();
+                        const invItem = inventoryRef.current.find(i => String(i.name).trim() === cleanVal);
+                        const uPrice = invItem ? Number(invItem.price) : (productHistoryRef.current[cleanVal] || 0);
+                        targetOrder.product = value;
+                        targetOrder.price = (Number(targetOrder.quantity) || 0) * uPrice;
+                        targetOrder.isUnmodified = false;
                     } 
-                    return o; 
-                })); 
-            }, [setOrders, setProductHistory, setInventory, saveInventoryToServer]);
+                    else if (field === 'price') {
+                        const valNum = Number(String(value).replace(/,/g, ''));
+                        targetOrder.price = valNum;
+                        targetOrder.isUnmodified = false;
+
+                        const cleanProd = String(targetOrder.product || '').trim();
+                        const qty = Number(targetOrder.quantity) || 0;
+                        const uPrice = qty > 0 ? valNum / qty : 0;
+
+                        if (cleanProd !== '' && uPrice > 0) {
+                            setInventory(prevInv => {
+                                const exists = prevInv.find(i => String(i.name).trim() === cleanProd);
+                                let newInv;
+                                if (!exists) {
+                                    newInv = [{ id: `inv_${Date.now()}_${Math.random()}`, name: cleanProd, price: uPrice }, ...prevInv];
+                                } else {
+                                    newInv = prevInv.map(i => String(i.name).trim() === cleanProd ? { ...i, price: uPrice } : i);
+                                }
+                                saveInventoryToServer(newInv);
+                                return newInv;
+                            });
+                            setProductHistory(h => ({ ...h, [cleanProd]: uPrice }));
+
+                            updatedOrders = updatedOrders.map(o => {
+                                if (o.id !== id && String(o.product).trim() === cleanProd) {
+                                    return { ...o, price: (Number(o.quantity) || 0) * uPrice, isUnmodified: false };
+                                }
+                                return o;
+                            });
+                        }
+                    }
+                    else if (field === 'isUnmodified') {
+                        targetOrder.isUnmodified = value;
+                    }
+                    
+                    return updatedOrders;
+                });
+            }, [setOrders, setInventory, setProductHistory, saveInventoryToServer]);
 
             const handleQuantityUpdate = useCallback((itemId, newQtyVal) => { 
                 setOrders(prev => prev.map(o => { 
@@ -1427,7 +1448,7 @@
                 
                 let msg = `${emoji} ${nick} 님 ${emoji}\n\n[${broadcastName} 주문목록]\n${itemListText}\n배송비 ${currentShipping.toLocaleString()}원\n\n총 주문금액 ${grandTotal.toLocaleString()}원\n------------------\n`;
                 if (isCard) { 
-                    const cardBase = Math.max(0, grandTotal - depositTotal); // 잔금 (총액 - 입금액)
+                    const cardBase = Math.max(0, grandTotal - depositTotal); 
                     if (depositTotal > 0) {
                         msg += `[카드결제]\n총 주문금액 ${grandTotal.toLocaleString()}원\n선입금 ${depositTotal.toLocaleString()}원\n수수료(10%) ${(cardBase * 0.1).toLocaleString()}원\n👉결제요청액 ${(cardBase * 1.1).toLocaleString()}원 예정\n\n핸드폰번호 남겨주세요🌸\n------------------\n\n`; 
                     } else {
@@ -1469,21 +1490,40 @@
                 const inv = inventoryRef.current; const hist = productHistoryRef.current;
                 const invItem = Array.isArray(inv) ? inv.find(i => String(i.name).trim() === cContent) : null;
                 
-                let price = 0; const isCustomPriceValid = customPrice !== null && customPrice !== '';
-                if (isCustomPriceValid) price = Number(String(customPrice).replace(/,/g, '')); else price = invItem ? Number(invItem.price) : (hist[cContent] || 0);
+                const isCustomPriceValid = customPrice !== null && customPrice !== '';
+                let price = 0; 
+                if (isCustomPriceValid) price = Number(String(customPrice).replace(/,/g, '')); 
+                else price = invItem ? Number(invItem.price) : (hist[cContent] || 0);
 
                 if (cContent !== '' && (isCustomPriceValid || price > 0)) {
                     const priceToSave = price || 0;
                     setInventory(prevInv => {
-                        const invArr = Array.isArray(prevInv) ? prevInv : []; const exists = invArr.find(i => String(i.name).trim() === cContent);
+                        const invArr = Array.isArray(prevInv) ? prevInv : []; 
+                        const exists = invArr.find(i => String(i.name).trim() === cContent);
+                        let newInv;
                         if (!exists) {
-                            const newInv = [{ id: `inv_${Date.now()}_${Math.random()}`, name: cContent, price: priceToSave }, ...invArr]; 
+                            newInv = [{ id: `inv_${Date.now()}_${Math.random()}`, name: cContent, price: priceToSave }, ...invArr]; 
+                        } else if (exists.price !== priceToSave && isCustomPriceValid) {
+                            newInv = invArr.map(i => String(i.name).trim() === cContent ? { ...i, price: priceToSave } : i);
+                        }
+                        
+                        if (newInv) {
                             saveInventoryToServer(newInv);
                             return newInv;
                         }
                         return invArr;
                     });
+                    
                     if (priceToSave > 0) setProductHistory(h => ({ ...h, [cContent]: priceToSave }));
+                    
+                    if (isCustomPriceValid) {
+                        setOrders(prev => prev.map(o => {
+                            if (String(o.product).trim() === cContent) {
+                                return { ...o, price: (Number(o.quantity) || 0) * priceToSave };
+                            }
+                            return o;
+                        }));
+                    }
                 }
 
                 if (!isAuto) { setCheckedOrders(prev => { const n = new Set(prev); n.delete(cNick); return n; }); setSelectedNick(cNick); setOrderSearch(''); }
@@ -1571,11 +1611,36 @@
                 
                 const newInv = [{ id: `inv_${Date.now()}`, name: cleanName, price: priceNum }, ...inventory];
                 setInventory(newInv);
-                saveInventoryToServer(newInv);
-                
                 if(priceNum > 0) setProductHistory(prev => ({...prev, [cleanName]: priceNum}));
                 setNewInvName(''); setNewInvPrice('');
+                
+                saveInventoryToServer(newInv);
             };
+
+            const sortedInventoryList = useMemo(() => {
+                let filtered = inventory;
+                if (currentSearchTerm) {
+                    const term = String(currentSearchTerm).toLowerCase();
+                    filtered = inventory.filter(i => String(i.name).toLowerCase().includes(term));
+                }
+
+                const orderCounts = {};
+                orders.forEach(o => {
+                    if (!o.isCancelled && o.product) {
+                        const prodName = String(o.product).trim();
+                        orderCounts[prodName] = (orderCounts[prodName] || 0) + (Number(o.quantity) || 0);
+                    }
+                });
+
+                return [...filtered].sort((a, b) => {
+                    const countA = orderCounts[String(a.name).trim()] || 0;
+                    const countB = orderCounts[String(b.name).trim()] || 0;
+                    if (countB !== countA) {
+                        return countB - countA; 
+                    }
+                    return String(b.id).localeCompare(String(a.id)); 
+                });
+            }, [inventory, orders, currentSearchTerm]);
 
             return (
                 <div className="flex h-full gap-2 p-2 overflow-x-auto bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100">
@@ -1617,9 +1682,13 @@
                                             }
                                         });
                                         setInventory(newInvList);
-                                        saveInventoryToServer(newInvList);
                                         setIsBatchModalOpen(false); 
-                                        openModal(`${addedCount}개의 상품이 일괄 등록되었습니다.`, "alert");
+                                        
+                                        if (addedCount > 0) {
+                                            saveInventoryToServer(newInvList);
+                                            openModal(`${addedCount}개의 상품이 일괄 등록/전송되었습니다.`, "alert");
+                                        }
+
                                     }} className="flex-1 py-2 rounded bg-slate-800 text-white font-bold text-xs shadow-sm hover:bg-slate-900">일괄 생성</button>
                                 </div>
                             </div>
@@ -1635,7 +1704,7 @@
                         </div>
                         <div className="p-2 bg-slate-100 dark:bg-slate-800 border-b dark:border-slate-700 flex flex-col gap-2">
                              <div className="font-bold text-slate-800 dark:text-slate-200 flex items-center justify-between"><div className="flex items-center gap-2"><span className="flex items-center gap-1"><Icon name="youtube-logo" weight="fill" className="text-red-500"/> 라이브 채팅</span><button onClick={() => setShowKeywordOnly(!showKeywordOnly)} className={`flex items-center justify-center w-6 h-6 rounded-full transition-all ${showKeywordOnly ? 'bg-slate-700 text-white shadow-sm' : 'bg-white dark:bg-slate-700 text-slate-400 dark:text-slate-300 border border-slate-300 dark:border-slate-600 hover:text-slate-600 dark:hover:text-slate-100'}`}><Icon name="target" weight={showKeywordOnly ? "fill" : "bold"} size={14} /></button></div><span className="text-xs text-slate-500 dark:text-slate-400">{filteredChats.length}건</span></div>
-                             <div className={`text-[9px] p-0.5 rounded text-center truncate ${syncStatus.includes('에러') || syncStatus.includes('실패') || syncStatus.includes('입력하세요') || syncStatus.includes('차단') ? 'bg-red-100 text-red-600 font-bold' : 'text-slate-600 dark:text-slate-400 bg-slate-200 dark:bg-slate-700'}`}>{syncStatus}</div>
+                             <div className={`text-[9px] p-0.5 rounded text-center truncate ${syncStatus.includes('에러') || syncStatus.includes('실패') || syncStatus.includes('차단') ? 'bg-red-100 text-red-600 font-bold' : 'text-slate-600 dark:text-slate-400 bg-slate-200 dark:bg-slate-700'}`}>{syncStatus}</div>
                              <div className="flex gap-2">
                                  <div className="relative flex-1"><Icon name="magnifying-glass" className="absolute left-1.5 top-1/2 -translate-y-1/2 text-slate-400 text-[10px]"/><input type="text" placeholder="검색" value={chatSearch} onChange={e => setChatSearch(e.target.value)} onKeyDown={e => { if(e.key==='Escape'){ setChatSearch(''); e.target.blur(); } }} className="w-full text-[10px] pl-5 py-1.5 border dark:border-slate-600 rounded outline-none bg-white dark:bg-slate-900 focus:ring-1 focus:ring-slate-400" /></div>
                                  <form onSubmit={handleAddKeyword} className="flex gap-1 w-[45%]">
@@ -1711,7 +1780,7 @@
                                 </form>
                                 <div className="w-[20%] relative h-full flex items-center min-w-[80px]">
                                     <Icon name="magnifying-glass" className="absolute left-1.5 top-1/2 -translate-y-1/2 text-slate-400 text-[10px]"/>
-                                    <input type="text" placeholder="검색" value={orderSearch} onChange={e => setOrderSearch(e.target.value)} onKeyDown={e => { if(e.key==='Escape'){ setOrderSearch(''); e.target.blur(); } }} className="w-full h-full pl-6 pr-1 py-1.5 border dark:border-slate-600 rounded text-[10px] outline-none focus:ring-1 focus:ring-slate-500 bg-white dark:bg-slate-800 dark:text-white shadow-sm" />
+                                    <input type="text" placeholder="주문자/상품 검색" value={orderSearch} onChange={e => setOrderSearch(e.target.value)} onKeyDown={e => { if(e.key==='Escape'){ setOrderSearch(''); e.target.blur(); } }} className="w-full h-full pl-6 pr-1 py-1.5 border dark:border-slate-600 rounded text-[10px] outline-none focus:ring-1 focus:ring-slate-500 bg-white dark:bg-slate-800 dark:text-white shadow-sm" />
                                 </div>
                             </div>
                         </div>
@@ -1730,7 +1799,7 @@
                                 
                                 const { data: addrData, conflict: addrConflict, type: addrType } = addressLookup.get(nick);
                                 
-                                return (<CustomerBlock key={nick} nick={nick} items={items} isSelected={selectedNick === nick} currentShipping={ship} isCard={isCard} isPaidState={bal <= 0 && activeItems.length > 0} grandTotal={grand} depositTotal={depSum} balance={bal} baseGrandTotal={baseGrand} baseBalance={baseBal} addr={addrData} addrType={addrType} addrConflict={addrConflict} addressMapping={addressMapping} autoDepositorName={addrData?.realname || ''} displayDepositorName={depositorNames[nick] || addrData?.realname || '입금자'} isAutoDepositor={!depositorNames[nick] && addrData?.realname} depositorNames={depositorNames} copyStatus={copyStatus} isOrderConfirmed={checkedOrders.has(nick)} isEditingShipping={editingShippingNick === nick} setSelectedNick={setSelectedNick} addOrderLogic={addOrderLogic} handleNicknameEdit={handleNicknameEdit} toggleCardPayment={toggleCardPayment} handleShippingChange={handleShippingChange} setEditingShippingNick={setEditingShippingNick} openModal={openModal} setDepositorNames={setDepositorNames} handleFullDepositToggle={handleFullDepositToggle} copyOrderSheet={copyOrderSheet} handleOrderCheckToggle={handleOrderCheckToggle} handleAddressUnmapping={handleAddressUnmapping} handleAddressMapping={handleAddressMapping} handlePromoteAddress={handlePromoteAddress} handleProductChange={handleProductChange} handleQuantityUpdate={handleQuantityUpdate} handleOrderCancel={handleOrderCancel} handleOrderDelete={handleOrderDelete} toggleVIP={specialCustomers} onOpenQuickAddress={(nick) => setQuickAddrModal({ isOpen: true, nick, editData: null })} findAddressSuggestions={findAddressSuggestions} cashReceiptStatus={cashReceipts[nick]} toggleCashReceipt={toggleCashReceipt} />);
+                                return (<CustomerBlock key={nick} nick={nick} items={items} isSelected={selectedNick === nick} currentShipping={ship} isCard={isCard} isPaidState={bal <= 0 && activeItems.length > 0} grandTotal={grand} depositTotal={depSum} balance={bal} baseGrandTotal={baseGrand} baseBalance={baseBal} addr={addrData} addrType={addrType} addrConflict={addrConflict} addressMapping={addressMapping} autoDepositorName={addrData?.realname || ''} displayDepositorName={depositorNames[nick] || addrData?.realname || '입금자'} isAutoDepositor={!depositorNames[nick] && addrData?.realname} depositorNames={depositorNames} copyStatus={copyStatus} isOrderConfirmed={checkedOrders.has(nick)} isEditingShipping={editingShippingNick === nick} setSelectedNick={setSelectedNick} addOrderLogic={addOrderLogic} handleNicknameEdit={handleNicknameEdit} toggleCardPayment={toggleCardPayment} handleShippingChange={handleShippingChange} setEditingShippingNick={setEditingShippingNick} openModal={openModal} setDepositorNames={setDepositorNames} handleFullDepositToggle={handleFullDepositToggle} copyOrderSheet={copyOrderSheet} handleOrderCheckToggle={handleOrderCheckToggle} handleAddressUnmapping={handleAddressUnmapping} handleAddressMapping={handleAddressMapping} handlePromoteAddress={handlePromoteAddress} handleProductChange={handleProductChange} handleQuantityUpdate={handleQuantityUpdate} handleOrderCancel={handleOrderCancel} handleOrderDelete={handleOrderDelete} toggleVIP={toggleVIP} specialCustomers={specialCustomers} onOpenQuickAddress={(nick) => setQuickAddrModal({ isOpen: true, nick, editData: null })} findAddressSuggestions={findAddressSuggestions} cashReceiptStatus={cashReceipts[nick]} toggleCashReceipt={toggleCashReceipt} />);
                             })}
                         </div>
                     </div>
@@ -1800,7 +1869,7 @@
                                         <div className="text-[11px] text-slate-600 dark:text-slate-400 font-medium flex items-center gap-1 w-full overflow-hidden mt-0.5">
                                             <span className="shrink-0">{addr.realname}</span>
                                             <span className="text-slate-400 shrink-0">|</span>
-                                            <span className="shrink-0">{fixPhoneNumber(addr.phone)}</span>
+                                            <span className="shrink-0">{addr.phone}</span>
                                             <span className="text-slate-700 dark:text-slate-300 truncate flex-1 ml-1" title={`${addr.address} ${addr.memo}`}>{addr.address}{addr.memo && <span className="text-red-500 font-bold ml-1.5">[{addr.memo}]</span>}</span>
                                         </div>
                                     </div>
@@ -1839,7 +1908,7 @@
                             <div className="w-6 shrink-0"></div>
                         </div>
                         <div className="flex-1 overflow-y-auto p-1.5 space-y-1.5 bg-slate-50 dark:bg-slate-900">
-                            {inventory.filter(i => !currentSearchTerm || String(i.name).toLowerCase().includes(String(currentSearchTerm).toLowerCase())).map(item => (
+                            {sortedInventoryList.map(item => (
                                 <InventoryItemRow 
                                     key={item.id} item={item} orders={orders} setOrders={setOrders} inventory={inventory} setInventory={setInventory} setProductHistory={setProductHistory} openModal={openModal} expandedInventoryItem={expandedInventoryItem} setExpandedInventoryItem={setExpandedInventoryItem} setManualProduct={setManualProduct} setCurrentSearchTerm={setCurrentSearchTerm} setManualPrice={setManualPrice} setIsFixedProductMode={setIsFixedProductMode} customerPaidStatus={customerPaidStatus} saveInventoryToServer={saveInventoryToServer}
                                 />
@@ -1920,13 +1989,8 @@
                     if(items.length === 0) return; 
                     const addrInfo = addresses.find(a => normalizeString(a.nickname) === normalizeString(nick)) || {}; 
                     const fullAddress = addrInfo.zipcode ? `(${addrInfo.zipcode}) ${addrInfo.address || ''}` : (addrInfo.address || ''); 
-                    
-                    // 전화번호 복구 처리 추가
-                    let cleanPhone = String(addrInfo.phone || '').replace(/[^0-9]/g, '');
-                    if (cleanPhone.length === 10 && !cleanPhone.startsWith('0')) cleanPhone = '0' + cleanPhone;
-
                     const statusColumn = isCard ? "카드결제" : (isPaid ? "" : "미입금");
-                    const createRow = (productValue) => ({ '날짜시간': new Date().toLocaleString(), '공란1': '', '입금상태': statusColumn, '닉네임': nick, '주문제품(수량)': productValue, '이름': addrInfo.realname || '', '핸드폰번호': cleanPhone, '주소': fullAddress, '배송메모': addrInfo.memo || '' }); 
+                    const createRow = (productValue) => ({ '날짜시간': new Date().toLocaleString(), '공란1': '', '입금상태': statusColumn, '닉네임': nick, '주문제품(수량)': productValue, '이름': addrInfo.realname || '', '핸드폰번호': addrInfo.phone || '', '주소': fullAddress, '배송메모': addrInfo.memo || '' }); 
                     excelRows.push(createRow(`[ ${nick} ]`)); items.forEach(item => { const qtyPart = item.quantity > 1 ? ` ★${item.quantity}개` : ''; excelRows.push(createRow(`${item.product}${qtyPart}`)); }); 
                 }); 
                 downloadExcel(excelRows, '고객별_정산_배송리스트'); 
@@ -1993,9 +2057,8 @@
                     }
 
                     if (addrInfo && addrInfo.address && !templateConfigLocal.alwaysRequestAddress) {
-                        let cleanPhone = String(addrInfo.phone || '').replace(/[^0-9]/g, '');
-                        if (cleanPhone.length === 10 && !cleanPhone.startsWith('0')) cleanPhone = '0' + cleanPhone;
-                        msg += `\n[배송지 확인]\n\n${addrInfo.realname || nick}\n${cleanPhone}\n${addrInfo.address} ${addrInfo.zipcode ? `(${addrInfo.zipcode})` : ''}\n${addrInfo.memo ? addrInfo.memo + '\n' : ''}\n------------------\n${templateConfigLocal.addrNotice}`;
+                        const dispPhone = fixPhoneNumber(addrInfo.phone);
+                        msg += `\n[배송지 확인]\n\n${addrInfo.realname || nick}\n${dispPhone}\n${addrInfo.address} ${addrInfo.zipcode ? `(${addrInfo.zipcode})` : ''}\n${addrInfo.memo ? addrInfo.memo + '\n' : ''}\n------------------\n${templateConfigLocal.addrNotice}`;
                     } else if (!sentAddressRequestsLocal.has(nick) || templateConfigLocal.alwaysRequestAddress) { 
                         msg += `\n${templateConfigLocal.surveyNotice}`; 
                     }
@@ -2028,14 +2091,13 @@
                     
                     const depositTotal = items.reduce((sum, i) => sum + (i.deposit || 0), 0); 
                     const addrInfo = findAddress(nick) || {};
-                    let cleanPhone = String(addrInfo.phone || '').replace(/[^0-9]/g, '');
-                    if (cleanPhone.length === 10 && !cleanPhone.startsWith('0')) cleanPhone = '0' + cleanPhone;
+                    const phone = fixPhoneNumber(addrInfo.phone) || '';
                     
                     data.push({ 
                         '방송명': broadcastName, 
                         '닉네임': nick, 
                         '금액': depositTotal, 
-                        '전화번호': cleanPhone 
+                        '전화번호': phone 
                     });
                 });
                 
@@ -2162,7 +2224,6 @@
             const [broadcastName, setBroadcastName] = useLocalStorage('broadcastName', '오늘의방송');
             const [bankAccount, setBankAccount] = useLocalStorage('bankAccount', FIXED_BANK_ACCOUNT);
             
-            // 캐시에 빈 값이 들어있을 경우 강제로 덮어씌우기 (초기 세팅용)
             useEffect(() => {
                 setChatSheetId('199YCBXzInxmG8GforoRCNHNps21NhVIf9wHA6NXXhtg');
                 setDepSheetId('14bx2HMd_NID3zQN-Hb0x0At2Qmti7-p1Zfx1ZadNScY');
@@ -2217,7 +2278,6 @@
                     const keysToRemove = ['youtubeOrders', 'cardPayments', 'cashReceipts', 'shippingOverrides', 'matchedDeposits', 'sentAddressRequests', 'deletedDepositIds', 'checkedOrders', 'productInventory', 'productHistory', 'ignoredAutoMatch'].map(getLsKey);
                     keysToRemove.forEach(k => localStorage.removeItem(k));
                     
-                    // 강제 새로고침 대신 상태만 부드럽게 날려버림
                     setOrders([]);
                     setInventory([]);
                     setProductHistory({});
