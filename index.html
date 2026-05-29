@@ -765,10 +765,9 @@
 
             const handleQuickAddressSubmit = async (addrData) => {
                 if (!addrData.timestamp) addrData.timestamp = new Date().toISOString();
-                
                 const cleanPhone = fixPhoneNumber(addrData.phone);
                 const localData = { ...addrData, phone: cleanPhone, _source: 'master' };
-                // 시트로 보낼 때만 홑따옴표를 붙여서 보냄
+                // 💡 구글 시트로 보낼 때 전화번호/우편번호 0 날아감 방지 홑따옴표 추가
                 const masterData = { ...localData, phone: cleanPhone ? "'" + cleanPhone : '', zipcode: localData.zipcode ? "'" + localData.zipcode : '' };
                 
                 setAddresses(prev => {
@@ -1133,7 +1132,6 @@
                 });
 
                 let entries = Object.entries(groups).filter(([nick, items]) => {
-                    if (selectedNick === nick) return true; // 수정 중인 블록은 필터 무시
                     if (filterStatus === 'no-address') { return !(addressLookup.get(nick)?.data?.address); }
                     if (deferredOrderSearch) {
                         const term = String(deferredOrderSearch).toLowerCase().replace(/\s/g, '');
@@ -1167,10 +1165,8 @@
                     return true;
                 });
 
+                // 💡 [수정] 노란색(선택된) 주문이 위로 확 튕겨 올라가는 로직 삭제
                 entries.sort((a, b) => {
-                    if (a[0] === selectedNick) return -1; // 수정 중인 블록 무조건 최상단 고정
-                    if (b[0] === selectedNick) return 1;
-
                     if (deferredOrderSearch) {
                         const term = String(deferredOrderSearch).toLowerCase().replace(/\s/g, '');
                         const aN = String(a[0]).toLowerCase().replace(/\s/g, ''); 
@@ -1235,7 +1231,15 @@
                 return safeContent.split(pattern).map((part, i) => kwArray.includes(part) ? <span key={i} className="text-slate-700 dark:text-slate-300 font-bold bg-slate-200 dark:bg-slate-600 px-0.5 rounded">{part}</span> : part);
             }, []);
 
-            const handleChatClick = (chat) => { bringToTopAndScroll(chat.nickname); setClickedChats(prev => new Set(prev).add(chat.id)); const finalProduct = (isFixedProductMode && manualProduct.trim() !== '') ? manualProduct.trim() : String(chat.content || ''); const finalPrice = isFixedProductMode ? manualPrice : null; addOrderLogic(chat.nickname, finalProduct, 1, true, null, finalPrice, isFixedProductMode); };
+            // 💡 [수정] 라이브 채팅 클릭 시 자동 매칭 기능 100% 삭제 (수동으로만 추가됨)
+            const handleChatClick = (chat) => { 
+                bringToTopAndScroll(chat.nickname); 
+                setClickedChats(prev => new Set(prev).add(chat.id)); 
+                const finalProduct = (isFixedProductMode && manualProduct.trim() !== '') ? manualProduct.trim() : String(chat.content || ''); 
+                const finalPrice = isFixedProductMode ? manualPrice : null; 
+                addOrderLogic(chat.nickname, finalProduct, 1, true, null, finalPrice, isFixedProductMode); 
+            };
+            
             const handleAddKeyword = (e) => { e.preventDefault(); const kw = keywordInput.trim(); if(!kw) return; setKeywords(prev => { const next = [...(prev || [])]; if(!next.includes(kw)) next.push(kw); return next; }); setKeywordInput(''); };
             const handleRemoveKeyword = (keyword) => { setKeywords(prev => (prev || []).filter(k => k !== keyword)); };
 
@@ -1322,6 +1326,7 @@
                     let addrRes = addressLookup.get(o.customer); let addr = addrRes.data || {}; 
                     const currentShipping = getCalculatedShipping(o.customer, customerTotals[o.customer] || 0); 
                     const isCard = cardPayments[o.customer] ? true : false; 
+                    // 💡 구글 시트로 보낼 때 전화번호/우편번호 0 날아감 방지 홑따옴표 추가
                     const cleanPhone = fixPhoneNumber(addr.phone);
                     return { nickname: o.customer, product: o.product, qty: o.quantity, price: o.price, deposit: o.deposit, shipping: currentShipping, address: addr.address || '', zipcode: addr.zipcode ? "'" + addr.zipcode : '', phone: cleanPhone ? "'" + cleanPhone : '', realname: addr.realname || '', memo: addr.memo || '', isCard: isCard }; 
                 }); 
@@ -1376,6 +1381,7 @@
                     setAddressMapping(prev => ({ ...prev, [orderNick]: addressNick })); 
                     const addrData = addresses.find(a => normalizeString(a.nickname) === normalizeString(addressNick));
                     if (addrData && googleScriptUrl && masterSheetId) {
+                        // 💡 구글 시트로 보낼 때 전화번호/우편번호 0 날아감 방지 홑따옴표 추가
                         const cleanPhone = fixPhoneNumber(addrData.phone);
                         const mappedData = { ...addrData, nickname: orderNick, phone: cleanPhone ? "'" + cleanPhone : '', zipcode: addrData.zipcode ? "'" + addrData.zipcode : '', _source: 'master' };
                         try { 
@@ -1399,6 +1405,14 @@
                             const invItem = Array.isArray(inv) ? inv.find(i => String(i.name).trim() === cleanVal) : null;
                             const uPrice = invItem ? Number(invItem.price) : (hist[cleanVal] || 0);
                             newOrder.price = (Number(newOrder.quantity) || 0) * uPrice; 
+                            
+                            // 💡 [추가] 신규 상품명 입력 시 재고 목록에 자동 추가 (단가가 없어도 이름만 등록)
+                            setInventory(prevInv => {
+                                if (!Array.isArray(prevInv)) return prevInv;
+                                const exists = prevInv.find(i => String(i.name).trim() === cleanVal);
+                                if (!exists && cleanVal !== '') return [{ id: `inv_${Date.now()}_${Math.random()}`, name: cleanVal, price: uPrice }, ...prevInv];
+                                return prevInv;
+                            });
                         } 
                         if (field === 'price' && o.product && String(o.product).trim() !== '') { 
                             const cleanProd = String(o.product).trim(); const valNum = String(value).replace(/,/g, '');
@@ -1490,7 +1504,7 @@
                 let price = 0; const isCustomPriceValid = customPrice !== null && customPrice !== '';
                 if (isCustomPriceValid) price = Number(String(customPrice).replace(/,/g, '')); else price = invItem ? Number(invItem.price) : (hist[cContent] || 0);
 
-                if (cContent !== '' && (isCustomPriceValid || price > 0)) {
+                if (cContent !== '') {
                     const priceToSave = price || 0;
                     setInventory(prevInv => {
                         const invArr = Array.isArray(prevInv) ? prevInv : []; const exists = invArr.find(i => String(i.name).trim() === cContent);
@@ -1653,6 +1667,7 @@
                         </div>
                     )}
 
+                    {/* 채팅 영역 (1차 라이브 관제) */}
                     <div className="w-[18%] flex flex-col bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-lg shadow-sm overflow-hidden min-w-[180px]">
                         <div className="p-1.5 bg-slate-100 dark:bg-slate-900 border-b dark:border-slate-700 grid grid-cols-4 gap-1">
                             {quickMessages.map((msg, idx) => (
@@ -1661,7 +1676,7 @@
                         </div>
                         <div className="p-2 bg-slate-100 dark:bg-slate-800 border-b dark:border-slate-700 flex flex-col gap-2">
                              <div className="font-bold text-slate-800 dark:text-slate-200 flex items-center justify-between"><div className="flex items-center gap-2"><span className="flex items-center gap-1"><Icon name="youtube-logo" weight="fill" className="text-red-500"/> 라이브 채팅</span><button onClick={() => setShowKeywordOnly(!showKeywordOnly)} className={`flex items-center justify-center w-6 h-6 rounded-full transition-all ${showKeywordOnly ? 'bg-slate-700 text-white shadow-sm' : 'bg-white dark:bg-slate-700 text-slate-400 dark:text-slate-300 border border-slate-300 dark:border-slate-600 hover:text-slate-600 dark:hover:text-slate-100'}`}><Icon name="target" weight={showKeywordOnly ? "fill" : "bold"} size={14} /></button></div><span className="text-xs text-slate-500 dark:text-slate-400">{filteredChats.length}건</span></div>
-                             <div className={`text-[9px] p-0.5 rounded text-center truncate ${syncStatus.includes('에러') || syncStatus.includes('실패') || syncStatus.includes('입력하세요') || syncStatus.includes('차단') ? 'bg-red-100 text-red-600 font-bold' : 'text-slate-600 dark:text-slate-400 bg-slate-200 dark:bg-slate-700'}`}>{syncStatus}</div>
+                             <div className={`text-[9px] p-0.5 rounded text-center truncate ${syncStatus.includes('에러') || syncStatus.includes('실패') || syncStatus.includes('차단') ? 'bg-red-100 text-red-600 font-bold' : 'text-slate-600 dark:text-slate-400 bg-slate-200 dark:bg-slate-700'}`}>{syncStatus}</div>
                              <div className="flex gap-2">
                                  <div className="relative flex-1"><Icon name="magnifying-glass" className="absolute left-1.5 top-1/2 -translate-y-1/2 text-slate-400 text-[10px]"/><input type="text" placeholder="검색" value={chatSearch} onChange={e => setChatSearch(e.target.value)} onKeyDown={e => { if(e.key==='Escape'){ setChatSearch(''); e.target.blur(); } }} className="w-full text-[10px] pl-5 py-1.5 border dark:border-slate-600 rounded outline-none bg-white dark:bg-slate-900 focus:ring-1 focus:ring-slate-400" /></div>
                                  <form onSubmit={handleAddKeyword} className="flex gap-1 w-[45%]">
@@ -1688,6 +1703,7 @@
                         </div>
                     </div>
 
+                    {/* 주문서 영역 */}
                     <div className="w-[34%] bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-lg flex flex-col overflow-hidden shadow-sm min-w-[340px]">
                         <div className="grid grid-cols-4 gap-1 p-2 bg-slate-100 dark:bg-slate-800 border-b dark:border-slate-700 text-center text-[10px]">
                             {[{id:'all', label:'총매출', val:dashboardStats.totalSales, isCurrency:true, colSpan:2}, 
@@ -1760,6 +1776,7 @@
                         </div>
                     </div>
 
+                    {/* 입금 영역 */}
                     <div className="w-[14%] flex flex-col bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-lg overflow-hidden shadow-sm min-w-[120px]">
                         <div className="p-2 bg-slate-100 dark:bg-slate-800 border-b dark:border-slate-700 flex flex-col gap-2">
                             <div className="font-bold text-slate-800 dark:text-slate-200 flex items-center justify-between">
@@ -1795,6 +1812,7 @@
                         <div className="p-1 bg-white dark:bg-slate-800 text-center font-bold text-[10px] border-t dark:border-slate-700">총: <span className="text-slate-800 dark:text-slate-200 text-xs">{totalDepositAmount.toLocaleString()}</span>원</div>
                     </div>
 
+                    {/* 주소록 영역 */}
                     <div className="w-[13%] flex flex-col bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-lg overflow-hidden shadow-sm min-w-[130px]">
                         <div className="p-2 bg-slate-100 dark:bg-slate-800 border-b dark:border-slate-700 flex flex-col gap-2">
                             <div className="font-bold text-slate-800 dark:text-slate-200 flex items-center justify-between">
@@ -1832,6 +1850,7 @@
                         </div>
                     </div>
 
+                    {/* 재고 영역 */}
                     <div className="w-[20%] flex flex-col bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-lg overflow-hidden shadow-sm min-w-[200px]">
                         <div className="p-2 bg-slate-100 dark:bg-slate-800 border-b dark:border-slate-700 flex flex-col gap-2 shrink-0">
                             <div className="font-bold text-slate-800 dark:text-slate-200 flex items-center justify-between">
@@ -2178,11 +2197,10 @@
             
             // 캐시에 빈 값이 들어있을 경우 강제로 덮어씌우기 (초기 세팅용)
             useEffect(() => {
-                setChatSheetId('199YCBXzInxmG8GforoRCNHNps21NhVIf9wHA6NXXhtg');
-                setDepSheetId('14bx2HMd_NID3zQN-Hb0x0At2Qmti7-p1Zfx1ZadNScY');
-                setAddrSheetId('1ywl4gRvswQpvIYtPVbSROzz7a5elbLieYhqMZmt191U');
-                setGoogleScriptUrl('https://script.google.com/macros/s/AKfycbxmzti9c3GQ1ON-xUDKE2Qf0Lm8o9-CB2bU3S3WoPRzbL0Zea07n5i3sF_ltWN7mJx8/exec');
-                setMasterSheetId('1B8SBMX18_Px1CpRHuDTxqodqudiTrf6NfVoptjHtnGQ');
+                if (!chatSheetId || chatSheetId.trim() === '') setChatSheetId('199YCBXzInxmG8GforoRCNHNps21NhVIf9wHA6NXXhtg');
+                if (!addrSheetId || addrSheetId.trim() === '') setAddrSheetId('1ywl4gRvswQpvIYtPVbSROzz7a5elbLieYhqMZmt191U');
+                if (!googleScriptUrl || googleScriptUrl.trim() === '') setGoogleScriptUrl('https://script.google.com/macros/s/AKfycbxmzti9c3GQ1ON-xUDKE2Qf0Lm8o9-CB2bU3S3WoPRzbL0Zea07n5i3sF_ltWN7mJx8/exec');
+                if (!masterSheetId || masterSheetId.trim() === '') setMasterSheetId('1B8SBMX18_Px1CpRHuDTxqodqudiTrf6NfVoptjHtnGQ');
             }, []);
 
             const [quickShipping, setQuickShipping] = useLocalStorage('quickShipping', 4000); 
@@ -2226,8 +2244,9 @@
                 setModalConfig({ isOpen: true, type: t, message: m, onConfirm: (v) => { if (oc) oc(v); setModalConfig(p => ({ ...p, isOpen: false })); }, onCancel: () => { if (ocan) ocan(); setModalConfig(p => ({ ...p, isOpen: false })); }, initialValue: iv }); 
             }, []);
 
+            // 💡 [수정] 초기화 버튼 클릭 시 브라우저가 뻗지 않고 부드럽게 데이터를 0으로 덮어씀
             const handleResetAllData = useCallback(() => {
-                openModal("방송 데이터를 완전히 초기화하시겠습니까?\n(입금내역, 주문서, 재고 기록이 영구 삭제됩니다.\n※ 주소록 및 VIP 명단은 절대 지워지지 않습니다!)", 'confirm', () => {
+                openModal("방송 데이터를 완전히 초기화하시겠습니까?\n(입금내역, 주문서, 재고 기록이 영구 삭제됩니다.\n※ 주소록 및 VIP 명단은 지워지지 않습니다!)", 'confirm', () => {
                     const keysToRemove = ['youtubeOrders', 'cardPayments', 'cashReceipts', 'shippingOverrides', 'matchedDeposits', 'sentAddressRequests', 'deletedDepositIds', 'checkedOrders', 'productInventory', 'productHistory', 'ignoredAutoMatch'].map(getLsKey);
                     keysToRemove.forEach(k => localStorage.removeItem(k));
                     
