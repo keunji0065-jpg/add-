@@ -48,8 +48,7 @@
         const getLsKey = (key) => `${WS_ID}_${key}`;
 
         const FIXED_BANK_ACCOUNT = "카카오뱅크 김선정\n7942 18 01611";
-        // 이모티콘 수백개 대량 추가
-        const EMOJI_LIST = ["💙","💖","💛","💚","💜","🤍","❤️","🖤","🤎","💕","💞","⭐","🌟","✨","🔥","💥","💯","✅","✔️","❌","❗","❓","📢","🔔","🌈","💰","💸","💳","🧾","🪙","🚗","🚚","✈️","📱","💻","🎉","🎈", "🐶","🐱","🐰","🐻","🐼","🐨","🐯","🦁","🐷","🐸","🐙","🐵","🐔","🐧","🐦","🐤","🐺","🐗","🐴","🦄","🐝","🐛","🐌","🐞","🐜","🦋","🐢","🐍","🦎","🦂","🦀","🦑","🐙","🦐","🐠","🐟","🐬","🐳","🐋","🦈","🐊","🐅","🐆","🦓","🦍","🦧","🐘","🦛","🦏","🐪","🐫","🦒","🐃","🐂","🐄","🐎","🐖","🐏","🐑","🦙","🐐","🦌","🐕","🐩","🐈","🐓","🦃","🦚","🦜","🦢","🕊️","🐇","🦝","🦨","🦡","🐁","🐀","🐿️","🦔","🍎","🍎","🍐","🍊","🍋","🍌","🍉","🍇","🍓","🍈","🍒","🍑","🍍","🥝","🍅","🍆","🥑","🥦","🥒","🌶️","🌽","🥕","🥔","🍠","🥜","🍯","🍞","🥐","🥖","🥨","🥯","🥞","🧀","🍖","🍗","🥩","🥓","🍔","🍟","🍕","🌭","🥪","🌮","🌯","🥙","🥚","🍳","🥘","🍲","🥗","🍿","🍱","🍘","🍙","🍚","🍛","🍜","🍝","🍠","🍢","🍣","🍤","🍥","🥮","🍡","🥟","🥠","🥡","🍦","🍧","🍨","🍩","🍪","🎂","🍰","🧁","🥧","🍫","🍬","🍭","🍮","🍯","🍼","🥛","☕","🍵","🍶","🍾","🍷","🍸","🍹","🍺","🍻","🥂","🥃","🥤","🧃","🧉","🧊","🥢","🍽️","🍴","🥄","🔪","🏺", "👗", "👚", "👕", "👖", "👔", "👙", "👘", "🥻", "🩱", "🩲", "🩳", "🧥", "🧥", "🦺", "🥼", "🧤", "🧣", "🧦", "🧢", "👒", "🎩", "🎓", "👑", "🎒", "🧳", "👝", "👛", "👜", "💼", "👓", "🕶", "🥽", "🌂", "👟", "👞", "🥾", "🥿", "👠", "👡", "👢", "🩰"];
+        const EMOJI_LIST = ["💙","💖","💛","💚","💜","🤍","❤️","🖤","🤎","💕","💞","⭐","🌟","✨","🔥","💥","💯","✅","✔️","❌","❗","❓","📢","🔔","🌈","💰","💸","💳","🧾","🪙","🚗","🚚","✈️","📱","💻","🎉","🎈"];
 
         const Icon = ({ name, className="", weight="regular", size }) => <i className={`ph ph-${name} ${className}`} data-phosphor-icon-weight={weight} style={{fontSize: size}}></i>;
         
@@ -281,52 +280,6 @@
             );
         };
 
-        const VIPManagementModal = ({ isOpen, onClose, specialCustomers, setSpecialCustomers, openModal }) => {
-            const [newVipNick, setNewVipNick] = useState('');
-            if (!isOpen) return null;
-            
-            const vipList = Object.entries(specialCustomers || {}).filter(([nick, data]) => data.type === 'vip');
-            
-            const handleAddVip = (e) => {
-                e.preventDefault(); const cleanNick = newVipNick.trim(); if (!cleanNick) return;
-                setSpecialCustomers(prev => {
-                    const nickNorm = normalizeString(cleanNick); 
-                    const existingKey = Object.keys(prev).find(k => normalizeString(k) === nickNorm);
-                    if (existingKey && prev[existingKey].type === 'vip') { if (openModal) openModal("이미 등록된 VIP입니다.", "alert"); return prev; }
-                    return { ...prev, [cleanNick]: { type: 'vip', memo: '', purchaseCount: 0, noShowCount: 0 } };
-                });
-                setNewVipNick('');
-            };
-            
-            const handleRemoveVip = (nickToRemove) => { setSpecialCustomers(prev => { const next = { ...prev }; delete next[nickToRemove]; return next; }); };
-            
-            return (
-                <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-[9999] animate-pop" onClick={onClose}>
-                    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 w-full max-w-md mx-4 flex flex-col max-h-[80vh]" onClick={e => e.stopPropagation()}>
-                        <div className="mb-4 border-b dark:border-slate-700 pb-3 flex justify-between items-center shrink-0">
-                            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2"><Icon name="crown" weight="fill" /> VIP 특별 관리 대장</h3>
-                            <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><Icon name="x" weight="bold" size={20}/></button>
-                        </div>
-                        <form onSubmit={handleAddVip} className="flex gap-2 mb-4 shrink-0">
-                            <input type="text" value={newVipNick} onChange={e=>setNewVipNick(e.target.value)} placeholder="추가할 VIP 닉네임" className="flex-1 border dark:border-slate-600 rounded px-3 py-2 text-sm bg-transparent dark:text-white" />
-                            <button type="submit" className="bg-slate-700 text-white px-4 py-2 rounded text-sm font-bold shadow-sm">추가</button>
-                        </form>
-                        <div className="flex-1 overflow-y-auto space-y-2 pr-1">
-                            {vipList.length === 0 ? (<div className="text-center text-slate-500 py-8 text-sm">등록된 VIP가 없습니다.</div>) : (
-                                vipList.map(([nick, data]) => (
-                                    <div key={nick} className="flex justify-between items-center p-2.5 border dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-700/50">
-                                        <span className="font-bold text-slate-800 dark:text-slate-100">{nick}</span>
-                                        <button onClick={() => handleRemoveVip(nick)} className="text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 p-1.5 rounded text-xs font-bold flex items-center gap-1"><Icon name="trash" weight="bold" /> 해제</button>
-                                    </div>
-                                ))
-                            )}
-                        </div>
-                        <div className="mt-4 pt-3 border-t dark:border-slate-700 text-[10px] text-slate-500 text-center">💡 VIP로 등록된 고객은 주문 시 자동으로 배송비가 0원 처리됩니다.</div>
-                    </div>
-                </div>
-            );
-        };
-
         const SettingsField = ({ label, value, onChange, placeholder, type="text" }) => (
             <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{label}</label>
@@ -406,7 +359,7 @@
             );
         };
 
-        const InventoryItemRow = memo(({ item, orders, setOrders, inventory, setInventory, setProductHistory, openModal, expandedInventoryItem, setExpandedInventoryItem, setManualProduct, setCurrentSearchTerm, setManualPrice, setIsFixedProductMode, customerPaidStatus }) => {
+        const InventoryItemRow = memo(({ item, orders, setOrders, inventory, setInventory, setProductHistory, openModal, expandedInventoryItem, setExpandedInventoryItem, setManualProduct, setCurrentSearchTerm, setManualPrice, setIsFixedProductMode, customerPaidStatus, saveInventoryToServer }) => {
             const [isEditing, setIsEditing] = useState(false);
             const [localName, setLocalName] = useState(item.name);
             const [localPrice, setLocalPrice] = useState(item.price === 0 || item.price === '' ? '' : Number(item.price).toLocaleString());
@@ -435,7 +388,9 @@
                 if (!newName) { openModal('상품명을 입력해주세요.', 'alert'); return; }
                 if (newName !== item.name && inventory.some(i => i.name === newName && i.id !== item.id)) { openModal('이미 동일한 이름의 상품이 있습니다.', 'alert'); setLocalName(item.name); return; }
 
-                setInventory(prev => prev.map(i => i.id === item.id ? { ...i, name: newName, price: newPrice } : i));
+                const newInv = inventory.map(i => i.id === item.id ? { ...i, name: newName, price: newPrice } : i);
+                setInventory(newInv);
+                saveInventoryToServer(newInv); // 🚨 수정 즉시 서버 저장
                 
                 if (newName !== item.name || newPrice !== item.price) {
                     setOrders(prev => prev.map(o => { if (o.product === item.name) { return { ...o, product: newName, price: (Number(o.quantity) || 0) * newPrice }; } return o; }));
@@ -444,7 +399,13 @@
                 setIsEditing(false);
             };
 
-            const handleDelete = () => { openModal(`'${item.name}' 항목을 재고 목록에서 삭제하시겠습니까?\n(기존 주문 내역은 유지됩니다)`, 'confirm', () => { setInventory(prev => prev.filter(i => i.id !== item.id)); }); };
+            const handleDelete = () => { 
+                openModal(`'${item.name}' 항목을 재고 목록에서 삭제하시겠습니까?\n(기존 주문 내역은 유지됩니다)`, 'confirm', () => { 
+                    const newInv = inventory.filter(i => i.id !== item.id);
+                    setInventory(newInv);
+                    saveInventoryToServer(newInv); // 🚨 삭제 즉시 서버 저장 (좀비 현상 방지)
+                }); 
+            };
 
             return (
                 <div className="flex flex-col bg-white dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
@@ -546,7 +507,7 @@
                 <div className={`flex justify-between items-center text-xs px-1 py-0.5 rounded group transition-colors ${item.isCancelled ? 'bg-red-50/80 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30' : (item.isUnmodified ? 'bg-blue-100 dark:bg-blue-900/50 border-2 border-blue-400 dark:border-blue-600 shadow-sm my-0.5' : 'hover:bg-slate-100 dark:hover:bg-slate-700 border-2 border-transparent')}`}>
                     <div className="flex-1 flex gap-1 items-center">
                         {item.isCancelled && <span className="text-[9px] text-red-500 font-bold shrink-0">[취소]</span>}
-                        {/* 🚨 주문서 안에 직접입력 시 자동완성(datalist) 적용됨 */}
+                        {/* 🚨 자동완성 항상 활성화되도록 수정됨 */}
                         <input id={`prod-input-${item.id}`} type="text" list="product-list" value={localProduct} 
                             onChange={(e) => setLocalProduct(e.target.value)} onClick={(e) => e.stopPropagation()} 
                             onFocus={(e) => { 
@@ -737,8 +698,21 @@
             const sortOrderCache = useRef([]);
             const orderListRef = useRef(null);
             const chatScrollRef = useRef(null); 
+            const inventoryRef = useRef(inventory);
+            const productHistoryRef = useRef(productHistory);
+            const clickedChatsRef = useRef(clickedChats);
 
             useEffect(() => { localStorage.setItem(getLsKey('hiddenChatIds'), JSON.stringify([...hiddenChatIds])); }, [hiddenChatIds]);
+            useEffect(() => { inventoryRef.current = inventory; }, [inventory]);
+            useEffect(() => { productHistoryRef.current = productHistory; }, [productHistory]);
+            useEffect(() => { clickedChatsRef.current = clickedChats; }, [clickedChats]);
+
+            const fixPhoneNumber = (numStr) => {
+                if (!numStr) return '';
+                let cleaned = String(numStr).replace(/[^0-9]/g, '');
+                if (cleaned.length === 10 && !cleaned.startsWith('0')) cleaned = '0' + cleaned;
+                return cleaned;
+            };
 
             const bringToTopAndScroll = useCallback((rawNick) => {
                 if (!rawNick) return;
@@ -774,19 +748,13 @@
                 });
             }, [openModal, setOrders, setMatchedDeposits]);
 
-            const inventoryRef = useRef(inventory);
-            const productHistoryRef = useRef(productHistory);
-            const clickedChatsRef = useRef(clickedChats);
-            useEffect(() => { inventoryRef.current = inventory; }, [inventory]);
-            useEffect(() => { productHistoryRef.current = productHistory; }, [productHistory]);
-            useEffect(() => { clickedChatsRef.current = clickedChats; }, [clickedChats]);
-
-            const fixPhoneNumber = (numStr) => {
-                if (!numStr) return '';
-                let cleaned = String(numStr).replace(/[^0-9]/g, '');
-                if (cleaned.length === 10 && !cleaned.startsWith('0')) cleaned = '0' + cleaned;
-                return cleaned;
-            };
+            const saveInventoryToServer = useCallback(async (newInvList) => {
+                if (googleScriptUrl && masterSheetId) {
+                    try {
+                        await fetchGas(googleScriptUrl, { action: 'save_inventory', masterId: getCleanSheetId(masterSheetId), data: newInvList.map(i => ({ name: i.name, price: i.price })) });
+                    } catch (e) { console.error("재고 저장 실패", e); }
+                }
+            }, [googleScriptUrl, masterSheetId]);
 
             const handleQuickAddressSubmit = async (addrData) => {
                 if (!addrData.timestamp) addrData.timestamp = new Date().toISOString();
@@ -889,16 +857,6 @@
                 openModal(diffMsg, 'confirm', () => { handleQuickAddressSubmit({ ...rawData, nickname: orderNick }); openModal("새 주소로 찐주소록이 업데이트 되었습니다!", "alert"); });
             }, [openModal]);
 
-            const toggleVIP = useCallback((nick) => {
-                setSpecialCustomers(prev => {
-                    const next = { ...prev }; const nickNorm = normalizeString(nick);
-                    const existingKey = Object.keys(next).find(k => normalizeString(k) === nickNorm);
-                    if (existingKey && next[existingKey].type === 'vip') { delete next[existingKey]; } 
-                    else { next[nick] = { type: 'vip', memo: '', purchaseCount: 0, noShowCount: 0 }; }
-                    return next;
-                });
-            }, [setSpecialCustomers]);
-
             const getCalculatedShipping = useCallback((nick, productTotal) => {
                 if (shippingOverrides[nick] !== undefined) return Number(shippingOverrides[nick]);
                 const nickNorm = normalizeString(nick);
@@ -950,7 +908,7 @@
                     if (res && res.status === 'success') {
                         let statusMsg = "동기화: ";
                         
-                        // 1. 채팅
+                        // 1. 채팅 (2차원 배열)
                         if (res.chats && Array.isArray(res.chats)) {
                             let chatRows = res.chats;
                             if (chatRows.length > 0 && chatRows[0].some(c => typeof c === 'string' && (c.includes('날짜') || c.includes('닉네임') || c.includes('내용')))) {
@@ -970,7 +928,7 @@
                             else { statusMsg += `채팅(없음) `; }
                         } else { statusMsg += `채팅(연결실패) `; }
 
-                        // 2. 입금
+                        // 2. 입금 (2차원 배열 스마트 위치파악)
                         if (res.deposits && Array.isArray(res.deposits)) {
                             let depRows = res.deposits;
                             if (depRows.length > 0 && depRows[0].some(c => typeof c === 'string' && (c.includes('이름') || c.includes('금액') || c.includes('닉네임')))) {
@@ -1004,7 +962,7 @@
                             else { statusMsg += `입금(없음) `; }
                         } else { statusMsg += `입금(연결실패) `; }
 
-                        // 3. 새주소
+                        // 3. 새주소 (2차원 배열 파싱)
                         let mergedAddr = [];
                         if (res.rawAddresses && Array.isArray(res.rawAddresses)) {
                             if (res.rawAddresses.length > 1) {
@@ -1015,7 +973,6 @@
                                     const getVal = (...keys) => { for (let k of keys) { if (obj[k]) return String(obj[k]).trim(); } return ''; };
                                     
                                     let phoneVal = getVal('연락처', '전화번호', '휴대폰', '핸드폰');
-                                    if (phoneVal.startsWith("'")) phoneVal = phoneVal.substring(1);
                                     phoneVal = fixPhoneNumber(phoneVal);
 
                                     return {
@@ -1038,7 +995,6 @@
                         if (res.masterAddresses && Array.isArray(res.masterAddresses)) {
                             const masterAddrs = res.masterAddresses.map(a => {
                                 let phoneVal = String(a.phone || '').trim();
-                                if (phoneVal.startsWith("'")) phoneVal = phoneVal.substring(1);
                                 phoneVal = fixPhoneNumber(phoneVal);
                                 return {...a, phone: phoneVal, _source: 'master'};
                             });
@@ -1165,21 +1121,11 @@
                 orders.forEach(o => { if (!groups[o.customer]) groups[o.customer] = []; groups[o.customer].push(o); });
                 
                 Object.entries(groups).forEach(([nick, items]) => {
-                    // 💡 선택된 상태(작업중)일 때는 추가된 순서(id)대로 꽉 고정! 선택이 풀렸을 때만 가나다순으로 예쁘게 정렬
-                    if (selectedNick === nick) { 
-                        items.sort((a, b) => a.id - b.id); 
-                    } else { 
-                        items.sort((a, b) => {
-                            const cmp = String(a.product || '').localeCompare(String(b.product || ''), 'ko', { numeric: true });
-                            return cmp !== 0 ? cmp : a.id - b.id;
-                        }); 
-                    }
+                    if (selectedNick === nick) { items.sort((a, b) => a.id - b.id); } 
+                    else { items.sort((a, b) => String(a.product || '').localeCompare(String(b.product || ''), 'ko', { numeric: true })); }
                 });
 
                 let entries = Object.entries(groups).filter(([nick, items]) => {
-                    // 🚨 선택된 고객은 검색어 상관없이 무조건 노출하여 튕김 방지
-                    if (selectedNick === nick) return true;
-
                     if (filterStatus === 'no-address') { return !(addressLookup.get(nick)?.data?.address); }
                     if (deferredOrderSearch) {
                         const term = String(deferredOrderSearch).toLowerCase().replace(/\s/g, '');
@@ -1236,7 +1182,7 @@
                 }
                 
                 return entries;
-            }, [orders, deferredOrderSearch, filterStatus, cardPayments, getCalculatedShipping, addressLookup, depositorNames, selectedNick]);
+            }, [orders, deferredOrderSearch, filterStatus, cardPayments, getCalculatedShipping, addressLookup, depositorNames]);
 
             const totalItemsCount = useMemo(() => { let count = 0; filteredGroupedOrders.forEach(([_, items]) => { count += items.filter(i => !i.isCancelled).length; }); return count; }, [filteredGroupedOrders]);
             useEffect(() => { setDisplayLimit(30); }, [deferredOrderSearch, filterStatus, selectedNick]);
@@ -1278,13 +1224,7 @@
                 return safeContent.split(pattern).map((part, i) => kwArray.includes(part) ? <span key={i} className="text-slate-700 dark:text-slate-300 font-bold bg-slate-200 dark:bg-slate-600 px-0.5 rounded">{part}</span> : part);
             }, []);
 
-            const handleChatClick = (chat) => { 
-                bringToTopAndScroll(chat.nickname); 
-                setClickedChats(prev => new Set(prev).add(chat.id)); 
-                const finalProduct = (isFixedProductMode && manualProduct.trim() !== '') ? manualProduct.trim() : String(chat.content || ''); 
-                const finalPrice = isFixedProductMode ? manualPrice : null; 
-                addOrderLogic(chat.nickname, finalProduct, 1, true, null, finalPrice, isFixedProductMode); 
-            };
+            const handleChatClick = (chat) => { bringToTopAndScroll(chat.nickname); setClickedChats(prev => new Set(prev).add(chat.id)); const finalProduct = (isFixedProductMode && manualProduct.trim() !== '') ? manualProduct.trim() : String(chat.content || ''); const finalPrice = isFixedProductMode ? manualPrice : null; addOrderLogic(chat.nickname, finalProduct, 1, true, null, finalPrice, isFixedProductMode); };
             const handleAddKeyword = (e) => { e.preventDefault(); const kw = keywordInput.trim(); if(!kw) return; setKeywords(prev => { const next = [...(prev || [])]; if(!next.includes(kw)) next.push(kw); return next; }); setKeywordInput(''); };
             const handleRemoveKeyword = (keyword) => { setKeywords(prev => (prev || []).filter(k => k !== keyword)); };
 
@@ -1371,7 +1311,7 @@
                     let addrRes = addressLookup.get(o.customer); let addr = addrRes.data || {}; 
                     const currentShipping = getCalculatedShipping(o.customer, customerTotals[o.customer] || 0); 
                     const isCard = cardPayments[o.customer] ? true : false; 
-                    return { nickname: o.customer, product: o.product, qty: o.quantity, price: o.price, deposit: o.deposit, shipping: currentShipping, address: addr.address || '', zipcode: addr.zipcode ? "'" + addr.zipcode : '', phone: addr.phone ? "'" + fixPhoneNumber(addr.phone) : '', realname: addr.realname || '', memo: addr.memo || '', isCard: isCard }; 
+                    return { nickname: o.customer, product: o.product, qty: o.quantity, price: o.price, deposit: o.deposit, shipping: currentShipping, address: addr.address || '', zipcode: addr.zipcode ? "'" + addr.zipcode : '', phone: addr.phone ? "'" + addr.phone : '', realname: addr.realname || '', memo: addr.memo || '', isCard: isCard }; 
                 }); 
                 
                 if (broadcastName) {
@@ -1388,23 +1328,6 @@
 
             const autoSaveRef = useRef(); useEffect(() => { autoSaveRef.current = autoSaveToGoogleSheet; }, [autoSaveToGoogleSheet]);
             useEffect(() => { const saveInterval = setInterval(() => { if (autoSaveRef.current) autoSaveRef.current(); }, 60000); return () => clearInterval(saveInterval); }, []); 
-
-            // 🚨 재고 삭제가 씹히지 않도록 기존 데이터와 신규 데이터 간의 차이만 5초마다 자동저장
-            const isInitialInvMount = useRef(true);
-            useEffect(() => {
-                if (isInitialInvMount.current) {
-                    isInitialInvMount.current = false;
-                    return;
-                }
-                const timer = setTimeout(async () => {
-                    try {
-                        if (googleScriptUrl && masterSheetId) {
-                            await fetchGas(googleScriptUrl, { action: 'save_inventory', masterId: getCleanSheetId(masterSheetId), data: inventory.map(i => ({ name: i.name, price: i.price })) });
-                        }
-                    } catch(e) {}
-                }, 2000); 
-                return () => clearTimeout(timer);
-            }, [inventory, googleScriptUrl, masterSheetId]);
 
             useEffect(() => { if (lastAddedOrderId) { const input = document.getElementById(`prod-input-${lastAddedOrderId}`); if (input) input.focus(); setLastAddedOrderId(null); } }, [lastAddedOrderId, orders]);
 
@@ -1429,7 +1352,7 @@
                     setAddressMapping(prev => ({ ...prev, [orderNick]: addressNick })); 
                     const addrData = addresses.find(a => normalizeString(a.nickname) === normalizeString(addressNick));
                     if (addrData && googleScriptUrl && masterSheetId) {
-                        const mappedData = { ...addrData, nickname: orderNick, phone: addrData.phone ? "'" + fixPhoneNumber(addrData.phone) : '', zipcode: addrData.zipcode ? "'" + addrData.zipcode : '', _source: 'master' };
+                        const mappedData = { ...addrData, nickname: orderNick, phone: addrData.phone ? "'" + addrData.phone : '', _source: 'master' };
                         try { 
                             await fetchGas(googleScriptUrl, { action: 'save_master_address', masterId: getCleanSheetId(masterSheetId), data: mappedData }); 
                         } catch (err) {
@@ -1460,8 +1383,14 @@
                                 setInventory(prevInv => {
                                     if (!Array.isArray(prevInv)) return prevInv;
                                     const exists = prevInv.find(i => String(i.name).trim() === cleanProd);
-                                    if (!exists) return [{ id: `inv_${Date.now()}_${Math.random()}`, name: cleanProd, price: uPrice }, ...prevInv];
-                                    return prevInv.map(i => String(i.name).trim() === cleanProd ? { ...i, price: uPrice } : i);
+                                    if (!exists) {
+                                        const newInv = [{ id: `inv_${Date.now()}_${Math.random()}`, name: cleanProd, price: uPrice }, ...prevInv];
+                                        saveInventoryToServer(newInv);
+                                        return newInv;
+                                    }
+                                    const updatedInv = prevInv.map(i => String(i.name).trim() === cleanProd ? { ...i, price: uPrice } : i);
+                                    saveInventoryToServer(updatedInv);
+                                    return updatedInv;
                                 });
                             }
                         } 
@@ -1469,7 +1398,7 @@
                     } 
                     return o; 
                 })); 
-            }, [setOrders, setProductHistory, setInventory]);
+            }, [setOrders, setProductHistory, setInventory, saveInventoryToServer]);
 
             const handleQuantityUpdate = useCallback((itemId, newQtyVal) => { 
                 setOrders(prev => prev.map(o => { 
@@ -1519,7 +1448,7 @@
                 }
                 
                 if (addr && addr.address && !alwaysRequestAddress) {
-                    const dispPhone = addr.phone ? fixPhoneNumber(addr.phone) : '';
+                    const dispPhone = fixPhoneNumber(addr.phone);
                     msg += `\n[배송지 확인]\n\n${addr.realname || nick}\n${dispPhone}\n${addr.address} ${addr.zipcode ? `(${addr.zipcode})` : ''}\n${addr.memo ? addr.memo + '\n' : ''}\n------------------\n${addrNotice}`;
                 } else if (!sentAddressRequests.has(nick) || alwaysRequestAddress) { 
                     msg += `\n${surveyNotice}`; setSentAddressRequests(prev => new Set(prev).add(nick)); 
@@ -1543,12 +1472,16 @@
                 let price = 0; const isCustomPriceValid = customPrice !== null && customPrice !== '';
                 if (isCustomPriceValid) price = Number(String(customPrice).replace(/,/g, '')); else price = invItem ? Number(invItem.price) : (hist[cContent] || 0);
 
-                // 🚨 단가가 0보다 클 때만 재고에 자동 추가 (쓰레기 재고 방어)
-                if (cContent !== '' && price > 0) {
+                if (cContent !== '' && (isCustomPriceValid || price > 0)) {
                     const priceToSave = price || 0;
                     setInventory(prevInv => {
                         const invArr = Array.isArray(prevInv) ? prevInv : []; const exists = invArr.find(i => String(i.name).trim() === cContent);
-                        if (!exists) return [{ id: `inv_${Date.now()}_${Math.random()}`, name: cContent, price: priceToSave }, ...invArr]; return invArr;
+                        if (!exists) {
+                            const newInv = [{ id: `inv_${Date.now()}_${Math.random()}`, name: cContent, price: priceToSave }, ...invArr]; 
+                            saveInventoryToServer(newInv);
+                            return newInv;
+                        }
+                        return invArr;
                     });
                     if (priceToSave > 0) setProductHistory(h => ({ ...h, [cContent]: priceToSave }));
                 }
@@ -1564,7 +1497,7 @@
                     if (afterId) { const idx = prev.findIndex(o => o.id === afterId); if (idx !== -1) { const next = [...prev]; next.splice(idx + 1, 0, newOrder); return next; } }
                     return [newOrder, ...prev];
                 });
-            }, [setCheckedOrders, setOrders, setInventory, setProductHistory]);
+            }, [setCheckedOrders, setOrders, setInventory, setProductHistory, saveInventoryToServer]);
 
             const handleManualSubmit = (e) => { e.preventDefault(); if(!manualNick.trim()) return openModal("닉네임을 입력해주세요.", 'alert'); addOrderLogic(manualNick, manualProduct, 1, false, null, manualPrice, true); setManualNick(''); if (!isFixedProductMode) { setManualProduct(''); setManualPrice(''); } };
             const handleDepositClick = (dep) => {
@@ -1638,15 +1571,10 @@
                 
                 const newInv = [{ id: `inv_${Date.now()}`, name: cleanName, price: priceNum }, ...inventory];
                 setInventory(newInv);
+                saveInventoryToServer(newInv);
+                
                 if(priceNum > 0) setProductHistory(prev => ({...prev, [cleanName]: priceNum}));
                 setNewInvName(''); setNewInvPrice('');
-                
-                // 수동으로 등록한 신규 상품은 즉시 저장 시도
-                if (googleScriptUrl && masterSheetId) {
-                    try {
-                        await fetchGas(googleScriptUrl, { action: 'save_inventory', masterId: getCleanSheetId(masterSheetId), data: newInv.map(i => ({ name: i.name, price: i.price })) });
-                    } catch(err) {}
-                }
             };
 
             return (
@@ -1689,26 +1617,16 @@
                                             }
                                         });
                                         setInventory(newInvList);
+                                        saveInventoryToServer(newInvList);
                                         setIsBatchModalOpen(false); 
-                                        
-                                        if (googleScriptUrl && masterSheetId && addedCount > 0) {
-                                            try {
-                                                await fetchGas(googleScriptUrl, { action: 'save_inventory', masterId: getCleanSheetId(masterSheetId), data: newInvList.map(i => ({ name: i.name, price: i.price })) });
-                                                openModal(`${addedCount}개의 상품이 등록/전송되었습니다.`, "alert");
-                                            } catch(err) { 
-                                                openModal(`상품 생성은 성공했으나, 서버 전송에 실패했습니다: ${err.message}`, "alert"); 
-                                            }
-                                        } else {
-                                            openModal(`${addedCount}개의 상품이 일괄 등록되었습니다.`, "alert");
-                                        }
-
+                                        openModal(`${addedCount}개의 상품이 일괄 등록되었습니다.`, "alert");
                                     }} className="flex-1 py-2 rounded bg-slate-800 text-white font-bold text-xs shadow-sm hover:bg-slate-900">일괄 생성</button>
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    {/* 채팅 영역 (1차 라이브 관제) */}
+                    {/* 채팅 영역 */}
                     <div className="w-[18%] flex flex-col bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-lg shadow-sm overflow-hidden min-w-[180px]">
                         <div className="p-1.5 bg-slate-100 dark:bg-slate-900 border-b dark:border-slate-700 grid grid-cols-4 gap-1">
                             {quickMessages.map((msg, idx) => (
@@ -1882,7 +1800,7 @@
                                         <div className="text-[11px] text-slate-600 dark:text-slate-400 font-medium flex items-center gap-1 w-full overflow-hidden mt-0.5">
                                             <span className="shrink-0">{addr.realname}</span>
                                             <span className="text-slate-400 shrink-0">|</span>
-                                            <span className="shrink-0">{addr.phone}</span>
+                                            <span className="shrink-0">{fixPhoneNumber(addr.phone)}</span>
                                             <span className="text-slate-700 dark:text-slate-300 truncate flex-1 ml-1" title={`${addr.address} ${addr.memo}`}>{addr.address}{addr.memo && <span className="text-red-500 font-bold ml-1.5">[{addr.memo}]</span>}</span>
                                         </div>
                                     </div>
@@ -1923,7 +1841,7 @@
                         <div className="flex-1 overflow-y-auto p-1.5 space-y-1.5 bg-slate-50 dark:bg-slate-900">
                             {inventory.filter(i => !currentSearchTerm || String(i.name).toLowerCase().includes(String(currentSearchTerm).toLowerCase())).map(item => (
                                 <InventoryItemRow 
-                                    key={item.id} item={item} orders={orders} setOrders={setOrders} inventory={inventory} setInventory={setInventory} setProductHistory={setProductHistory} openModal={openModal} expandedInventoryItem={expandedInventoryItem} setExpandedInventoryItem={setExpandedInventoryItem} setManualProduct={setManualProduct} setCurrentSearchTerm={setCurrentSearchTerm} setManualPrice={setManualPrice} setIsFixedProductMode={setIsFixedProductMode} customerPaidStatus={customerPaidStatus}
+                                    key={item.id} item={item} orders={orders} setOrders={setOrders} inventory={inventory} setInventory={setInventory} setProductHistory={setProductHistory} openModal={openModal} expandedInventoryItem={expandedInventoryItem} setExpandedInventoryItem={setExpandedInventoryItem} setManualProduct={setManualProduct} setCurrentSearchTerm={setCurrentSearchTerm} setManualPrice={setManualPrice} setIsFixedProductMode={setIsFixedProductMode} customerPaidStatus={customerPaidStatus} saveInventoryToServer={saveInventoryToServer}
                                 />
                             ))}
                         </div>
@@ -2002,8 +1920,13 @@
                     if(items.length === 0) return; 
                     const addrInfo = addresses.find(a => normalizeString(a.nickname) === normalizeString(nick)) || {}; 
                     const fullAddress = addrInfo.zipcode ? `(${addrInfo.zipcode}) ${addrInfo.address || ''}` : (addrInfo.address || ''); 
+                    
+                    // 전화번호 복구 처리 추가
+                    let cleanPhone = String(addrInfo.phone || '').replace(/[^0-9]/g, '');
+                    if (cleanPhone.length === 10 && !cleanPhone.startsWith('0')) cleanPhone = '0' + cleanPhone;
+
                     const statusColumn = isCard ? "카드결제" : (isPaid ? "" : "미입금");
-                    const createRow = (productValue) => ({ '날짜시간': new Date().toLocaleString(), '공란1': '', '입금상태': statusColumn, '닉네임': nick, '주문제품(수량)': productValue, '이름': addrInfo.realname || '', '핸드폰번호': addrInfo.phone || '', '주소': fullAddress, '배송메모': addrInfo.memo || '' }); 
+                    const createRow = (productValue) => ({ '날짜시간': new Date().toLocaleString(), '공란1': '', '입금상태': statusColumn, '닉네임': nick, '주문제품(수량)': productValue, '이름': addrInfo.realname || '', '핸드폰번호': cleanPhone, '주소': fullAddress, '배송메모': addrInfo.memo || '' }); 
                     excelRows.push(createRow(`[ ${nick} ]`)); items.forEach(item => { const qtyPart = item.quantity > 1 ? ` ★${item.quantity}개` : ''; excelRows.push(createRow(`${item.product}${qtyPart}`)); }); 
                 }); 
                 downloadExcel(excelRows, '고객별_정산_배송리스트'); 
@@ -2070,7 +1993,9 @@
                     }
 
                     if (addrInfo && addrInfo.address && !templateConfigLocal.alwaysRequestAddress) {
-                        msg += `\n[배송지 확인]\n\n${addrInfo.realname || nick}\n${addrInfo.phone || ''}\n${addrInfo.address} ${addrInfo.zipcode ? `(${addrInfo.zipcode})` : ''}\n${addrInfo.memo ? addrInfo.memo + '\n' : ''}\n------------------\n${templateConfigLocal.addrNotice}`;
+                        let cleanPhone = String(addrInfo.phone || '').replace(/[^0-9]/g, '');
+                        if (cleanPhone.length === 10 && !cleanPhone.startsWith('0')) cleanPhone = '0' + cleanPhone;
+                        msg += `\n[배송지 확인]\n\n${addrInfo.realname || nick}\n${cleanPhone}\n${addrInfo.address} ${addrInfo.zipcode ? `(${addrInfo.zipcode})` : ''}\n${addrInfo.memo ? addrInfo.memo + '\n' : ''}\n------------------\n${templateConfigLocal.addrNotice}`;
                     } else if (!sentAddressRequestsLocal.has(nick) || templateConfigLocal.alwaysRequestAddress) { 
                         msg += `\n${templateConfigLocal.surveyNotice}`; 
                     }
@@ -2103,13 +2028,14 @@
                     
                     const depositTotal = items.reduce((sum, i) => sum + (i.deposit || 0), 0); 
                     const addrInfo = findAddress(nick) || {};
-                    const phone = addrInfo.phone || '';
+                    let cleanPhone = String(addrInfo.phone || '').replace(/[^0-9]/g, '');
+                    if (cleanPhone.length === 10 && !cleanPhone.startsWith('0')) cleanPhone = '0' + cleanPhone;
                     
                     data.push({ 
                         '방송명': broadcastName, 
                         '닉네임': nick, 
                         '금액': depositTotal, 
-                        '전화번호': phone 
+                        '전화번호': cleanPhone 
                     });
                 });
                 
@@ -2306,7 +2232,7 @@
                     
                     openModal("화면의 모든 데이터가 안전하게 초기화되었습니다.", 'alert');
                 });
-            }, [openModal]);
+            }, [openModal, setOrders, setInventory, setProductHistory, setShippingOverrides, setCardPayments, setCashReceipts, setMatchedDeposits, setSentAddressRequests, setDeletedDepositIds, setCheckedOrders, setClickedChats]);
 
             const handleExportBackup = () => {
                 const backupData = [{ 
