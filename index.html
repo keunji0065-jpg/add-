@@ -104,10 +104,10 @@
         const parseSafeDate = (val) => {
             if (!val) return new Date(0);
             const s = String(val).trim();
-            let d = new Date(s);
-            if (!isNaN(d) && d.getTime() > 0) return d;
             const match = s.match(/(\d{4})[./-]\s*(\d{1,2})[./-]\s*(\d{1,2})/);
             if (match) return new Date(parseInt(match[1]), parseInt(match[2])-1, parseInt(match[3]));
+            let d = new Date(s);
+            if (!isNaN(d) && d.getTime() > 0) return d;
             return new Date(0);
         };
 
@@ -390,9 +390,11 @@
             const [isEditing, setIsEditing] = useState(false);
             const [localName, setLocalName] = useState(item.name);
             const [localPrice, setLocalPrice] = useState(item.price === 0 || item.price === '' ? '' : Number(item.price).toLocaleString());
+            const [localStock, setLocalStock] = useState(item.stock === undefined || item.stock === '' ? '' : item.stock);
 
             useEffect(() => { setLocalName(item.name); }, [item.name]);
             useEffect(() => { setLocalPrice(item.price === 0 || item.price === '' ? '' : Number(item.price).toLocaleString()); }, [item.price]);
+            useEffect(() => { setLocalStock(item.stock === undefined || item.stock === '' ? '' : item.stock); }, [item.stock]);
 
             const orderedCount = itemStats ? itemStats.count : 0;
             const aggregatedOrders = itemStats ? itemStats.aggregated : [];
@@ -402,6 +404,7 @@
             const handleSave = () => {
                 const newName = localName.trim();
                 const newPrice = Number(String(localPrice).replace(/,/g, ''));
+                const newStock = localStock === '' ? '' : parseInt(localStock);
                 if (!newName) { openModal('상품명을 입력해주세요.', 'alert'); return; }
 
                 let isDuplicate = false;
@@ -410,7 +413,7 @@
                         isDuplicate = true;
                         return prevInv; 
                     }
-                    const newInv = prevInv.map(i => i.name === item.name ? { ...i, name: newName, price: newPrice } : i);
+                    const newInv = prevInv.map(i => i.name === item.name ? { ...i, name: newName, price: newPrice, stock: newStock } : i);
                     saveInventoryToServer(newInv); 
                     return newInv;
                 });
@@ -473,7 +476,8 @@
                         {isEditing ? (
                             <div className="flex-1 flex gap-1 items-center min-w-0 pr-1">
                                 <input autoFocus type="text" value={localName} onChange={e=>setLocalName(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')handleSave();}} className="w-full border dark:border-slate-600 bg-transparent dark:text-white px-1 py-0.5 rounded text-[10px] outline-none" placeholder="상품명" />
-                                <input type="text" value={localPrice} onChange={e=>{const v = e.target.value.replace(/,/g, ''); if (v === '' || v === '-') setLocalPrice(v); else if(!isNaN(v)) setLocalPrice(Number(v).toLocaleString());}} onKeyDown={e=>{if(e.key==='Enter')handleSave();}} className="w-14 border dark:border-slate-600 bg-transparent dark:text-white px-1 py-0.5 rounded text-[10px] text-right outline-none" placeholder="단가" />
+                                <input type="text" value={localPrice} onChange={e=>{const v = e.target.value.replace(/,/g, ''); if (v === '' || v === '-') setLocalPrice(v); else if(!isNaN(v)) setLocalPrice(Number(v).toLocaleString());}} onKeyDown={e=>{if(e.key==='Enter')handleSave();}} className="w-12 border dark:border-slate-600 bg-transparent dark:text-white px-1 py-0.5 rounded text-[10px] text-right outline-none" placeholder="단가" />
+                                <input type="number" value={localStock} onChange={e=>setLocalStock(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')handleSave();}} className="w-10 border dark:border-slate-600 bg-transparent dark:text-white px-1 py-0.5 rounded text-[10px] text-right outline-none" placeholder="무한" />
                                 <button onClick={handleSave} className="bg-slate-600 hover:bg-slate-700 text-white px-1.5 py-0.5 rounded shadow-sm"><Icon name="check" weight="bold"/></button>
                                 <button onClick={()=>setIsEditing(false)} className="bg-slate-400 hover:bg-slate-500 text-white px-1.5 py-0.5 rounded shadow-sm"><Icon name="x" weight="bold"/></button>
                                 <button onClick={handleDelete} className="bg-red-500 hover:bg-red-600 text-white px-1.5 py-0.5 rounded shadow-sm ml-1"><Icon name="trash" weight="bold"/></button>
@@ -497,7 +501,10 @@
                                 <button onClick={(e) => { e.stopPropagation(); handleToggleSoldOut(); }} className={`px-1.5 py-0.5 rounded text-[9px] font-bold shrink-0 mx-1 shadow-sm transition-colors ${item.isSoldOut ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-slate-200 text-slate-600 hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600'}`}>{item.isSoldOut ? '판매' : '품절'}</button>
                                 <button onClick={(e) => { e.stopPropagation(); setIsEditing(true); }} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 w-5 flex justify-center shrink-0"><Icon name="pencil-simple" weight="bold"/></button>
                                 <div className={`w-12 text-center text-[11px] font-bold shrink-0 ${item.isSoldOut ? 'text-red-400' : 'text-slate-800 dark:text-slate-300'}`}>{item.price ? Number(item.price).toLocaleString() : '0'}</div>
-                                <div className={`w-10 text-center font-bold shrink-0 ${item.isSoldOut ? 'text-red-400' : 'text-slate-600 dark:text-slate-400'}`}>{orderedCount}</div>
+                                <div className={`w-10 text-center font-bold text-[11px] shrink-0 ${item.stock !== undefined && item.stock !== '' && (item.stock - orderedCount <= 0) ? 'text-red-500' : 'text-blue-600 dark:text-blue-400'}`} title={`초기설정재고: ${item.stock !== undefined && item.stock !== '' ? item.stock : '무한'}`}>
+                                    {item.stock !== undefined && item.stock !== '' ? item.stock - orderedCount : '∞'}
+                                </div>
+                                <div className={`w-8 text-center font-bold shrink-0 ${item.isSoldOut ? 'text-red-400' : 'text-slate-600 dark:text-slate-400'}`}>{orderedCount}</div>
                                 <button onClick={(e) => { e.stopPropagation(); setExpandedInventoryItem(isExpanded ? null : item.name); }} className={`ml-1 p-0.5 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors shrink-0 w-5 flex justify-center ${isExpanded ? 'bg-slate-200 dark:bg-slate-600 text-slate-700' : ''}`}><Icon name="caret-down" weight="bold" className={`transition-transform ${isExpanded ? 'rotate-180' : ''}`} /></button>
                             </>
                         )}
@@ -545,7 +552,7 @@
                 </div>
             );
         }, (prev, next) => {
-            if (prev.item.name !== next.item.name || prev.item.price !== next.item.price || prev.item.isSoldOut !== next.item.isSoldOut) return false;
+            if (prev.item.name !== next.item.name || prev.item.price !== next.item.price || prev.item.isSoldOut !== next.item.isSoldOut || prev.item.stock !== next.item.stock) return false;
             
             const isExpandedPrev = prev.expandedInventoryItem === prev.item.name;
             const isExpandedNext = next.expandedInventoryItem === next.item.name;
@@ -733,6 +740,7 @@
 
             const [newInvName, setNewInvName] = useState('');
             const [newInvPrice, setNewInvPrice] = useState('');
+            const [newInvStock, setNewInvStock] = useState('');
             const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
             
             const inventoryStats = useMemo(() => {
@@ -1059,11 +1067,22 @@
                         if (res.inventory && Array.isArray(res.inventory)) {
                             setInventory(prevInv => {
                                 const prevArray = Array.isArray(prevInv) ? prevInv : [];
-                                const soldOutMap = new Map(prevArray.map(i => [i.name, i.isSoldOut]));
-                                return res.inventory.map(i => ({
-                                    id: i.name, name: i.name, price: Number(i.price), 
-                                    isSoldOut: i.status === '품절' || soldOutMap.get(i.name) === true
-                                }));
+                                const prevMap = new Map(prevArray.map(i => [i.name, i]));
+                                
+                                const serverNames = new Set(res.inventory.map(i => i.name));
+                                const localOnly = prevArray.filter(i => !serverNames.has(i.name));
+
+                                const merged = res.inventory.map(i => {
+                                    const existing = prevMap.get(i.name);
+                                    return {
+                                        id: i.name, 
+                                        name: i.name, 
+                                        price: Number(i.price), 
+                                        stock: existing && existing.stock !== undefined ? existing.stock : '', 
+                                        isSoldOut: i.status === '품절' || (existing && existing.isSoldOut)
+                                    };
+                                });
+                                return [...localOnly, ...merged];
                             });
                         }
 
@@ -1648,16 +1667,17 @@
                 e.preventDefault(); const cleanName = String(newInvName).trim();
                 if(!cleanName) return openModal("상품명을 입력해주세요.", "alert");
                 const priceNum = Number(String(newInvPrice).replace(/,/g, '')) || 0;
+                const stockNum = newInvStock === '' ? '' : parseInt(newInvStock);
                 if(inventory.some(i => i.name === cleanName)) return openModal("이미 등록된 상품명입니다.", "alert");
                 
                 setInventory(prev => {
-                    const newInv = [{ id: `inv_${Date.now()}_${Math.random()}`, name: cleanName, price: priceNum, isSoldOut: false }, ...prev];
+                    const newInv = [{ id: `inv_${Date.now()}_${Math.random()}`, name: cleanName, price: priceNum, stock: stockNum, isSoldOut: false }, ...prev];
                     saveInventoryToServer(newInv);
                     return newInv;
                 });
                 
                 if(priceNum > 0) setProductHistory(prev => ({...prev, [cleanName]: priceNum}));
-                setNewInvName(''); setNewInvPrice('');
+                setNewInvName(''); setNewInvPrice(''); setNewInvStock('');
             };
 
             return (
@@ -1681,11 +1701,13 @@
                                         </div>
                                     </div>
                                     <div><label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1">일괄 단가 (선택)</label><input type="text" id="batch-price" placeholder="예: 15000" className="w-full border dark:border-slate-600 rounded px-2 py-2 text-xs bg-slate-50 dark:bg-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-slate-500 text-right font-bold" /></div>
+                                    <div><label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1">일괄 재고 (선택, 비우면 무한)</label><input type="number" id="batch-stock" placeholder="예: 50" className="w-full border dark:border-slate-600 rounded px-2 py-2 text-xs bg-slate-50 dark:bg-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-slate-500 text-right font-bold" /></div>
                                 </div>
                                 <div className="flex gap-2 mt-5">
                                     <button onClick={() => setIsBatchModalOpen(false)} className="flex-1 py-2 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-bold text-xs hover:bg-slate-200">취소</button>
                                     <button onClick={async () => {
                                         const baseName = document.getElementById('batch-base-name').value.trim(); const optionsStr1 = document.getElementById('batch-options-1').value.trim(); const optionsStr2 = document.getElementById('batch-options-2').value.trim(); const priceNum = Number(document.getElementById('batch-price').value.replace(/,/g, '').trim()) || 0;
+                                        const stockStr = document.getElementById('batch-stock').value.trim(); const stockNum = stockStr === '' ? '' : parseInt(stockStr);
                                         if(!baseName) return openModal("기본 상품명을 입력해주세요.", "alert");
                                         const list1 = optionsStr1.split(',').map(s => s.trim()).filter(Boolean); const list2 = optionsStr2.split(',').map(s => s.trim()).filter(Boolean);
                                         let combinations = [];
@@ -1693,7 +1715,7 @@
                                         let addedCount = 0; let newInvList = [...inventory];
                                         combinations.reverse().forEach(opt => {
                                             if(!newInvList.some(i => i.name === opt)) {
-                                                newInvList.unshift({ id: `inv_${Date.now()}_${Math.random()}`, name: opt, price: priceNum, isSoldOut: false });
+                                                newInvList.unshift({ id: `inv_${Date.now()}_${Math.random()}`, name: opt, price: priceNum, stock: stockNum, isSoldOut: false });
                                                 if (priceNum > 0) setProductHistory(h => ({...h, [opt]: priceNum}));
                                                 addedCount++;
                                             }
@@ -1882,14 +1904,15 @@
                             <div className="flex items-center gap-1 mt-1">
                                 <form onSubmit={handleQuickAddProduct} className="flex-1 flex gap-1 items-center bg-white dark:bg-slate-900 p-0.5 rounded border dark:border-slate-600">
                                     <input type="text" placeholder="새 상품명" value={newInvName} onChange={e=>setNewInvName(e.target.value)} className="w-full text-[10px] px-1.5 py-1 bg-transparent outline-none dark:text-white font-bold" />
-                                    <input type="text" placeholder="단가" value={newInvPrice} onChange={e=> { const val = e.target.value.replace(/,/g, ''); if (val === '' || val === '-') setNewInvPrice(val); else if(!isNaN(val)) setNewInvPrice(Number(val).toLocaleString()); }} className="w-14 text-[10px] px-1 py-1 bg-transparent text-right outline-none dark:text-white font-bold" />
+                                    <input type="text" placeholder="단가" value={newInvPrice} onChange={e=> { const val = e.target.value.replace(/,/g, ''); if (val === '' || val === '-') setNewInvPrice(val); else if(!isNaN(val)) setNewInvPrice(Number(val).toLocaleString()); }} className="w-12 text-[10px] px-1 py-1 bg-transparent text-right outline-none dark:text-white font-bold" />
+                                    <input type="number" placeholder="재고(무한)" value={newInvStock} onChange={e=>setNewInvStock(e.target.value)} className="w-12 text-[10px] px-1 py-1 bg-transparent text-right outline-none dark:text-white font-bold" />
                                     <button type="submit" className="bg-slate-700 hover:bg-slate-800 text-white px-1.5 py-1 rounded text-[10px] font-bold shrink-0">등록</button>
                                 </form>
                                 <div className="relative w-16 sm:w-20 shrink-0"><Icon name="magnifying-glass" className="absolute left-1.5 top-1/2 -translate-y-1/2 text-slate-400 text-[10px]"/><input type="text" placeholder="검색" value={currentSearchTerm} onChange={e => setCurrentSearchTerm(e.target.value)} className="w-full text-[10px] pl-4 pr-1 py-1 border dark:border-slate-600 rounded outline-none bg-white dark:bg-slate-900 dark:text-white" /></div>
                             </div>
                         </div>
                         <div className="flex w-full bg-slate-50 dark:bg-slate-800 p-1.5 border-b border-slate-200 dark:border-slate-700 text-[10px] font-bold text-slate-500 dark:text-slate-400 items-center text-center shrink-0">
-                            <div className="flex-1 text-left pl-1">상품명 <span className="text-[8px] font-normal">(수정가능)</span></div><div className="w-5 shrink-0"></div><div className="w-14 shrink-0 text-center">단가</div><div className="w-8 shrink-0 text-center">주문</div><div className="w-6 shrink-0"></div>
+                            <div className="flex-1 text-left pl-1">상품명 <span className="text-[8px] font-normal">(수정가능)</span></div><div className="w-5 shrink-0"></div><div className="w-12 shrink-0 text-center">단가</div><div className="w-10 shrink-0 text-center">잔여</div><div className="w-8 shrink-0 text-center">주문</div><div className="w-6 shrink-0"></div>
                         </div>
                         <div className="flex-1 overflow-y-auto p-1.5 space-y-1.5 bg-slate-50 dark:bg-slate-900">
                             {inventory.filter(i => !currentSearchTerm || String(i.name).toLowerCase().includes(String(currentSearchTerm).toLowerCase())).map(item => (
