@@ -386,7 +386,7 @@
             );
         };
 
-        const InventoryItemRow = memo(({ item, orders, setOrders, inventory, setInventory, setProductHistory, openModal, expandedInventoryItem, setExpandedInventoryItem, setManualProduct, setCurrentSearchTerm, setManualPrice, setIsFixedProductMode, customerPaidStatus, saveInventoryToServer, cardPayments }) => {
+        const InventoryItemRow = memo(({ item, itemStats, setOrders, setInventory, setProductHistory, openModal, expandedInventoryItem, setExpandedInventoryItem, setManualProduct, setCurrentSearchTerm, setManualPrice, setIsFixedProductMode, customerPaidStatus, saveInventoryToServer, cardPayments }) => {
             const [isEditing, setIsEditing] = useState(false);
             const [localName, setLocalName] = useState(item.name);
             const [localPrice, setLocalPrice] = useState(item.price === 0 || item.price === '' ? '' : Number(item.price).toLocaleString());
@@ -394,18 +394,8 @@
             useEffect(() => { setLocalName(item.name); }, [item.name]);
             useEffect(() => { setLocalPrice(item.price === 0 || item.price === '' ? '' : Number(item.price).toLocaleString()); }, [item.price]);
 
-            const activeOrders = useMemo(() => orders.filter(o => o.product === item.name && !o.isCancelled), [orders, item.name]);
-            const orderedCount = activeOrders.reduce((sum, o) => sum + Number(o.quantity || 0), 0);
-            
-            const aggregatedOrders = useMemo(() => {
-                const groups = {};
-                activeOrders.forEach(o => {
-                    if(!groups[o.customer]) { groups[o.customer] = { customer: o.customer, quantity: 0, orderIds: [] }; }
-                    groups[o.customer].quantity += Number(o.quantity || 0);
-                    groups[o.customer].orderIds.push(o.id);
-                });
-                return Object.values(groups).sort((a, b) => String(a.customer).localeCompare(String(b.customer), 'ko'));
-            }, [activeOrders]);
+            const orderedCount = itemStats ? itemStats.count : 0;
+            const aggregatedOrders = itemStats ? itemStats.aggregated : [];
 
             const isExpanded = expandedInventoryItem === item.name;
 
@@ -413,11 +403,23 @@
                 const newName = localName.trim();
                 const newPrice = Number(String(localPrice).replace(/,/g, ''));
                 if (!newName) { openModal('상품명을 입력해주세요.', 'alert'); return; }
-                if (newName !== item.name && inventory.some(i => i.name === newName && i.id !== item.id)) { openModal('이미 동일한 이름의 상품이 있습니다.', 'alert'); setLocalName(item.name); return; }
 
-                const newInv = inventory.map(i => i.id === item.id ? { ...i, name: newName, price: newPrice } : i);
-                setInventory(newInv);
-                saveInventoryToServer(newInv); 
+                let isDuplicate = false;
+                setInventory(prevInv => {
+                    if (newName !== item.name && prevInv.some(i => i.name === newName && i.name !== item.name)) { 
+                        isDuplicate = true;
+                        return prevInv; 
+                    }
+                    const newInv = prevInv.map(i => i.name === item.name ? { ...i, name: newName, price: newPrice } : i);
+                    saveInventoryToServer(newInv); 
+                    return newInv;
+                });
+
+                if (isDuplicate) {
+                    openModal('이미 동일한 이름의 상품이 있습니다.', 'alert'); 
+                    setLocalName(item.name);
+                    return;
+                }
                 
                 if (newName !== item.name || newPrice !== item.price) {
                     setOrders(prev => prev.map(o => { if (o.product === item.name) { return { ...o, product: newName, price: (Number(o.quantity) || 0) * newPrice }; } return o; }));
@@ -428,16 +430,20 @@
 
             const handleDelete = () => { 
                 openModal(`'${item.name}' 항목을 재고 목록에서 삭제하시겠습니까?\n(기존 주문 내역은 유지됩니다)`, 'confirm', () => { 
-                    const newInv = inventory.filter(i => i.id !== item.id);
-                    setInventory(newInv);
-                    saveInventoryToServer(newInv); 
+                    setInventory(prevInv => {
+                        const newInv = prevInv.filter(i => i.name !== item.name);
+                        saveInventoryToServer(newInv);
+                        return newInv;
+                    });
                 }); 
             };
 
             const handleToggleSoldOut = () => {
-                const newInv = inventory.map(i => i.id === item.id ? { ...i, isSoldOut: !i.isSoldOut } : i);
-                setInventory(newInv);
-                saveInventoryToServer(newInv);
+                setInventory(prevInv => {
+                    const newInv = prevInv.map(i => i.name === item.name ? { ...i, isSoldOut: !i.isSoldOut } : i);
+                    saveInventoryToServer(newInv);
+                    return newInv;
+                });
             };
 
             const handleCopyNames = (e) => {
@@ -467,7 +473,7 @@
                         {isEditing ? (
                             <div className="flex-1 flex gap-1 items-center min-w-0 pr-1">
                                 <input autoFocus type="text" value={localName} onChange={e=>setLocalName(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')handleSave();}} className="w-full border dark:border-slate-600 bg-transparent dark:text-white px-1 py-0.5 rounded text-[10px] outline-none" placeholder="상품명" />
-                                <input type="text" value={localPrice} onChange={e=>{const v = e.target.value.replace(/,/g, ''); if(!isNaN(v)) setLocalPrice(v ? Number(v).toLocaleString() : '');}} onKeyDown={e=>{if(e.key==='Enter')handleSave();}} className="w-14 border dark:border-slate-600 bg-transparent dark:text-white px-1 py-0.5 rounded text-[10px] text-right outline-none" placeholder="단가" />
+                                <input type="text" value={localPrice} onChange={e=>{const v = e.target.value.replace(/,/g, ''); if (v === '' || v === '-') setLocalPrice(v); else if(!isNaN(v)) setLocalPrice(Number(v).toLocaleString());}} onKeyDown={e=>{if(e.key==='Enter')handleSave();}} className="w-14 border dark:border-slate-600 bg-transparent dark:text-white px-1 py-0.5 rounded text-[10px] text-right outline-none" placeholder="단가" />
                                 <button onClick={handleSave} className="bg-slate-600 hover:bg-slate-700 text-white px-1.5 py-0.5 rounded shadow-sm"><Icon name="check" weight="bold"/></button>
                                 <button onClick={()=>setIsEditing(false)} className="bg-slate-400 hover:bg-slate-500 text-white px-1.5 py-0.5 rounded shadow-sm"><Icon name="x" weight="bold"/></button>
                                 <button onClick={handleDelete} className="bg-red-500 hover:bg-red-600 text-white px-1.5 py-0.5 rounded shadow-sm ml-1"><Icon name="trash" weight="bold"/></button>
@@ -538,6 +544,23 @@
                     )}
                 </div>
             );
+        }, (prev, next) => {
+            if (prev.item.name !== next.item.name || prev.item.price !== next.item.price || prev.item.isSoldOut !== next.item.isSoldOut) return false;
+            
+            const isExpandedPrev = prev.expandedInventoryItem === prev.item.name;
+            const isExpandedNext = next.expandedInventoryItem === next.item.name;
+            if (isExpandedPrev !== isExpandedNext) return false;
+            
+            if (isExpandedNext) {
+                if (prev.itemStats !== next.itemStats) return false;
+                if (prev.customerPaidStatus !== next.customerPaidStatus) return false;
+                if (prev.cardPayments !== next.cardPayments) return false;
+            } else {
+                const prevCount = prev.itemStats ? prev.itemStats.count : 0;
+                const nextCount = next.itemStats ? next.itemStats.count : 0;
+                if (prevCount !== nextCount) return false;
+            }
+            return true;
         });
 
         const OrderItem = memo(({ item, nick, nextItemId, isLast, handleProductChange, handleQuantityUpdate, handleOrderCancel, handleOrderDelete, addOrderLogic, setSelectedNick, inventory, productHistory }) => {
@@ -566,7 +589,7 @@
                             onClick={(e) => e.stopPropagation()} 
                             onFocus={(e) => { e.target.select(); setIsProductFocused(true); setSelectedNick(nick); if(item.isUnmodified) handleProductChange(item.id, 'isUnmodified', false); }} 
                             onBlur={() => { setIsProductFocused(false); if (localProduct !== item.product) handleProductChange(item.id, 'product', localProduct); }} 
-                            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleProductChange(item.id, 'product', localProduct); document.getElementById(`qty-input-${item.id}`)?.focus(); } }} 
+                            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleProductChange(item.id, 'product', localProduct); setTimeout(() => document.getElementById(`qty-input-${item.id}`)?.focus(), 10); } }} 
                             className={`w-full outline-none px-1 rounded bg-transparent font-bold ${item.isCancelled ? 'text-slate-400 line-through' : (item.isUnmodified ? 'text-blue-700 dark:text-blue-300' : 'dark:text-slate-200')}`} placeholder="상품명" disabled={item.isCancelled} />
                     </div>
                     <div className="flex items-center gap-1 group shrink-0">
@@ -575,16 +598,16 @@
                                 onChange={(e) => setLocalQty(e.target.value)} onClick={(e) => e.stopPropagation()} 
                                 onFocus={(e) => { e.target.select(); setIsQtyFocused(true); setSelectedNick(nick); if(item.isUnmodified) handleProductChange(item.id, 'isUnmodified', false); }} 
                                 onBlur={() => { setIsQtyFocused(false); const q = localQty === '' || isNaN(parseInt(localQty)) ? '' : parseInt(localQty); if (q !== item.quantity) handleQuantityUpdate(item.id, q); }} 
-                                onKeyDown={(e) => { if(e.key==='Enter') { e.preventDefault(); document.getElementById(`price-input-${item.id}`)?.focus(); } }} 
+                                onKeyDown={(e) => { if(e.key==='Enter') { e.preventDefault(); setTimeout(() => document.getElementById(`price-input-${item.id}`)?.focus(), 10); } }} 
                                 className={`w-12 text-right pr-4 font-bold outline-none rounded py-0.5 ${item.isCancelled ? 'text-[11px] bg-transparent line-through text-slate-400 cursor-not-allowed' : `${Number(localQty) >= 2 ? 'text-[12px] text-red-600 bg-red-50' : (item.isUnmodified ? 'text-blue-700 dark:text-blue-300' : 'text-[11px] text-slate-800')} hover:bg-slate-200 bg-transparent`}`} disabled={item.isCancelled} />
                             <span className={`absolute right-1 pointer-events-none ${Number(localQty) >= 2 && !item.isCancelled ? 'text-[10px] text-red-600 font-bold' : (item.isUnmodified ? 'text-blue-500' : 'text-[10px] text-slate-500')}`}>개</span>
                         </div>
                         <input id={`price-input-${item.id}`} type="text" value={localPrice} 
-                            onChange={(e) => { const val = e.target.value.replace(/,/g, ''); if (!isNaN(val) && val !== '') setLocalPrice(Number(val).toLocaleString()); else if (val === '') setLocalPrice(''); }} 
+                            onChange={(e) => { const val = e.target.value.replace(/,/g, ''); if (val === '' || val === '-') setLocalPrice(val); else if (!isNaN(val)) setLocalPrice(Number(val).toLocaleString()); }} 
                             onClick={(e) => e.stopPropagation()} 
                             onFocus={(e) => { e.target.select(); setIsPriceFocused(true); setSelectedNick(nick); if(item.isUnmodified) handleProductChange(item.id, 'isUnmodified', false); }} 
                             onBlur={() => { setIsPriceFocused(false); const val = String(localPrice).replace(/,/g, ''); if (!isNaN(val) && Number(val) !== Number(item.price)) { handleProductChange(item.id, 'price', val); } }} 
-                            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); const val = String(localPrice).replace(/,/g, ''); if (!isNaN(val) && Number(val) !== Number(item.price)) { handleProductChange(item.id, 'price', val); } if (!isLast && nextItemId) { document.getElementById(`prod-input-${nextItemId}`)?.focus(); } else { addOrderLogic(nick, '', 1, true, item.id); } } }} 
+                            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); const val = String(localPrice).replace(/,/g, ''); if (!isNaN(val) && Number(val) !== Number(item.price)) { handleProductChange(item.id, 'price', val); } if (!isLast && nextItemId) { setTimeout(() => document.getElementById(`prod-input-${nextItemId}`)?.focus(), 10); } else { addOrderLogic(nick, '', 1, true, item.id); } } }} 
                             className={`w-16 text-right bg-transparent outline-none px-1 rounded font-bold ${item.isCancelled ? 'line-through text-slate-400 cursor-not-allowed' : (item.isUnmodified ? 'text-blue-700 dark:text-blue-300' : 'text-slate-700 hover:bg-slate-100')} ${Number(item.price) === 0 && !item.isCancelled ? 'bg-red-50 border-b border-red-300' : ''}`} disabled={item.isCancelled} />
                         <button onClick={(e)=>{e.stopPropagation(); handleOrderCancel(item.id); setSelectedNick(nick);}} className={`ml-1 ${item.isCancelled ? "text-slate-500" : "text-slate-300 hover:text-red-500"}`} title={item.isCancelled ? "취소 철회" : "주문 취소"}><Icon name={item.isCancelled ? "arrow-u-up-left" : "prohibit"} weight="bold"/></button>
                         <button onClick={(e)=>{e.stopPropagation(); handleOrderDelete(item.id); setSelectedNick(nick);}} className="text-slate-300 hover:text-red-500 ml-1"><Icon name="trash" weight="bold"/></button>
@@ -712,6 +735,25 @@
             const [newInvPrice, setNewInvPrice] = useState('');
             const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
             
+            const inventoryStats = useMemo(() => {
+                const stats = {};
+                orders.forEach(o => {
+                    if (!o.isCancelled && o.product) {
+                        if (!stats[o.product]) stats[o.product] = { count: 0, customers: {} };
+                        stats[o.product].count += Number(o.quantity || 0);
+                        if (!stats[o.product].customers[o.customer]) {
+                            stats[o.product].customers[o.customer] = { customer: o.customer, quantity: 0, orderIds: [] };
+                        }
+                        stats[o.product].customers[o.customer].quantity += Number(o.quantity || 0);
+                        stats[o.product].customers[o.customer].orderIds.push(o.id);
+                    }
+                });
+                for (let prod in stats) {
+                    stats[prod].aggregated = Object.values(stats[prod].customers).sort((a, b) => String(a.customer).localeCompare(String(b.customer), 'ko'));
+                }
+                return stats;
+            }, [orders]);
+
             const deferredOrderSearch = React.useDeferredValue(orderSearch);
             const deferredChatSearch = React.useDeferredValue(chatSearch);
 
@@ -830,29 +872,50 @@
                 addresses.forEach(a => {
                     const cleanNick = normalizeString(a.nickname);
                     const ts = parseSafeDate(a.timestamp).getTime();
-                    if (a._source === 'master') { if (!masterMap[cleanNick] || ts > parseSafeDate(masterMap[cleanNick].timestamp).getTime()) masterMap[cleanNick] = a; } 
-                    else { if (!rawMap[cleanNick] || ts > parseSafeDate(rawMap[cleanNick].timestamp).getTime()) rawMap[cleanNick] = a; }
-                    const targetAddr = masterMap[cleanNick] || rawMap[cleanNick] || a;
+                    
+                    if (a._source === 'master') { 
+                        if (!masterMap[cleanNick] || ts > parseSafeDate(masterMap[cleanNick].timestamp).getTime()) masterMap[cleanNick] = a; 
+                    } else { 
+                        if (!rawMap[cleanNick] || ts > parseSafeDate(rawMap[cleanNick].timestamp).getTime()) rawMap[cleanNick] = a; 
+                    }
+                    
+                    const targetAddr = a;
                     if (!exactNickMap[cleanNick]) exactNickMap[cleanNick] = [];
-                    if (!exactNickMap[cleanNick].includes(targetAddr)) exactNickMap[cleanNick].push(targetAddr);
+                    exactNickMap[cleanNick].push(targetAddr);
+                    
                     const cleanReal = normalizeString(a.realname);
-                    if (cleanReal) { if (!realNameMap[cleanReal]) realNameMap[cleanReal] = []; if (!realNameMap[cleanReal].includes(targetAddr)) realNameMap[cleanReal].push(targetAddr); }
-                    const ko = extractKo(a.nickname);
-                    if (ko && ko.length >= 2) { if (!koBaseMap[ko]) koBaseMap[ko] = []; if (!koBaseMap[ko].includes(targetAddr)) koBaseMap[ko].push(targetAddr); }
+                    if (cleanReal) { 
+                        if (!realNameMap[cleanReal]) realNameMap[cleanReal] = []; 
+                        realNameMap[cleanReal].push(targetAddr); 
+                    }
                 });
                 return {
                     get: (nick) => {
                         if (!nick) return { data: null, conflict: null, type: 'none' };
-                        const cleanNick = normalizeString(nick); const mappedTarget = addressMapping[nick];
-                        if (mappedTarget === '__UNMAPPED__' || addressMapping[cleanNick] === '__UNMAPPED__') return { data: null, conflict: null, type: 'none' };
-                        if (mappedTarget) { const mNick = normalizeString(mappedTarget); const mAddr = masterMap[mNick] || rawMap[mNick]; if (mAddr) return { data: mAddr, conflict: null, type: mAddr._source || 'mapped' }; }
-                        const exactMatches = exactNickMap[cleanNick] || realNameMap[cleanNick];
-                        if (exactMatches && exactMatches.length === 1) {
-                            const addr = exactMatches[0]; const mAddr = masterMap[normalizeString(addr.nickname)] || rawMap[normalizeString(addr.nickname)] || addr;
-                            const master = masterMap[normalizeString(mAddr.nickname)]; const raw = rawMap[normalizeString(mAddr.nickname)];
+                        const cleanNick = normalizeString(nick); 
+                        const mappedTarget = addressMapping[nick] || addressMapping[cleanNick];
+                        if (mappedTarget === '__UNMAPPED__') return { data: null, conflict: null, type: 'none' };
+                        
+                        if (mappedTarget) { 
+                            const mNick = normalizeString(mappedTarget); 
+                            const mAddr = masterMap[mNick] || rawMap[mNick]; 
+                            if (mAddr) return { data: mAddr, conflict: null, type: mAddr._source || 'mapped' }; 
+                        }
+                        
+                        let matches = exactNickMap[cleanNick] || [];
+                        if (matches.length === 0) matches = realNameMap[cleanNick] || [];
+                        
+                        if (matches.length > 0) {
+                            matches.sort((a, b) => parseSafeDate(b.timestamp).getTime() - parseSafeDate(a.timestamp).getTime());
+                            const addr = matches[0];
+                            const mAddrNick = normalizeString(addr.nickname);
+                            const master = masterMap[mAddrNick]; 
+                            const raw = rawMap[mAddrNick];
                             let conflict = null;
-                            if (master && raw && parseSafeDate(raw.timestamp).getTime() > parseSafeDate(master.timestamp).getTime()) { if (raw.address !== master.address || raw.phone !== master.phone || raw.realname !== master.realname) conflict = raw; }
-                            return { data: master || raw || mAddr, conflict: conflict, type: master ? 'master' : 'raw' };
+                            if (master && raw && parseSafeDate(raw.timestamp).getTime() > parseSafeDate(master.timestamp).getTime()) { 
+                                if (raw.address !== master.address || raw.phone !== master.phone || raw.realname !== master.realname) conflict = raw; 
+                            }
+                            return { data: master || raw || addr, conflict: conflict, type: master ? 'master' : 'raw' };
                         }
                         return { data: null, conflict: null, type: 'none' };
                     }
@@ -1027,28 +1090,60 @@
                 result = result.filter(d => !deletedDepositIds.has(d.id)); 
                 if (depositSearch) result = result.filter(d => String(d.name||'').includes(depositSearch) || String(d.amount).includes(depositSearch)); 
                 
-                let targetNick = '', targetReal = '', addressRealName = '';
+                let targetNickClean = '', targetNickKo = '', targetRealClean = '', targetRealKo = '', addrRealClean = '', addrRealKo = '';
                 if (selectedNick) { 
-                    targetNick = cleanForMatch(selectedNick); targetReal = depositorNames[selectedNick] ? cleanForMatch(depositorNames[selectedNick]) : ''; 
-                    const addrRes = addressLookup.get(selectedNick); addressRealName = addrRes && addrRes.data ? cleanForMatch(addrRes.data.realname) : '';
+                    targetNickClean = cleanForMatch(selectedNick); 
+                    targetNickKo = extractKo(selectedNick);
+                    const tReal = depositorNames[selectedNick];
+                    targetRealClean = tReal ? cleanForMatch(tReal) : ''; 
+                    targetRealKo = tReal ? extractKo(tReal) : ''; 
+                    const addrRes = addressLookup.get(selectedNick); 
+                    const aReal = addrRes && addrRes.data ? addrRes.data.realname : '';
+                    addrRealClean = aReal ? cleanForMatch(aReal) : '';
+                    addrRealKo = aReal ? extractKo(aReal) : '';
                 }
 
+                const checkMatch = (tClean, tKo, vClean, vKo) => {
+                    if (!tClean && !tKo) return 10;
+                    if (tClean && vClean && tClean === vClean) return 0;
+                    if (tKo && vKo && tKo === vKo && tKo.length >= 2) return 0;
+                    if (tClean && vClean && (tClean.includes(vClean) || vClean.includes(tClean)) && Math.min(tClean.length, vClean.length) >= 2) return 1;
+                    if (tKo && vKo && (tKo.includes(vKo) || vKo.includes(tKo)) && Math.min(tKo.length, vKo.length) >= 2) return 1;
+                    if (tClean && vClean && (getChosung(tClean).includes(getChosung(vClean)) || getChosung(vClean).includes(getChosung(tClean))) && Math.min(tClean.length, vClean.length) >= 2) return 2;
+                    return 10;
+                };
+
                 const decorated = result.map(d => {
-                    let isUsed = matchedDeposits?.has(d.id) ? 1 : 0; let score = 10;
+                    let isUsed = matchedDeposits?.has(d.id) ? 1 : 0; 
+                    let score = 10;
                     if (selectedNick) {
-                        const val = cleanForMatch(d.name);
-                        if (val) {
-                            if (val === targetNick || val === targetReal || val === addressRealName) score = 0; 
-                            else if ((targetNick && targetReal && (val === targetNick + targetReal || val === targetReal + targetNick)) || 
-                                     (targetNick && addressRealName && (val === targetNick + addressRealName || val === addressRealName + targetNick))) score = 0;
-                            else if ((targetNick && val.startsWith(targetNick)) || (targetReal && val.startsWith(targetReal)) || (addressRealName && val.startsWith(addressRealName))) score = 1; 
-                            else if ((targetNick && val.includes(targetNick)) || (targetReal && val.includes(targetReal)) || (addressRealName && val.includes(addressRealName))) score = 2; 
-                        }
+                        const valClean = cleanForMatch(d.name);
+                        const valKo = extractKo(d.name);
+                        score = Math.min(
+                            checkMatch(targetNickClean, targetNickKo, valClean, valKo),
+                            checkMatch(targetRealClean, targetRealKo, valClean, valKo),
+                            checkMatch(addrRealClean, addrRealKo, valClean, valKo)
+                        );
                     }
                     return { item: d, isUsed, score };
                 });
 
-                decorated.sort((a, b) => { if (a.isUsed !== b.isUsed) return a.isUsed - b.isUsed; if (a.score !== b.score) return a.score - b.score; return 0; });
+                decorated.sort((a, b) => { 
+                    const aIsSimilar = a.score < 10;
+                    const bIsSimilar = b.score < 10;
+                    
+                    if (aIsSimilar && !bIsSimilar) return -1;
+                    if (!aIsSimilar && bIsSimilar) return 1;
+                    
+                    if (aIsSimilar && bIsSimilar) {
+                        if (a.score !== b.score) return a.score - b.score;
+                        if (a.isUsed !== b.isUsed) return a.isUsed - b.isUsed;
+                        return 0;
+                    }
+                    
+                    if (a.isUsed !== b.isUsed) return a.isUsed - b.isUsed;
+                    return 0; 
+                });
                 return decorated.map(d => d.item); 
             }, [allDeposits, depositSearch, selectedNick, deletedDepositIds, matchedDeposits, depositorNames, addressLookup]);
             
@@ -1315,18 +1410,19 @@
                         } 
                         if (field === 'price' && o.product && String(o.product).trim() !== '') { 
                             const cleanProd = String(o.product).trim(); const valNum = String(value).replace(/,/g, '');
-                            const uPrice = o.quantity > 0 ? Number(valNum) / o.quantity : 0; 
-                            if (uPrice > 0) {
-                                setProductHistory(h => ({ ...h, [cleanProd]: uPrice })); 
+                            const effQty = (o.quantity && o.quantity > 0) ? o.quantity : 1;
+                            const uPrice = Number(valNum) / effQty; 
+                            if (uPrice >= 1) {
                                 setInventory(prevInv => {
                                     if (!Array.isArray(prevInv)) return prevInv;
                                     const exists = prevInv.find(i => String(i.name).trim() === cleanProd);
                                     if (!exists) {
-                                        const newInv = [{ id: `inv_${Date.now()}_${Math.random()}`, name: cleanProd, price: uPrice }, ...prevInv];
-                                        saveInventoryToServer(newInv); return newInv;
+                                        const newInv = [{ id: `inv_${Date.now()}_${Math.random()}`, name: cleanProd, price: uPrice, isSoldOut: false }, ...prevInv];
+                                        saveInventoryToServer(newInv); 
+                                        setProductHistory(h => ({ ...h, [cleanProd]: uPrice }));
+                                        return newInv;
                                     }
-                                    const updatedInv = prevInv.map(i => String(i.name).trim() === cleanProd ? { ...i, price: uPrice } : i);
-                                    saveInventoryToServer(updatedInv); return updatedInv;
+                                    return prevInv;
                                 });
                             }
                         } 
@@ -1406,15 +1502,17 @@
 
                 if (cContent !== '' && (isCustomPriceValid || price > 0)) {
                     const priceToSave = price || 0;
-                    setInventory(prevInv => {
-                        const invArr = Array.isArray(prevInv) ? prevInv : []; const exists = invArr.find(i => String(i.name).trim() === cContent);
-                        if (!exists) {
-                            const newInv = [{ id: `inv_${Date.now()}_${Math.random()}`, name: cContent, price: priceToSave }, ...invArr]; 
-                            saveInventoryToServer(newInv); return newInv;
-                        }
-                        return invArr;
-                    });
-                    if (priceToSave > 0) setProductHistory(h => ({ ...h, [cContent]: priceToSave }));
+                    if (priceToSave >= 1) {
+                        setInventory(prevInv => {
+                            const invArr = Array.isArray(prevInv) ? prevInv : []; const exists = invArr.find(i => String(i.name).trim() === cContent);
+                            if (!exists) {
+                                const newInv = [{ id: `inv_${Date.now()}_${Math.random()}`, name: cContent, price: priceToSave, isSoldOut: false }, ...invArr]; 
+                                saveInventoryToServer(newInv); return newInv;
+                            }
+                            return invArr;
+                        });
+                        setProductHistory(h => ({ ...h, [cContent]: priceToSave }));
+                    }
                 }
 
                 if (!isAuto) { setCheckedOrders(prev => { const n = new Set(prev); n.delete(cNick); return n; }); setSelectedNick(cNick); }
@@ -1490,21 +1588,74 @@
                 });
                 let res = Object.values(latestMap);
                 if (addressSearch) { const term = String(addressSearch).toLowerCase(); res = res.filter(a => String(a.nickname).toLowerCase().includes(term) || String(a.realname).toLowerCase().includes(term) || String(a.phone).includes(term)); }
-                res.sort((a, b) => { const tA = parseSafeDate(a.timestamp).getTime(); const tB = parseSafeDate(b.timestamp).getTime(); return tB - tA; });
+                
                 if (selectedNick) {
-                    const targetClean = normalizeString(selectedNick);
-                    res.sort((a, b) => { const aMatch = normalizeString(a.nickname) === targetClean; const bMatch = normalizeString(b.nickname) === targetClean; if (aMatch && !bMatch) return -1; if (!aMatch && bMatch) return 1; return 0; });
+                    const targetNickClean = cleanForMatch(selectedNick);
+                    const targetNickKo = extractKo(selectedNick);
+                    const targetReal = depositorNames[selectedNick];
+                    const targetRealClean = targetReal ? cleanForMatch(targetReal) : '';
+                    const targetRealKo = targetReal ? extractKo(targetReal) : '';
+
+                    const checkMatch = (tClean, tKo, vClean, vKo) => {
+                        if (!tClean && !tKo) return 10;
+                        if (tClean && vClean && tClean === vClean) return 0;
+                        if (tKo && vKo && tKo === vKo && tKo.length >= 2) return 0;
+                        if (tClean && vClean && (tClean.includes(vClean) || vClean.includes(tClean)) && Math.min(tClean.length, vClean.length) >= 2) return 1;
+                        if (tKo && vKo && (tKo.includes(vKo) || vKo.includes(tKo)) && Math.min(tKo.length, vKo.length) >= 2) return 1;
+                        if (tClean && vClean && (getChosung(tClean).includes(getChosung(vClean)) || getChosung(vClean).includes(getChosung(tClean))) && Math.min(tClean.length, vClean.length) >= 2) return 2;
+                        return 10;
+                    };
+
+                    res.forEach(a => {
+                        const aNickClean = cleanForMatch(a.nickname);
+                        const aNickKo = extractKo(a.nickname);
+                        const aRealClean = cleanForMatch(a.realname);
+                        const aRealKo = extractKo(a.realname);
+                        
+                        const scoreNick = Math.min(
+                            checkMatch(targetNickClean, targetNickKo, aNickClean, aNickKo),
+                            checkMatch(targetRealClean, targetRealKo, aNickClean, aNickKo)
+                        );
+                        const scoreReal = Math.min(
+                            checkMatch(targetNickClean, targetNickKo, aRealClean, aRealKo),
+                            checkMatch(targetRealClean, targetRealKo, aRealClean, aRealKo)
+                        );
+
+                        a._tempScore = Math.min(scoreNick, scoreReal);
+                    });
+
+                    res.sort((a, b) => {
+                        const aIsSimilar = a._tempScore < 10;
+                        const bIsSimilar = b._tempScore < 10;
+                        
+                        if (aIsSimilar && !bIsSimilar) return -1;
+                        if (!aIsSimilar && bIsSimilar) return 1;
+                        
+                        if (aIsSimilar && bIsSimilar) {
+                            if (a._tempScore !== b._tempScore) return a._tempScore - b._tempScore;
+                            return parseSafeDate(b.timestamp).getTime() - parseSafeDate(a.timestamp).getTime();
+                        }
+                        
+                        return parseSafeDate(b.timestamp).getTime() - parseSafeDate(a.timestamp).getTime();
+                    });
+                } else {
+                    res.sort((a, b) => { const tA = parseSafeDate(a.timestamp).getTime(); const tB = parseSafeDate(b.timestamp).getTime(); return tB - tA; });
                 }
                 return res;
-            }, [addresses, addressSearch, selectedNick, addressMapping]);
+            }, [addresses, addressSearch, selectedNick, addressMapping, depositorNames]);
 
             const handleQuickAddProduct = async (e) => {
                 e.preventDefault(); const cleanName = String(newInvName).trim();
                 if(!cleanName) return openModal("상품명을 입력해주세요.", "alert");
                 const priceNum = Number(String(newInvPrice).replace(/,/g, '')) || 0;
                 if(inventory.some(i => i.name === cleanName)) return openModal("이미 등록된 상품명입니다.", "alert");
-                const newInv = [{ id: `inv_${Date.now()}`, name: cleanName, price: priceNum, isSoldOut: false }, ...inventory];
-                setInventory(newInv); saveInventoryToServer(newInv);
+                
+                setInventory(prev => {
+                    const newInv = [{ id: `inv_${Date.now()}_${Math.random()}`, name: cleanName, price: priceNum, isSoldOut: false }, ...prev];
+                    saveInventoryToServer(newInv);
+                    return newInv;
+                });
+                
                 if(priceNum > 0) setProductHistory(prev => ({...prev, [cleanName]: priceNum}));
                 setNewInvName(''); setNewInvPrice('');
             };
@@ -1637,7 +1788,7 @@
                                                 className={`w-full border dark:border-slate-600 rounded pl-2 pr-9 py-1.5 text-xs outline-none focus:ring-1 focus:ring-slate-500 bg-white dark:bg-slate-900 dark:text-white transition-all ${isFixedProductMode ? 'ring-2 ring-slate-600 border-slate-600' : ''}`} />
                                             <button type="button" onClick={() => setIsFixedProductMode(!isFixedProductMode)} className={`absolute right-1 top-1/2 -translate-y-1/2 px-1.5 py-0.5 rounded text-[10px] font-bold transition-colors ${isFixedProductMode ? 'bg-slate-700 text-white shadow-inner' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-300'}`} title="고정">고정</button>
                                         </div>
-                                        <input type="text" placeholder="단가" value={manualPrice} onChange={e => { const val = e.target.value.replace(/,/g, ''); if(!isNaN(val)) setManualPrice(val ? Number(val).toLocaleString() : ''); }} className={`w-16 border dark:border-slate-600 rounded px-2 py-1.5 text-xs outline-none text-right bg-white dark:bg-slate-900 transition-all ${isFixedProductMode ? 'ring-2 ring-slate-600 border-slate-600' : ''}`} />
+                                        <input type="text" placeholder="단가" value={manualPrice} onChange={e => { const val = e.target.value.replace(/,/g, ''); if (val === '' || val === '-') setManualPrice(val); else if(!isNaN(val)) setManualPrice(Number(val).toLocaleString()); }} className={`w-16 border dark:border-slate-600 rounded px-2 py-1.5 text-xs outline-none text-right bg-white dark:bg-slate-900 transition-all ${isFixedProductMode ? 'ring-2 ring-slate-600 border-slate-600' : ''}`} />
                                     </div>
                                     <button type="submit" className="bg-slate-700 hover:bg-slate-800 transition-colors text-white px-2 py-1.5 rounded text-xs font-bold shadow-sm shrink-0 whitespace-nowrap">＋</button>
                                 </form>
@@ -1731,7 +1882,7 @@
                             <div className="flex items-center gap-1 mt-1">
                                 <form onSubmit={handleQuickAddProduct} className="flex-1 flex gap-1 items-center bg-white dark:bg-slate-900 p-0.5 rounded border dark:border-slate-600">
                                     <input type="text" placeholder="새 상품명" value={newInvName} onChange={e=>setNewInvName(e.target.value)} className="w-full text-[10px] px-1.5 py-1 bg-transparent outline-none dark:text-white font-bold" />
-                                    <input type="text" placeholder="단가" value={newInvPrice} onChange={e=> { const val = e.target.value.replace(/,/g, ''); if(!isNaN(val)) setNewInvPrice(val ? Number(val).toLocaleString() : ''); }} className="w-14 text-[10px] px-1 py-1 bg-transparent text-right outline-none dark:text-white font-bold" />
+                                    <input type="text" placeholder="단가" value={newInvPrice} onChange={e=> { const val = e.target.value.replace(/,/g, ''); if (val === '' || val === '-') setNewInvPrice(val); else if(!isNaN(val)) setNewInvPrice(Number(val).toLocaleString()); }} className="w-14 text-[10px] px-1 py-1 bg-transparent text-right outline-none dark:text-white font-bold" />
                                     <button type="submit" className="bg-slate-700 hover:bg-slate-800 text-white px-1.5 py-1 rounded text-[10px] font-bold shrink-0">등록</button>
                                 </form>
                                 <div className="relative w-16 sm:w-20 shrink-0"><Icon name="magnifying-glass" className="absolute left-1.5 top-1/2 -translate-y-1/2 text-slate-400 text-[10px]"/><input type="text" placeholder="검색" value={currentSearchTerm} onChange={e => setCurrentSearchTerm(e.target.value)} className="w-full text-[10px] pl-4 pr-1 py-1 border dark:border-slate-600 rounded outline-none bg-white dark:bg-slate-900 dark:text-white" /></div>
@@ -1742,7 +1893,7 @@
                         </div>
                         <div className="flex-1 overflow-y-auto p-1.5 space-y-1.5 bg-slate-50 dark:bg-slate-900">
                             {inventory.filter(i => !currentSearchTerm || String(i.name).toLowerCase().includes(String(currentSearchTerm).toLowerCase())).map(item => (
-                                <InventoryItemRow key={item.id} item={item} orders={orders} setOrders={setOrders} inventory={inventory} setInventory={setInventory} setProductHistory={setProductHistory} openModal={openModal} expandedInventoryItem={expandedInventoryItem} setExpandedInventoryItem={setExpandedInventoryItem} setManualProduct={setManualProduct} setCurrentSearchTerm={setCurrentSearchTerm} setManualPrice={setManualPrice} setIsFixedProductMode={setIsFixedProductMode} customerPaidStatus={customerPaidStatus} saveInventoryToServer={saveInventoryToServer} cardPayments={cardPayments} />
+                                <InventoryItemRow key={item.id || item.name} item={item} itemStats={inventoryStats[item.name]} setOrders={setOrders} setInventory={setInventory} setProductHistory={setProductHistory} openModal={openModal} expandedInventoryItem={expandedInventoryItem} setExpandedInventoryItem={setExpandedInventoryItem} setManualProduct={setManualProduct} setCurrentSearchTerm={setCurrentSearchTerm} setManualPrice={setManualPrice} setIsFixedProductMode={setIsFixedProductMode} customerPaidStatus={customerPaidStatus} saveInventoryToServer={saveInventoryToServer} cardPayments={cardPayments} />
                             ))}
                         </div>
                     </div>
@@ -1752,9 +1903,22 @@
 
         const OrderManagementTab = ({ orders, shippingOverrides, quickShipping, jejuShipping, freeShippingThreshold, broadcastName, addresses, handleExportBackup, handleImportBackup, addressMapping, cardPayments, specialCustomers, openModal, cashReceipts, inventory, productHistory }) => {
             const findAddress = (nick) => {
-                if (addressMapping[nick] === '__UNMAPPED__') return undefined;
-                if (addressMapping[nick]) return addresses.find(a => normalizeString(a.nickname) === normalizeString(addressMapping[nick]));
-                return addresses.find(a => normalizeString(a.nickname) === normalizeString(nick));
+                if (!nick) return undefined;
+                const cleanNick = normalizeString(nick);
+                const mappedTarget = addressMapping[nick] || addressMapping[cleanNick];
+                if (mappedTarget === '__UNMAPPED__') return undefined;
+                
+                let matches = addresses.filter(a => normalizeString(a.nickname) === (mappedTarget ? normalizeString(mappedTarget) : cleanNick));
+                if (matches.length === 0 && !mappedTarget) {
+                    matches = addresses.filter(a => normalizeString(a.realname) === cleanNick);
+                }
+
+                if (matches.length > 0) {
+                    matches.sort((a,b) => parseSafeDate(b.timestamp).getTime() - parseSafeDate(a.timestamp).getTime());
+                    const masterMatch = matches.find(m => m._source === 'master');
+                    return masterMatch || matches[0];
+                }
+                return undefined;
             };
 
             const getCalculatedShipping = (nick, productTotal) => {
@@ -1795,18 +1959,28 @@
                 const groups = {}; orders.forEach(o => { if (!groups[o.customer]) groups[o.customer] = []; groups[o.customer].push(o); }); 
                 let entries = Object.entries(groups).map(([nick, items]) => {
                     const activeItems = items.filter(i => !i.isCancelled); const isCard = cardPayments[nick]; 
-                    const productTotal = activeItems.reduce((sum, i) => sum + Number(i.price), 0); const currentShipping = getCalculatedShipping(nick, productTotal);
-                    const depositTotal = items.reduce((sum, i) => sum + (i.deposit || 0), 0); const grandTotal = productTotal + (activeItems.length > 0 ? currentShipping : 0); 
-                    const isPaid = (depositTotal >= grandTotal) || isCard; const balance = grandTotal - depositTotal;
-                    return { nick, items: activeItems, isPaid, isCard, depositTotal, grandTotal, balance };
+                    const hasCashReceipt = cashReceipts[nick];
+                    const productTotal = activeItems.reduce((sum, i) => sum + Number(i.price), 0);
+                    const currentShipping = getCalculatedShipping(nick, productTotal);
+                    const depositTotal = items.reduce((sum, i) => sum + (i.deposit || 0), 0); 
+                    const grandTotal = productTotal + (activeItems.length > 0 ? currentShipping : 0); 
+                    const isPaid = (depositTotal >= grandTotal) || isCard;
+                    const balance = grandTotal - depositTotal;
+                    return { nick, items: activeItems, isPaid, isCard, hasCashReceipt, depositTotal, grandTotal, balance };
                 });
+
                 const getStatusPriority = (entry) => { if (entry.isPaid && !entry.isCard) return 1; if (entry.isCard) return 2; return 3; };
                 entries.sort((a, b) => { const pA = getStatusPriority(a); const pB = getStatusPriority(b); if (pA !== pB) return pA - pB; return a.nick.localeCompare(b.nick); });
-                let excelRows = []; entries.forEach(({ nick, items, isPaid, isCard, depositTotal, grandTotal, balance }) => { 
-                    if(items.length === 0) return; const addrInfo = addresses.find(a => normalizeString(a.nickname) === normalizeString(nick)) || {}; 
+
+                let excelRows = []; entries.forEach(({ nick, items, isPaid, isCard, hasCashReceipt, depositTotal, grandTotal, balance }) => { 
+                    if(items.length === 0) return; 
+                    const addrInfo = findAddress(nick) || {}; 
                     const fullAddress = addrInfo.zipcode ? `(${addrInfo.zipcode}) ${addrInfo.address || ''}` : (addrInfo.address || ''); 
-                    let cleanPhone = String(addrInfo.phone || '').replace(/[^0-9]/g, ''); if (cleanPhone.length === 10 && !cleanPhone.startsWith('0')) cleanPhone = '0' + cleanPhone;
-                    const statusColumn = isCard ? "카드결제" : (isPaid ? "완납" : (depositTotal > 0 ? `부분입금(미수 ${balance.toLocaleString()})` : `미입금(미수 ${balance.toLocaleString()})`));
+                    
+                    let cleanPhone = String(addrInfo.phone || '').replace(/[^0-9]/g, '');
+                    if (cleanPhone.length === 10 && !cleanPhone.startsWith('0')) cleanPhone = '0' + cleanPhone;
+
+                    const statusColumn = isCard ? "카드결제" : (hasCashReceipt ? "현금영수증" : (isPaid ? "완납" : (depositTotal > 0 ? `부분입금(미수 ${balance.toLocaleString()})` : `미입금(미수 ${balance.toLocaleString()})`)));
                     const createRow = (productValue) => ({ '날짜시간': new Date().toLocaleString(), '공란1': '', '입금상태': statusColumn, '닉네임': nick, '주문제품(수량)': productValue, '이름': addrInfo.realname || '', '핸드폰번호': cleanPhone, '주소': fullAddress, '배송메모': addrInfo.memo || '' }); 
                     excelRows.push(createRow(`[ ${nick} ]`)); items.forEach(item => { const qtyPart = item.quantity > 1 ? ` ★${item.quantity}개` : ''; excelRows.push(createRow(`${item.product}${qtyPart}`)); }); 
                 }); 
@@ -1957,8 +2131,8 @@
 
             useEffect(() => {
                 const currentUrl = window.localStorage.getItem(getLsKey('googleScriptUrl'));
-                if (!currentUrl || currentUrl === '""' || currentUrl === 'null' || !currentUrl.includes('AKfycbwKPG6R0_LENHbstaBDQjHbR4td1kMQrS-Jzm27bnhatW42mZXjknKNK7NJ7llgK9Ou')) {
-                    setGoogleScriptUrl('https://script.google.com/macros/s/AKfycbwKPG6R0_LENHbstaBDQjHbR4td1kMQrS-Jzm27bnhatW42mZXjknKNK7NJ7llgK9Ou/exec');
+                if (!currentUrl || currentUrl === '""' || currentUrl === 'null' || !currentUrl.includes('AKfycby4mtwu7yRnnYpG0Srj0DupWEJAX-DF1HMfOXu5QrwZ8sUIpMwfYTUKRsG435E-aUB2')) {
+                    setGoogleScriptUrl('https://script.google.com/macros/s/AKfycby4mtwu7yRnnYpG0Srj0DupWEJAX-DF1HMfOXu5QrwZ8sUIpMwfYTUKRsG435E-aUB2/exec');
                     setChatSheetId('199YCBXzInxmG8GforoRCNHNps21NhVIf9wHA6NXXhtg');
                     setDepSheetId('14bx2HMd_NID3zQN-Hb0x0At2Qmti7-p1Zfx1ZadNScY');
                     setAddrSheetId('1ywl4gRvswQpvIYtPVbSROzz7a5elbLieYhqMZmt191U');
