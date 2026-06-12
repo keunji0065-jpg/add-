@@ -870,7 +870,7 @@
                 setAddressMapping(prevMap => ({ ...prevMap, [masterData.nickname]: masterData.nickname }));
 
                 if (googleScriptUrl && masterSheetId) {
-                    const payloadToGas = { ...masterData, phone: masterData.phone ? "'" + masterData.phone : '', zipcode: masterData.zipcode ? "'" + masterData.zipcode : '' };
+                    const payloadToGas = { ...masterData, '닉네임': masterData.nickname, name: masterData.nickname, phone: masterData.phone ? "'" + masterData.phone : '', zipcode: masterData.zipcode ? "'" + masterData.zipcode : '' };
                     try { await fetchGas(googleScriptUrl, { action: 'save_master_address', masterId: getCleanSheetId(masterSheetId), data: payloadToGas }); } catch (err) {}
                 }
             };
@@ -1290,7 +1290,7 @@
                         const finalNick = newNick.trim(); const updatedAddr = { ...addr, nickname: finalNick, _source: 'master', timestamp: new Date().toISOString() };
                         setAddresses(prev => { const filtered = prev.filter(a => a.nickname !== addr.nickname); return [...filtered, updatedAddr]; });
                         if (googleScriptUrl && masterSheetId) {
-                            const payloadToGas = { ...updatedAddr, phone: updatedAddr.phone ? "'" + updatedAddr.phone : '', zipcode: updatedAddr.zipcode ? "'" + updatedAddr.zipcode : '' };
+                            const payloadToGas = { ...updatedAddr, '닉네임': updatedAddr.nickname, name: updatedAddr.nickname, phone: updatedAddr.phone ? "'" + updatedAddr.phone : '', zipcode: updatedAddr.zipcode ? "'" + updatedAddr.zipcode : '' };
                             fetchGas(googleScriptUrl, { action: 'save_master_address', masterId: getCleanSheetId(masterSheetId), data: payloadToGas }).catch(()=>{});
                         }
                     }
@@ -1373,9 +1373,10 @@
                     let addrRes = addressLookup.get(o.customer); let addr = addrRes.data || {}; 
                     const currentShipping = getCalculatedShipping(o.customer, customerTotals[o.customer] || 0); 
                     const isCard = cardPayments[o.customer] ? true : false; 
-                    return { nickname: o.customer, product: o.product, qty: o.quantity, price: o.price, deposit: o.deposit, shipping: currentShipping, address: addr.address || '', zipcode: addr.zipcode ? "'" + addr.zipcode : '', phone: addr.phone ? "'" + addr.phone : '', realname: addr.realname || '', memo: addr.memo || '', isCard: isCard }; 
+                    // [핵심 패치] GAS가 인식하도록 '닉네임', 'name', '상품명' 등 키값 복구
+                    return { nickname: o.customer || '', '닉네임': o.customer || '', name: o.customer || '', product: o.product, '상품명': o.product, qty: o.quantity, price: o.price, deposit: o.deposit, shipping: currentShipping, address: addr.address || '', zipcode: addr.zipcode ? "'" + addr.zipcode : '', phone: addr.phone ? "'" + addr.phone : '', realname: addr.realname || '', memo: addr.memo || '', isCard: isCard }; 
                 }); 
-                if (broadcastName) { saveList.unshift({ nickname: '___WORKSPACE_META___', product: broadcastName, qty: 0, price: 0, deposit: 0, shipping: 0, address: '', zipcode: '', phone: '', realname: '', memo: '', isCard: false }); }
+                if (broadcastName) { saveList.unshift({ nickname: '___WORKSPACE_META___', '닉네임': '___WORKSPACE_META___', name: '___WORKSPACE_META___', product: broadcastName, '상품명': broadcastName, qty: 0, price: 0, deposit: 0, shipping: 0, address: '', zipcode: '', phone: '', realname: '', memo: '', isCard: false }); }
                 try { const actualSheetId = getCleanSheetId(masterSheetId); if(actualSheetId) { await fetchGas(googleScriptUrl, { action: 'save_orders', masterId: actualSheetId, data: saveList }); } } catch(e) {} finally { setIsSaving(false); } 
             }, [orders, cardPayments, getCalculatedShipping, googleScriptUrl, addressLookup, masterSheetId, broadcastName]);
 
@@ -1404,7 +1405,7 @@
                     setAddressMapping(prev => ({ ...prev, [orderNick]: addressNick })); 
                     const addrData = addresses.find(a => normalizeString(a.nickname) === normalizeString(addressNick));
                     if (addrData && googleScriptUrl && masterSheetId) {
-                        const mappedData = { ...addrData, nickname: orderNick, phone: addrData.phone ? "'" + addrData.phone : '', _source: 'master' };
+                        const mappedData = { ...addrData, nickname: orderNick, '닉네임': orderNick, name: orderNick, phone: addrData.phone ? "'" + addrData.phone : '', _source: 'master' };
                         try { await fetchGas(googleScriptUrl, { action: 'save_master_address', masterId: getCleanSheetId(masterSheetId), data: mappedData }); } catch (err) { setGlobalError("🚨 통신 에러: 주소 저장 실패"); }
                     }
                 }); 
@@ -1525,7 +1526,7 @@
                         setInventory(prevInv => {
                             const invArr = Array.isArray(prevInv) ? prevInv : []; const exists = invArr.find(i => String(i.name).trim() === cContent);
                             if (!exists) {
-                                const newInv = [{ id: `inv_${Date.now()}_${Math.random()}`, name: cContent, price: priceToSave, isSoldOut: false }, ...invArr]; 
+                                const newInv = [{ id: `inv_${Date.now()}_${Math.random()}`, name: cContent, price: priceToSave, stock: '', isSoldOut: false }, ...invArr]; 
                                 saveInventoryToServer(newInv); return newInv;
                             }
                             return invArr;
