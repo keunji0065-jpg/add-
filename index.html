@@ -870,7 +870,13 @@
                 setAddressMapping(prevMap => ({ ...prevMap, [masterData.nickname]: masterData.nickname }));
 
                 if (googleScriptUrl && masterSheetId) {
-                    const payloadToGas = { ...masterData, '닉네임': masterData.nickname, name: masterData.nickname, phone: masterData.phone ? "'" + masterData.phone : '', zipcode: masterData.zipcode ? "'" + masterData.zipcode : '' };
+                    // 한글명/영문명 모두 추가해서 어떤 시트 헤더에도 매핑되게 설정
+                    const payloadToGas = { 
+                        ...masterData, 
+                        '닉네임': masterData.nickname, name: masterData.nickname, nick: masterData.nickname, '주문자': masterData.nickname, '아이디': masterData.nickname, '고객명': masterData.nickname,
+                        phone: masterData.phone ? "'" + masterData.phone : '', 
+                        zipcode: masterData.zipcode ? "'" + masterData.zipcode : '' 
+                    };
                     try { await fetchGas(googleScriptUrl, { action: 'save_master_address', masterId: getCleanSheetId(masterSheetId), data: payloadToGas }); } catch (err) {}
                 }
             };
@@ -1290,7 +1296,11 @@
                         const finalNick = newNick.trim(); const updatedAddr = { ...addr, nickname: finalNick, _source: 'master', timestamp: new Date().toISOString() };
                         setAddresses(prev => { const filtered = prev.filter(a => a.nickname !== addr.nickname); return [...filtered, updatedAddr]; });
                         if (googleScriptUrl && masterSheetId) {
-                            const payloadToGas = { ...updatedAddr, '닉네임': updatedAddr.nickname, name: updatedAddr.nickname, phone: updatedAddr.phone ? "'" + updatedAddr.phone : '', zipcode: updatedAddr.zipcode ? "'" + updatedAddr.zipcode : '' };
+                            const payloadToGas = { 
+                                ...updatedAddr, 
+                                '닉네임': updatedAddr.nickname, name: updatedAddr.nickname, nick: updatedAddr.nickname, '주문자': updatedAddr.nickname, '아이디': updatedAddr.nickname, '고객명': updatedAddr.nickname, 
+                                phone: updatedAddr.phone ? "'" + updatedAddr.phone : '', zipcode: updatedAddr.zipcode ? "'" + updatedAddr.zipcode : '' 
+                            };
                             fetchGas(googleScriptUrl, { action: 'save_master_address', masterId: getCleanSheetId(masterSheetId), data: payloadToGas }).catch(()=>{});
                         }
                     }
@@ -1369,15 +1379,51 @@
             const autoSaveToGoogleSheet = useCallback(async () => { 
                 if (!googleScriptUrl || !masterSheetId || Object.keys(orders).length === 0) return; setIsSaving(true); 
                 const customerTotals = {}; orders.filter(o => !o.isCancelled).forEach(o => { customerTotals[o.customer] = (customerTotals[o.customer] || 0) + Number(o.price); });
+                
+                // 앱스 스크립트의 닉네임 탭을 위해 중복 없는 닉네임 리스트를 추출합니다.
+                const uniqueNicknames = Array.from(new Set(orders.filter(o => !o.isCancelled).map(o => o.customer)));
+                
                 const saveList = orders.filter(o=>!o.isCancelled).map(o => { 
                     let addrRes = addressLookup.get(o.customer); let addr = addrRes.data || {}; 
                     const currentShipping = getCalculatedShipping(o.customer, customerTotals[o.customer] || 0); 
                     const isCard = cardPayments[o.customer] ? true : false; 
-                    // [핵심 패치] GAS가 인식하도록 '닉네임', 'name', '상품명' 등 키값 복구
-                    return { nickname: o.customer || '', '닉네임': o.customer || '', name: o.customer || '', product: o.product, '상품명': o.product, qty: o.quantity, price: o.price, deposit: o.deposit, shipping: currentShipping, address: addr.address || '', zipcode: addr.zipcode ? "'" + addr.zipcode : '', phone: addr.phone ? "'" + addr.phone : '', realname: addr.realname || '', memo: addr.memo || '', isCard: isCard }; 
+                    const customerVal = o.customer || '';
+                    
+                    // [핵심 패치] 어떤 시트 헤더를 쓰더라도 닉네임과 기타 정보가 들어가도록 다양한 키워드를 추가합니다.
+                    return { 
+                        nickname: customerVal, '닉네임': customerVal, name: customerVal, '주문자': customerVal, '아이디': customerVal, '유튜브닉네임': customerVal, '고객명': customerVal, nick: customerVal,
+                        product: o.product, '상품명': o.product, '상품': o.product, '주문제품': o.product,
+                        qty: o.quantity, '수량': o.quantity, '주문수량': o.quantity,
+                        price: o.price, '가격': o.price, '제품금액': o.price, '금액': o.price, '단가': o.price,
+                        deposit: o.deposit, '입금액': o.deposit, '입금': o.deposit,
+                        shipping: currentShipping, '배송비': currentShipping,
+                        address: addr.address || '', '주소': addr.address || '', '전체주소': addr.address || '', '배송지': addr.address || '',
+                        zipcode: addr.zipcode ? "'" + addr.zipcode : '', '우편번호': addr.zipcode ? "'" + addr.zipcode : '', '우편': addr.zipcode ? "'" + addr.zipcode : '',
+                        phone: addr.phone ? "'" + addr.phone : '', '연락처': addr.phone ? "'" + addr.phone : '', '전화번호': addr.phone ? "'" + addr.phone : '', '휴대폰': addr.phone ? "'" + addr.phone : '',
+                        realname: addr.realname || '', '이름': addr.realname || '', '수령인': addr.realname || '', '입금자명': addr.realname || '', '입금자': addr.realname || '',
+                        memo: addr.memo || '', '메모': addr.memo || '', '배송메모': addr.memo || '', '요청사항': addr.memo || '',
+                        isCard: isCard, '카드결제': isCard, '카드': isCard
+                    }; 
                 }); 
-                if (broadcastName) { saveList.unshift({ nickname: '___WORKSPACE_META___', '닉네임': '___WORKSPACE_META___', name: '___WORKSPACE_META___', product: broadcastName, '상품명': broadcastName, qty: 0, price: 0, deposit: 0, shipping: 0, address: '', zipcode: '', phone: '', realname: '', memo: '', isCard: false }); }
-                try { const actualSheetId = getCleanSheetId(masterSheetId); if(actualSheetId) { await fetchGas(googleScriptUrl, { action: 'save_orders', masterId: actualSheetId, data: saveList }); } } catch(e) {} finally { setIsSaving(false); } 
+                if (broadcastName) { 
+                    const bn = broadcastName;
+                    const metaCustomer = '___WORKSPACE_META___';
+                    saveList.unshift({ 
+                        nickname: metaCustomer, '닉네임': metaCustomer, name: metaCustomer, '주문자': metaCustomer, '아이디': metaCustomer, '유튜브닉네임': metaCustomer, '고객명': metaCustomer, nick: metaCustomer,
+                        product: bn, '상품명': bn, '상품': bn, '주문제품': bn,
+                        qty: 0, '수량': 0, '주문수량': 0,
+                        price: 0, '가격': 0, '제품금액': 0, '금액': 0, '단가': 0,
+                        deposit: 0, '입금액': 0, '입금': 0,
+                        shipping: 0, '배송비': 0,
+                        address: '', '주소': '', '전체주소': '', '배송지': '',
+                        zipcode: '', '우편번호': '', '우편': '',
+                        phone: '', '연락처': '', '전화번호': '', '휴대폰': '',
+                        realname: '', '이름': '', '수령인': '', '입금자명': '', '입금자': '',
+                        memo: '', '메모': '', '배송메모': '', '요청사항': '',
+                        isCard: false, '카드결제': false, '카드': false
+                    }); 
+                }
+                try { const actualSheetId = getCleanSheetId(masterSheetId); if(actualSheetId) { await fetchGas(googleScriptUrl, { action: 'save_orders', masterId: actualSheetId, data: saveList, nicknames: uniqueNicknames }); } } catch(e) {} finally { setIsSaving(false); } 
             }, [orders, cardPayments, getCalculatedShipping, googleScriptUrl, addressLookup, masterSheetId, broadcastName]);
 
             const autoSaveRef = useRef(); useEffect(() => { autoSaveRef.current = autoSaveToGoogleSheet; }, [autoSaveToGoogleSheet]);
@@ -1405,7 +1451,12 @@
                     setAddressMapping(prev => ({ ...prev, [orderNick]: addressNick })); 
                     const addrData = addresses.find(a => normalizeString(a.nickname) === normalizeString(addressNick));
                     if (addrData && googleScriptUrl && masterSheetId) {
-                        const mappedData = { ...addrData, nickname: orderNick, '닉네임': orderNick, name: orderNick, phone: addrData.phone ? "'" + addrData.phone : '', _source: 'master' };
+                        const mappedData = { 
+                            ...addrData, 
+                            nickname: orderNick, '닉네임': orderNick, name: orderNick, nick: orderNick, '주문자': orderNick, '아이디': orderNick, '고객명': orderNick, 
+                            phone: addrData.phone ? "'" + addrData.phone : '', 
+                            _source: 'master' 
+                        };
                         try { await fetchGas(googleScriptUrl, { action: 'save_master_address', masterId: getCleanSheetId(masterSheetId), data: mappedData }); } catch (err) { setGlobalError("🚨 통신 에러: 주소 저장 실패"); }
                     }
                 }); 
