@@ -870,7 +870,6 @@
                 setAddressMapping(prevMap => ({ ...prevMap, [masterData.nickname]: masterData.nickname }));
 
                 if (googleScriptUrl && masterSheetId) {
-                    // 한글명/영문명 모두 추가해서 어떤 시트 헤더에도 매핑되게 설정
                     const payloadToGas = { 
                         ...masterData, 
                         '닉네임': masterData.nickname, name: masterData.nickname, nick: masterData.nickname, '주문자': masterData.nickname, '아이디': masterData.nickname, '고객명': masterData.nickname,
@@ -1389,38 +1388,38 @@
                     const isCard = cardPayments[o.customer] ? true : false; 
                     const customerVal = o.customer || '';
                     
-                    // [핵심 패치] 어떤 시트 헤더를 쓰더라도 닉네임과 기타 정보가 들어가도록 다양한 키워드를 추가합니다.
+                    // [핵심 패치] 불필요하게 늘어나는 열을 방지하기 위해, 딱 필요한 12개의 고정 헤더만 보냅니다.
                     return { 
-                        nickname: customerVal, '닉네임': customerVal, name: customerVal, '주문자': customerVal, '아이디': customerVal, '유튜브닉네임': customerVal, '고객명': customerVal, nick: customerVal,
-                        product: o.product, '상품명': o.product, '상품': o.product, '주문제품': o.product,
-                        qty: o.quantity, '수량': o.quantity, '주문수량': o.quantity,
-                        price: o.price, '가격': o.price, '제품금액': o.price, '금액': o.price, '단가': o.price,
-                        deposit: o.deposit, '입금액': o.deposit, '입금': o.deposit,
-                        shipping: currentShipping, '배송비': currentShipping,
-                        address: addr.address || '', '주소': addr.address || '', '전체주소': addr.address || '', '배송지': addr.address || '',
-                        zipcode: addr.zipcode ? "'" + addr.zipcode : '', '우편번호': addr.zipcode ? "'" + addr.zipcode : '', '우편': addr.zipcode ? "'" + addr.zipcode : '',
-                        phone: addr.phone ? "'" + addr.phone : '', '연락처': addr.phone ? "'" + addr.phone : '', '전화번호': addr.phone ? "'" + addr.phone : '', '휴대폰': addr.phone ? "'" + addr.phone : '',
-                        realname: addr.realname || '', '이름': addr.realname || '', '수령인': addr.realname || '', '입금자명': addr.realname || '', '입금자': addr.realname || '',
-                        memo: addr.memo || '', '메모': addr.memo || '', '배송메모': addr.memo || '', '요청사항': addr.memo || '',
-                        isCard: isCard, '카드결제': isCard, '카드': isCard
+                        '닉네임': customerVal,
+                        '상품명': o.product,
+                        '수량': o.quantity,
+                        '단가(제품금액)': o.price,
+                        '배송비': currentShipping,
+                        '입금액': o.deposit,
+                        '카드결제': isCard ? 'O' : '',
+                        '수령인명': addr.realname || '',
+                        '연락처': addr.phone ? "'" + addr.phone : '',
+                        '우편번호': addr.zipcode ? "'" + addr.zipcode : '',
+                        '주소': addr.address || '',
+                        '요청사항': addr.memo || ''
                     }; 
                 }); 
                 if (broadcastName) { 
                     const bn = broadcastName;
                     const metaCustomer = '___WORKSPACE_META___';
                     saveList.unshift({ 
-                        nickname: metaCustomer, '닉네임': metaCustomer, name: metaCustomer, '주문자': metaCustomer, '아이디': metaCustomer, '유튜브닉네임': metaCustomer, '고객명': metaCustomer, nick: metaCustomer,
-                        product: bn, '상품명': bn, '상품': bn, '주문제품': bn,
-                        qty: 0, '수량': 0, '주문수량': 0,
-                        price: 0, '가격': 0, '제품금액': 0, '금액': 0, '단가': 0,
-                        deposit: 0, '입금액': 0, '입금': 0,
-                        shipping: 0, '배송비': 0,
-                        address: '', '주소': '', '전체주소': '', '배송지': '',
-                        zipcode: '', '우편번호': '', '우편': '',
-                        phone: '', '연락처': '', '전화번호': '', '휴대폰': '',
-                        realname: '', '이름': '', '수령인': '', '입금자명': '', '입금자': '',
-                        memo: '', '메모': '', '배송메모': '', '요청사항': '',
-                        isCard: false, '카드결제': false, '카드': false
+                        '닉네임': metaCustomer,
+                        '상품명': bn,
+                        '수량': 0,
+                        '단가(제품금액)': 0,
+                        '배송비': 0,
+                        '입금액': 0,
+                        '카드결제': '',
+                        '수령인명': '',
+                        '연락처': '',
+                        '우편번호': '',
+                        '주소': '',
+                        '요청사항': ''
                     }); 
                 }
                 try { const actualSheetId = getCleanSheetId(masterSheetId); if(actualSheetId) { await fetchGas(googleScriptUrl, { action: 'save_orders', masterId: actualSheetId, data: saveList, nicknames: uniqueNicknames }); } } catch(e) {} finally { setIsSaving(false); } 
