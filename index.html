@@ -825,7 +825,12 @@
                         <div className="bg-blue-50 dark:bg-blue-900/20 border-t border-blue-100 dark:border-blue-800">
                             <div className="flex justify-between items-center p-1.5 px-2 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors" onClick={(e) => { e.stopPropagation(); setShowDeposits(!showDeposits); }}>
                                 <span className="text-[10px] font-bold text-blue-700 dark:text-blue-300">🔗 연결된 입금 내역 ({customerDeposits.length}건)</span>
-                                <Icon name={showDeposits ? "caret-up" : "caret-down"} className="text-blue-500" />
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[11px] font-black text-blue-700 dark:text-blue-300">
+                                        합계: {customerDeposits.reduce((sum, d) => sum + Number(d.amount), 0).toLocaleString()}원
+                                    </span>
+                                    <Icon name={showDeposits ? "caret-up" : "caret-down"} className="text-blue-500" />
+                                </div>
                             </div>
                             {showDeposits && (
                                 <div className="p-1 space-y-0.5 bg-blue-100/50 dark:bg-blue-900/30">
@@ -1627,6 +1632,11 @@
                     const currentShipping = getCalculatedShipping(o.customer, customerTotals[o.customer] || 0); 
                     const isCard = cardPayments[o.customer] ? true : false; 
                     const customerVal = o.customer || '';
+
+                    // ✨ 새로 추가된 VIP, 노쇼, 대기 판별 로직
+                    const isVip = specialCustomers && specialCustomers[normalizeString(customerVal)]?.type === 'vip';
+                    const isNoShow = noShowCustomers && noShowCustomers[customerVal];
+                    const isWaitlist = waitlistCustomers && waitlistCustomers[customerVal];
                     
                     return { 
                         '닉네임': customerVal,
@@ -1640,7 +1650,10 @@
                         '연락처': addr.phone ? "'" + addr.phone : '',
                         '우편번호': addr.zipcode ? "'" + addr.zipcode : '',
                         '주소': addr.address || '',
-                        '요청사항': addr.memo || ''
+                        '요청사항': addr.memo || '',
+                        'VIP여부': isVip ? 'O' : '',  // 구글시트에 기록됨
+                        '노쇼여부': isNoShow ? 'O' : '', // 구글시트에 기록됨
+                        '대기여부': isWaitlist ? 'O' : '' // 구글시트에 기록됨
                     }; 
                 }); 
                 if (broadcastName) { 
@@ -1658,12 +1671,14 @@
                         '연락처': '',
                         '우편번호': '',
                         '주소': '',
-                        '요청사항': ''
+                        '요청사항': '',
+                        'VIP여부': '',
+                        '노쇼여부': '',
+                        '대기여부': ''
                     }); 
                 }
                 try { const actualSheetId = getCleanSheetId(masterSheetId); if(actualSheetId) { await fetchGas(googleScriptUrl, { action: 'save_orders', masterId: actualSheetId, data: saveList, nicknames: uniqueNicknames }); } } catch(e) {} finally { setIsSaving(false); } 
-            }, [orders, cardPayments, getCalculatedShipping, googleScriptUrl, addressLookup, masterSheetId, broadcastName]);
-
+            }, [orders, cardPayments, getCalculatedShipping, googleScriptUrl, addressLookup, masterSheetId, broadcastName, specialCustomers, noShowCustomers, waitlistCustomers]);
             const autoSaveRef = useRef(); useEffect(() => { autoSaveRef.current = autoSaveToGoogleSheet; }, [autoSaveToGoogleSheet]);
             useEffect(() => { const saveInterval = setInterval(() => { if (autoSaveRef.current) autoSaveRef.current(); }, 60000); return () => clearInterval(saveInterval); }, []); 
             useEffect(() => { if (lastAddedOrderId) { const input = document.getElementById(`prod-input-${lastAddedOrderId}`); if (input) input.focus(); setLastAddedOrderId(null); } }, [lastAddedOrderId, orders]);
@@ -2155,7 +2170,7 @@
                                         <div className="relative flex-1">
                                             <input id="manual-prod-input" type="text" list="product-list" placeholder="상품명" value={manualProduct} 
                                                 onChange={e => {
-                                                    const val = e.target.value; setManualProduct(val); setCurrentSearchTerm(val);
+                                                    const val = e.target.value; setManualProduct(val); 
                                                     const invItem = Array.isArray(inventory) ? inventory.find(i => String(i.name).trim() === String(val).trim()) : null;
                                                     const uPrice = invItem ? Number(invItem.price) : (productHistory[val] || 0);
                                                     if (uPrice > 0) setManualPrice(uPrice.toLocaleString()); else if (val === '') setManualPrice('');
@@ -2354,7 +2369,7 @@
                 downloadExcel(data, '상품별_발주리스트'); 
             };
 
-            const handleExportCustomers = () => { 
+           const handleExportCustomers = () => { 
                 const groups = {}; orders.forEach(o => { if (!groups[o.customer]) groups[o.customer] = []; groups[o.customer].push(o); }); 
                 let entries = Object.entries(groups).map(([nick, items]) => {
                     const activeItems = items.filter(i => !i.isCancelled); const isCard = cardPayments[nick]; 
@@ -2384,8 +2399,27 @@
                     let cleanPhone = String(addrInfo.phone || '').replace(/[^0-9]/g, '');
                     if (cleanPhone.length === 10 && !cleanPhone.startsWith('0')) cleanPhone = '0' + cleanPhone;
 
+                    // ✨ 새로 추가된 VIP, 노쇼, 대기 판별 로직
+                    const isVip = specialCustomers && specialCustomers[normalizeString(nick)]?.type === 'vip';
+                    const isNoShow = noShowCustomers && noShowCustomers[nick];
+                    const isWaitlist = waitlistCustomers && waitlistCustomers[nick];
+
                     const statusColumn = isCard ? "카드결제" : (hasCashReceipt ? "현금영수증" : (isPaid ? "완납" : (depositTotal > 0 ? `부분입금(미수 ${balance.toLocaleString()})` : `미입금(미수 ${balance.toLocaleString()})`)));
-                    const createRow = (productValue) => ({ '날짜시간': new Date().toLocaleString(), '공란1': '', '입금상태': statusColumn, '닉네임': nick, '주문제품(수량)': productValue, '이름': addrInfo.realname || '', '핸드폰번호': cleanPhone, '주소': fullAddress, '배송메모': addrInfo.memo || '' }); 
+                    
+                    const createRow = (productValue) => ({ 
+                        '날짜시간': new Date().toLocaleString(), 
+                        '입금상태': statusColumn, 
+                        '닉네임': nick, 
+                        '주문제품(수량)': productValue, 
+                        '이름': addrInfo.realname || '', 
+                        '핸드폰번호': cleanPhone, 
+                        '주소': fullAddress, 
+                        '배송메모': addrInfo.memo || '',
+                        'VIP': isVip ? 'O' : '',
+                        '노쇼': isNoShow ? 'O' : '',
+                        '대기': isWaitlist ? 'O' : ''
+                    }); 
+                    
                     excelRows.push(createRow(`[ ${nick} ]`)); items.forEach(item => { const qtyPart = item.quantity > 1 ? ` ★${item.quantity}개` : ''; excelRows.push(createRow(`${item.product}${qtyPart}`)); }); 
                 }); 
                 downloadExcel(excelRows, '고객별_정산_배송리스트'); 
