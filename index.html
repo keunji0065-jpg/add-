@@ -820,33 +820,41 @@
                             <OrderItem key={item.id} item={item} nick={nick} nextItemId={items[idx + 1]?.id} isLast={idx === items.length - 1} handleProductChange={handleProductChange} handleQuantityUpdate={handleQuantityUpdate} handleOrderCancel={handleOrderCancel} handleOrderDelete={handleOrderDelete} addOrderLogic={addOrderLogic} setSelectedNick={setSelectedNick} inventory={inventory} productHistory={productHistory} />
                         ))}
                     </div>
-                    
                     {customerDeposits && customerDeposits.length > 0 && (
-                        <div className="bg-blue-50 dark:bg-blue-900/20 border-t border-blue-100 dark:border-blue-800">
-                            <div className="flex justify-between items-center p-1.5 px-2 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors" onClick={(e) => { e.stopPropagation(); setShowDeposits(!showDeposits); }}>
-                                <span className="text-[10px] font-bold text-blue-700 dark:text-blue-300">🔗 연결된 입금 내역 ({customerDeposits.length}건)</span>
-                                <div className="flex items-center gap-2">
-                                    <span className="text-[11px] font-black text-blue-700 dark:text-blue-300">
-                                        합계: {customerDeposits.reduce((sum, d) => sum + Number(d.amount), 0).toLocaleString()}원
-                                    </span>
-                                    <Icon name={showDeposits ? "caret-up" : "caret-down"} className="text-blue-500" />
-                                </div>
-                            </div>
-                            {showDeposits && (
-                                <div className="p-1 space-y-0.5 bg-blue-100/50 dark:bg-blue-900/30">
-                                    {customerDeposits.map(d => (
-                                        <div key={d.id} className="flex justify-between items-center px-2 py-1 bg-white dark:bg-slate-800 rounded shadow-sm border border-blue-100 dark:border-blue-700">
-                                            <span className="text-[10px] text-slate-700 dark:text-slate-300 font-bold">{d.name}</span>
-                                            <div className="flex gap-2 items-center">
-                                                <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400">+{Number(d.amount).toLocaleString()}원</span>
-                                                <button onClick={(e) => { e.stopPropagation(); handleDepositUnmatch(d, nick); }} className="text-[9px] bg-red-50 text-red-500 border border-red-200 hover:bg-red-100 px-1.5 py-0.5 rounded font-bold shadow-sm transition-colors">해제</button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
+    <div className="bg-blue-50 dark:bg-blue-900/20 border-t border-blue-100 dark:border-blue-800">
+        <div 
+            className="flex justify-between items-center p-1.5 px-2 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors" 
+            onClick={(e) => { e.stopPropagation(); setShowDeposits(!showDeposits); }}
+        >
+            <span className="text-[10px] font-bold text-blue-700 dark:text-blue-300">
+                🔗 연결된 입금 내역 ({customerDeposits.length}건)
+            </span>
+            
+            {/* [수정됨] 토글을 열지 않아도 보이도록 화살표 바로 옆에 총액을 파란색으로 배치했습니다. */}
+            <div className="flex items-center gap-2">
+                <span className="text-[11px] font-black text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/50 px-1.5 py-0.5 rounded">
+                    합계: {customerDeposits.reduce((sum, d) => sum + Number(d.amount), 0).toLocaleString()}원
+                </span>
+                <Icon name={showDeposits ? "caret-up" : "caret-down"} className="text-blue-500" />
+            </div>
+        </div>
+        
+        {showDeposits && (
+            <div className="p-1 space-y-0.5 bg-blue-100/50 dark:bg-blue-900/30">
+                {customerDeposits.map(d => (
+                    <div key={d.id} className="flex justify-between items-center px-2 py-1 bg-white dark:bg-slate-800 rounded shadow-sm border border-blue-100 dark:border-blue-700">
+                        <span className="text-[10px] text-slate-700 dark:text-slate-300 font-bold">{d.name}</span>
+                        <div className="flex gap-2 items-center">
+                            <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400">+{Number(d.amount).toLocaleString()}원</span>
+                            <button onClick={(e) => { e.stopPropagation(); handleDepositUnmatch(d, nick); }} className="text-[9px] bg-red-50 text-red-500 border border-red-200 hover:bg-red-100 px-1.5 py-0.5 rounded font-bold shadow-sm transition-colors">해제</button>
                         </div>
-                    )}
+                    </div>
+                ))}
+            </div>
+        )}
+    </div>
+)}
+        
                 </div>
             );
         }, (prev, next) => {
@@ -2158,14 +2166,24 @@
                                     </div>
                                     <div className="flex-1 flex gap-1 items-center relative">
                                         <div className="relative flex-1">
-                                            <input id="manual-prod-input" type="text" list="product-list" placeholder="상품명" value={manualProduct} 
-                                                onChange={e => {
-                                                    const val = e.target.value; setManualProduct(val); 
-                                                    const invItem = Array.isArray(inventory) ? inventory.find(i => String(i.name).trim() === String(val).trim()) : null;
-                                                    const uPrice = invItem ? Number(invItem.price) : (productHistory[val] || 0);
-                                                    if (uPrice > 0) setManualPrice(uPrice.toLocaleString()); else if (val === '') setManualPrice('');
-                                                }} 
-                                                className={`w-full border dark:border-slate-600 rounded pl-2 pr-9 py-1.5 text-xs outline-none focus:ring-1 focus:ring-slate-500 bg-white dark:bg-slate-900 dark:text-white transition-all ${isFixedProductMode ? 'ring-2 ring-slate-600 border-slate-600' : ''}`} />
+                                           <input 
+    id="manual-prod-input" 
+    type="text" 
+    list="product-list" 
+    placeholder="상품명" 
+    value={manualProduct} 
+    onChange={e => {
+        // [수정됨] 여기서 검색어 상태(currentSearchTerm)를 건드리지 않도록 분리합니다.
+        const val = e.target.value; 
+        setManualProduct(val); 
+        
+        const invItem = Array.isArray(inventory) ? inventory.find(i => String(i.name).trim() === String(val).trim()) : null;
+        const uPrice = invItem ? Number(invItem.price) : (productHistory[val] || 0);
+        if (uPrice > 0) setManualPrice(uPrice.toLocaleString()); 
+        else if (val === '') setManualPrice('');
+    }} 
+    className={`w-full border dark:border-slate-600 rounded pl-2 pr-9 py-1.5 text-xs outline-none focus:ring-1 focus:ring-slate-500 bg-white dark:bg-slate-900 dark:text-white transition-all ${isFixedProductMode ? 'ring-2 ring-slate-600 border-slate-600' : ''}`} 
+/>
                                             <button type="button" onClick={() => setIsFixedProductMode(!isFixedProductMode)} className={`absolute right-1 top-1/2 -translate-y-1/2 px-1.5 py-0.5 rounded text-[10px] font-bold transition-colors ${isFixedProductMode ? 'bg-slate-700 text-white shadow-inner' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-300'}`} title="고정">고정</button>
                                         </div>
                                         <input type="text" placeholder="단가" value={manualPrice} onChange={e => { const val = e.target.value.replace(/,/g, ''); if (val === '' || val === '-') setManualPrice(val); else if(!isNaN(val)) setManualPrice(Number(val).toLocaleString()); }} className={`w-16 border dark:border-slate-600 rounded px-2 py-1.5 text-xs outline-none text-right bg-white dark:bg-slate-900 transition-all ${isFixedProductMode ? 'ring-2 ring-slate-600 border-slate-600' : ''}`} />
