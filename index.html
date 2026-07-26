@@ -911,6 +911,7 @@
             const [multiAddNick, setMultiAddNick] = useState(null);
             
             const [chats, setChats] = useState([]);
+            const lastChatRowRef = useRef(0);
             const [hiddenChatIds, setHiddenChatIds] = useState(() => { try { const s = localStorage.getItem(getLsKey('hiddenChatIds')); const p = JSON.parse(s); return Array.isArray(p) ? p : []; } catch(e){ return []; } });
             const [showKeywordOnly, setShowKeywordOnly] = useState(false);
             const [keywordInput, setKeywordInput] = useState('');
@@ -1160,21 +1161,30 @@
                 return strVal; 
             }, []);
 
-            const fetchAllData = useCallback(async () => {
+         const fetchAllData = useCallback(async () => {
                 if (!googleScriptUrl) { 
                     setSyncStatus(prev => prev === "설정 ⚙️: 통합 앱스 스크립트 URL을 입력하세요!" ? prev : "설정 ⚙️: 통합 앱스 스크립트 URL을 입력하세요!"); 
                     return; 
                 }
                 try {
-                    const fetchUrl = `${googleScriptUrl}?action=get_all&chatId=${getCleanSheetId(chatSheetId)}&depId=${getCleanSheetId(depSheetId)}&addrId=${getCleanSheetId(addrSheetId)}&masterId=${getCleanSheetId(masterSheetId)}&t=${Date.now()}`;
+                    // 💡 URL 끝에 &lastChatRow 파라미터를 추가해서 내가 안 읽은 부분만 요청합니다.
+                    const fetchUrl = `${googleScriptUrl}?action=get_all&chatId=${getCleanSheetId(chatSheetId)}&depId=${getCleanSheetId(depSheetId)}&addrId=${getCleanSheetId(addrSheetId)}&masterId=${getCleanSheetId(masterSheetId)}&lastChatRow=${lastChatRowRef.current}&t=${Date.now()}`;
                     const res = await fetchGas(fetchUrl);
                     
                     if (res && res.status === 'success') {
                         let statusMsg = "동기화: ";
+
+                        // 💡 백엔드에서 알려준 마지막 줄 번호로 갱신
+                        if (res.lastChatRow !== undefined) {
+                            lastChatRowRef.current = res.lastChatRow;
+                        }
+
                         // 1. 채팅
                         if (res.chats && Array.isArray(res.chats)) {
                             let chatRows = res.chats;
-                            if (chatRows.length > 0 && chatRows[0].some(c => typeof c === 'string' && (c.includes('날짜') || c.includes('닉네임') || c.includes('내용')))) chatRows = chatRows.slice(1);
+                            if (chatRows.length > 0 && chatRows[0].some(c => typeof c === 'string' && (c.includes('날짜') || c.includes('닉네임') || c.includes('내용')))) {
+                                chatRows = chatRows.slice(1);
+                            }
                             const newChats = chatRows.map((row, idx) => {
                                 const validCells = row.filter(cell => cell !== null && cell !== undefined && String(cell).trim() !== '');
                                 if (validCells.length < 2) return null;
@@ -1182,17 +1192,18 @@
                                 if (row[1] && row[2]) { time = String(row[0] || ''); nickname = String(row[1] || ''); content = String(row[2] || ''); } 
                                 else { time = String(validCells[0] || ''); nickname = String(validCells[1] || ''); content = String(validCells[2] || ''); }
                                 nickname = nickname.replace(/@/g, '').trim();
-                                return { id: `c_${idx}_${time}_${nickname}`, time, nickname, content };
+                                return { id: `c_${Date.now()}_${Math.random().toString(36).substr(2,9)}_${nickname}`, time, nickname, content };
                             }).filter(c => c !== null && c.nickname && c.content);
                             
-                            const chatIds = newChats.map(c => c.id).join(',');
-                            if(chatIds !== prevChatsStr.current) {
-                                setChats(newChats.reverse());
-                                prevChatsStr.current = chatIds;
+                            if(newChats.length > 0) {
+                                setChats(prevChats => {
+                                    const combined = [...newChats.reverse(), ...prevChats];
+                                    return combined.slice(0, 1000); 
+                                });
+                                statusMsg += `채팅(${newChats.length}) `; 
+                            } else { 
+                                statusMsg += `채팅(없음) `; 
                             }
-                            
-                            if(newChats.length > 0) statusMsg += `채팅(${newChats.length}) `; 
-                            else statusMsg += `채팅(없음) `;
                         } else { statusMsg += `채팅(연결실패) `; }
 
                         // 2. 입금
@@ -1308,7 +1319,6 @@
                     setSyncStatus(prev => prev === "네트워크 에러 발생" ? prev : "네트워크 에러 발생"); 
                 }
             }, [googleScriptUrl, chatSheetId, depSheetId, addrSheetId, masterSheetId, setAddresses, setInventory, setGlobalError, playCoinSound, playBellSound]);
-            
             // 비동기식 폴링으로 변경 (이전 요청이 끝난 후 5초 대기)
             useEffect(() => { 
                 let isMounted = true;
