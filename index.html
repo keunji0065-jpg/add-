@@ -96,9 +96,16 @@
             return s;
         };
 
-        const extractKo = (str) => {
+    const extractKo = (str) => {
             if (!str) return '';
             return String(str).replace(/[^가-힣]/g, '');
+        };
+
+        const fixPhoneNumber = (numStr) => {
+            if (!numStr) return '';
+            let cleaned = String(numStr).replace(/[^0-9]/g, '');
+            if (cleaned.length === 10 && !cleaned.startsWith('0')) cleaned = '0' + cleaned;
+            return cleaned;
         };
 
         const parseSafeDate = (val) => {
@@ -756,11 +763,7 @@ useEffect(() => {
             const isVip = useMemo(() => { const nickNorm = normalizeString(nick); const key = Object.keys(specialCustomers || {}).find(k => normalizeString(k) === nickNorm); return key && specialCustomers[key].type === 'vip'; }, [specialCustomers, nick]);
             const [showDeposits, setShowDeposits] = useState(false);
 
-            const fixPhoneNumber = (numStr) => {
-                if (!numStr) return ''; let cleaned = String(numStr).replace(/[^0-9]/g, '');
-                if (cleaned.length === 10 && !cleaned.startsWith('0')) cleaned = '0' + cleaned; return cleaned;
-            };
-            const cleanPhoneDisplay = addr && addr.phone ? fixPhoneNumber(addr.phone) : '';
+           const cleanPhoneDisplay = addr && addr.phone ? fixPhoneNumber(addr.phone) : '';
 
             return (
                 <div onClick={() => setSelectedNick(prev => prev === nick ? null : nick)} className={`bg-white dark:bg-slate-800 rounded shadow-sm transition-all overflow-hidden cursor-pointer ${borderClass} border mb-1.5`}>
@@ -1010,9 +1013,7 @@ useEffect(() => {
             useEffect(() => { localStorage.setItem(getLsKey('hiddenChatIds'), JSON.stringify([...hiddenChatIds])); }, [hiddenChatIds]);
             useEffect(() => { inventoryRef.current = inventory; }, [inventory]);
             useEffect(() => { productHistoryRef.current = productHistory; }, [productHistory]);
-            useEffect(() => { clickedChatsRef.current = clickedChats; }, [clickedChats]);
-
-            const fixPhoneNumber = (numStr) => { if (!numStr) return ''; let cleaned = String(numStr).replace(/[^0-9]/g, ''); if (cleaned.length === 10 && !cleaned.startsWith('0')) cleaned = '0' + cleaned; return cleaned; };
+        useEffect(() => { clickedChatsRef.current = clickedChats; }, [clickedChats]);
 
             const bringToTopAndScroll = useCallback((rawNick) => {
                 if (!rawNick) return; const cNick = String(rawNick).replace(/@/g, '').trim();
@@ -2433,10 +2434,9 @@ useEffect(() => {
                 let excelRows = []; entries.forEach(({ nick, items, isPaid, isCard, hasCashReceipt, depositTotal, grandTotal, balance }) => { 
                     if(items.length === 0) return; 
                     const addrInfo = findAddress(nick) || {}; 
-                    const fullAddress = addrInfo.zipcode ? `(${addrInfo.zipcode}) ${addrInfo.address || ''}` : (addrInfo.address || ''); 
+                  const fullAddress = addrInfo.zipcode ? `(${addrInfo.zipcode}) ${addrInfo.address || ''}` : (addrInfo.address || ''); 
                     
-                    let cleanPhone = String(addrInfo.phone || '').replace(/[^0-9]/g, '');
-                    if (cleanPhone.length === 10 && !cleanPhone.startsWith('0')) cleanPhone = '0' + cleanPhone;
+                    let cleanPhone = fixPhoneNumber(addrInfo.phone);
 
                     // 상태 확인
                     const isVip = specialCustomers && specialCustomers[normalizeString(nick)]?.type === 'vip';
@@ -2510,9 +2510,9 @@ useEffect(() => {
                         } else if (balance < 0) { statusStr = '과납'; msg += `${templateConfigLocal.paidMsg}\n\n[과납 안내]\n과납액: ${Math.abs(balance).toLocaleString()}원\n${overpaidMsg}\n------------------\n`; } 
                         else { statusStr = '입금'; if (isPaid) msg += `${templateConfigLocal.paidMsg}\n------------------\n`; }
                     }
-                    if (addrInfo && addrInfo.address && !templateConfigLocal.alwaysRequestAddress) {
-                        let cleanPhone = String(addrInfo.phone || '').replace(/[^0-9]/g, ''); if (cleanPhone.length === 10 && !cleanPhone.startsWith('0')) cleanPhone = '0' + cleanPhone;
-                        msg += `\n[배송지 확인]\n\n${addrInfo.realname || nick}\n${cleanPhone}\n${addrInfo.address} ${addrInfo.zipcode ? `(${addrInfo.zipcode})` : ''}\n${addrInfo.memo ? addrInfo.memo + '\n' : ''}\n------------------\n${templateConfigLocal.addrNotice}`;
+                   if (addrInfo && addrInfo.address && !templateConfigLocal.alwaysRequestAddress) {
+                        let cleanPhone = fixPhoneNumber(addrInfo.phone);
+                        msg += `\n[배송지 확인]\n\n${addrInfo.realname || nick}\n${cleanPhone}\n${addrInfo.address} ${addrInfo.zipcode ? `(${addrInfo.zipcode})` : ''}\n${addrInfo.memo ? addrInfo.memo + '\n' : ''}\n------------------\n${templateConfigLocal.addrNotice}`; 
                     } else if (!sentAddressRequestsLocal.has(nick) || templateConfigLocal.alwaysRequestAddress) { msg += `\n${templateConfigLocal.surveyNotice}`; }
                     data.push({ '닉네임': nick, '상품명': itemListTextForExcel, '가격': grandTotal.toLocaleString() + '원', '입금액': depositTotal.toLocaleString() + '원', '상태': statusStr, '카톡전송메세지': msg });
                 });
@@ -2768,7 +2768,7 @@ useEffect(() => {
 
                     <div className="flex-1 overflow-hidden">
                         {activeTab === 'live' ? (
-                            <LiveTab orders={orders} setOrders={setOrders} productHistory={productHistory} setProductHistory={setProductHistory} quickShipping={quickShipping} jejuShipping={jejuShipping} freeShippingThreshold={freeShippingThreshold} shippingOverrides={shippingOverrides} setShippingOverrides={setShippingOverrides} bankAccount={bankAccount} googleScriptUrl={googleScriptUrl} chatSheetId={chatSheetId} depSheetId={depSheetId} addrSheetId={addrSheetId} masterSheetId={masterSheetId} addresses={addresses} setAddresses={setAddresses} cardPayments={cardPayments} setCardPayments={setCardPayments} manualDeposits={manualDeposits} setManualDeposits={setManualDeposits} matchedDeposits={matchedDeposits} setMatchedDeposits={setMatchedDeposits} depositLinks={depositLinks} setDepositLinks={setDepositLinks} depositorNames={depositorNames} setDepositorNames={setDepositorNames} clickedChats={clickedChats} setClickedChats={setClickedChats} openModal={openModal} keywords={keywords} setKeywords={setKeywords} sentAddressRequests={sentAddressRequests} setSentAddressRequests={setSentAddressRequests} deletedDepositIds={deletedDepositIds} setDeletedDepositIds={setDeletedDepositIds} checkedOrders={checkedOrders} setCheckedOrders={setCheckedOrders} addressMapping={addressMapping} setAddressMapping={setAddressMapping} templateConfig={templateConfig} specialCustomers={specialCustomers} setSpecialCustomers={setSpecialCustomers} inventory={inventory} setInventory={setInventory} quickMessages={quickMessages} handleResetAllData={handleResetAllData} broadcastName={broadcastName} setGlobalError={setGlobalError} cashReceipts={cashReceipts} setCashReceipts={setCashReceipts} soundEnabled={soundEnabled} soundVolume={soundVolume} depositLinks={depositLinks} setDepositLinks={setDepositLinks} noShowCustomers={noShowCustomers} setNoShowCustomers={setNoShowCustomers} waitlistCustomers={waitlistCustomers} setWaitlistCustomers={setWaitlistCustomers} />
+                            <LiveTab orders={orders} setOrders={setOrders} productHistory={productHistory} setProductHistory={setProductHistory} quickShipping={quickShipping} jejuShipping={jejuShipping} freeShippingThreshold={freeShippingThreshold} shippingOverrides={shippingOverrides} setShippingOverrides={setShippingOverrides} bankAccount={bankAccount} googleScriptUrl={googleScriptUrl} chatSheetId={chatSheetId} depSheetId={depSheetId} addrSheetId={addrSheetId} masterSheetId={masterSheetId} addresses={addresses} setAddresses={setAddresses} cardPayments={cardPayments} setCardPayments={setCardPayments} manualDeposits={manualDeposits} setManualDeposits={setManualDeposits} matchedDeposits={matchedDeposits} setMatchedDeposits={setMatchedDeposits} depositLinks={depositLinks} setDepositLinks={setDepositLinks} depositorNames={depositorNames} setDepositorNames={setDepositorNames} clickedChats={clickedChats} setClickedChats={setClickedChats} openModal={openModal} keywords={keywords} setKeywords={setKeywords} sentAddressRequests={sentAddressRequests} setSentAddressRequests={setSentAddressRequests} deletedDepositIds={deletedDepositIds} setDeletedDepositIds={setDeletedDepositIds} checkedOrders={checkedOrders} setCheckedOrders={setCheckedOrders} addressMapping={addressMapping} setAddressMapping={setAddressMapping} templateConfig={templateConfig} specialCustomers={specialCustomers} setSpecialCustomers={setSpecialCustomers} inventory={inventory} setInventory={setInventory} quickMessages={quickMessages} handleResetAllData={handleResetAllData} broadcastName={broadcastName} setGlobalError={setGlobalError} cashReceipts={cashReceipts} setCashReceipts={setCashReceipts} soundEnabled={soundEnabled} soundVolume={soundVolume} noShowCustomers={noShowCustomers} setNoShowCustomers={setNoShowCustomers} waitlistCustomers={waitlistCustomers} setWaitlistCustomers={setWaitlistCustomers} />
                         ) : (
                             <OrderManagementTab orders={orders} shippingOverrides={shippingOverrides} quickShipping={quickShipping} jejuShipping={jejuShipping} freeShippingThreshold={freeShippingThreshold} broadcastName={broadcastName} addresses={addresses} handleExportBackup={handleExportBackup} handleImportBackup={handleImportBackup} addressMapping={addressMapping} cardPayments={cardPayments} specialCustomers={specialCustomers} openModal={openModal} cashReceipts={cashReceipts} inventory={inventory} productHistory={productHistory} noShowCustomers={noShowCustomers} waitlistCustomers={waitlistCustomers} />
                         )}
