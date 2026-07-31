@@ -151,17 +151,23 @@
         const Modal = ({ isOpen, type, message, onConfirm, onCancel, initialValue }) => {
             const [inputValue, setInputValue] = useState(initialValue || '');
             const inputRef = useRef(null);
-            
-            useEffect(() => {
-                const handleKeyDown = (e) => {
-                    if (!isOpen) return;
-                    if (type !== 'confirm' && type !== 'alert') { if (e.key === 'Enter') onConfirm(inputValue); } 
-                    else { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); onConfirm(); } }
-                    if (e.key === 'Escape' && type !== 'alert') onCancel();
-                };
-                window.addEventListener('keydown', handleKeyDown); 
-                return () => window.removeEventListener('keydown', handleKeyDown);
-            }, [isOpen, type, inputValue, onConfirm, onCancel]);
+        const inputValueRef = useRef(inputValue);
+useEffect(() => { inputValueRef.current = inputValue; }, [inputValue]);
+
+useEffect(() => {
+    const handleKeyDown = (e) => {
+        if (!isOpen) return;
+        if (type !== 'confirm' && type !== 'alert') { 
+            if (e.key === 'Enter') onConfirm(inputValueRef.current); 
+        } else { 
+            if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); onConfirm(); } 
+        }
+        if (e.key === 'Escape' && type !== 'alert') onCancel();
+    };
+    window.addEventListener('keydown', handleKeyDown); 
+    return () => window.removeEventListener('keydown', handleKeyDown);
+}, [isOpen, type, onConfirm, onCancel]);    
+          
             
             useEffect(() => { if (isOpen && type === 'prompt' && inputRef.current) { setInputValue(initialValue || ''); setTimeout(() => inputRef.current.focus(), 100); } }, [isOpen, type, initialValue]);
             
@@ -200,20 +206,24 @@
             const handleKeyDown = useCallback((e) => {
                 if (isOpen && e.key === 'Escape') onClose();
             }, [isOpen, onClose]);
-
-            useEffect(() => {
+useEffect(() => {
                 window.addEventListener('keydown', handleKeyDown);
                 return () => window.removeEventListener('keydown', handleKeyDown);
             }, [handleKeyDown]);
 
+            // ✨ useMemo를 먼저 실행하고!
+            const filteredInventory = useMemo(() => {
+                const lowerSearchTerm = deferredSearchTerm.toLowerCase();
+                return (inventory || []).filter(i => 
+                    String(i.name).toLowerCase().includes(lowerSearchTerm)
+                );
+            }, [inventory, deferredSearchTerm]);
+
+            // ✨ 그 다음에 화면을 가리도록 (if문) 순서를 바꿨습니다.
             if (!isOpen) return null;
 
-            const filteredInventory = (inventory || []).filter(i => 
-                String(i.name).toLowerCase().includes(deferredSearchTerm.toLowerCase())
-            );
-
             const totalQty = Object.values(selectedItems).reduce((sum, qty) => sum + qty, 0);
-
+            
             const handleAdd = () => {
                 if (totalQty === 0) return;
                 Object.entries(selectedItems).forEach(([name, qty]) => {
@@ -971,22 +981,27 @@
             const productHistoryRef = useRef(productHistory);
             const clickedChatsRef = useRef(clickedChats);
 
+            const synthRef = useRef(null);
+            useEffect(() => {
+                try { synthRef.current = new Tone.Synth().toDestination(); } catch(e) {}
+                return () => { if (synthRef.current) { synthRef.current.dispose(); } };
+            }, []);
+
             const playCoinSound = useCallback(() => {
-                if (!soundEnabled || soundVolume === 0) return;
-                try { 
-                    const volDb = soundVolume === 100 ? 0 : 20 * Math.log10(soundVolume / 100);
-                    const synth = new Tone.Synth({ volume: volDb }).toDestination(); 
-                    synth.triggerAttackRelease("C6", "16n"); 
-                } catch(e){}
+                if (!soundEnabled || soundVolume === 0 || !synthRef.current) return;
+                try {
+                    synthRef.current.volume.value = soundVolume === 100 ? 0 : 20 * Math.log10(soundVolume / 100);
+                    synthRef.current.triggerAttackRelease("C6", "16n");
+                } catch(e) {}
             }, [soundEnabled, soundVolume]);
 
             const playBellSound = useCallback(() => {
-                if (!soundEnabled || soundVolume === 0) return;
-                try { 
-                    const volDb = soundVolume === 100 ? 0 : 20 * Math.log10(soundVolume / 100);
-                    const synth = new Tone.Synth({ volume: volDb }).toDestination(); 
-                    synth.triggerAttackRelease("E5", "8n"); setTimeout(() => synth.triggerAttackRelease("C5", "4n"), 150); 
-                } catch(e){}
+                if (!soundEnabled || soundVolume === 0 || !synthRef.current) return;
+                try {
+                    synthRef.current.volume.value = soundVolume === 100 ? 0 : 20 * Math.log10(soundVolume / 100);
+                    synthRef.current.triggerAttackRelease("E5", "8n");
+                    setTimeout(() => synthRef.current.triggerAttackRelease("C5", "4n"), 150);
+                } catch(e) {}
             }, [soundEnabled, soundVolume]);
 
             const prevDepCount = useRef(0);
@@ -1179,7 +1194,7 @@
                             lastChatRowRef.current = res.lastChatRow;
                         }
 
-                        // 1. 채팅
+                                // 1. 채팅
                         if (res.chats && Array.isArray(res.chats)) {
                             let chatRows = res.chats;
                             if (chatRows.length > 0 && chatRows[0].some(c => typeof c === 'string' && (c.includes('날짜') || c.includes('닉네임') || c.includes('내용')))) {
@@ -1192,12 +1207,19 @@
                                 if (row[1] && row[2]) { time = String(row[0] || ''); nickname = String(row[1] || ''); content = String(row[2] || ''); } 
                                 else { time = String(validCells[0] || ''); nickname = String(validCells[1] || ''); content = String(validCells[2] || ''); }
                                 nickname = nickname.replace(/@/g, '').trim();
-                                return { id: `c_${Date.now()}_${Math.random().toString(36).substr(2,9)}_${nickname}`, time, nickname, content };
+                                // 🚨 [수정됨] Math.random 대신 시간+닉네임+내용을 조합하여 고유 ID 생성 (중복 렌더링 원천 차단)
+                                return { id: `c_${time}_${nickname}_${content}`, time, nickname, content };
                             }).filter(c => c !== null && c.nickname && c.content);
                             
                             if(newChats.length > 0) {
                                 setChats(prevChats => {
-                                    const combined = [...newChats.reverse(), ...prevChats];
+                                    // 🚨 [수정됨] 기존 채팅 배열을 검사하여 동일한 ID의 채팅이 들어오면 무시합니다.
+                                    const existingIds = new Set(prevChats.map(c => c.id));
+                                    const uniqueNewChats = newChats.filter(c => !existingIds.has(c.id));
+                                    
+                                    if (uniqueNewChats.length === 0) return prevChats;
+                                    
+                                    const combined = [...uniqueNewChats.reverse(), ...prevChats];
                                     return combined.slice(0, 1000); 
                                 });
                                 statusMsg += `채팅(${newChats.length}) `; 
@@ -1205,7 +1227,6 @@
                                 statusMsg += `채팅(없음) `; 
                             }
                         } else { statusMsg += `채팅(연결실패) `; }
-
                         // 2. 입금
                         if (res.deposits && Array.isArray(res.deposits)) {
                             let depRows = res.deposits;
@@ -2333,7 +2354,7 @@
             );
         };
 
-        const OrderManagementTab = ({ orders, shippingOverrides, quickShipping, jejuShipping, freeShippingThreshold, broadcastName, addresses, handleExportBackup, handleImportBackup, addressMapping, cardPayments, specialCustomers, openModal, cashReceipts, inventory, productHistory }) => {
+        const OrderManagementTab = ({ orders, shippingOverrides, quickShipping, jejuShipping, freeShippingThreshold, broadcastName, addresses, handleExportBackup, handleImportBackup, addressMapping, cardPayments, specialCustomers, openModal, cashReceipts, inventory, productHistory, noShowCustomers, waitlistCustomers }) => {
             const findAddress = (nick) => {
                 if (!nick) return undefined;
                 const cleanNick = normalizeString(nick);
@@ -2417,25 +2438,36 @@
                     let cleanPhone = String(addrInfo.phone || '').replace(/[^0-9]/g, '');
                     if (cleanPhone.length === 10 && !cleanPhone.startsWith('0')) cleanPhone = '0' + cleanPhone;
 
-                    // ✨ 새로 추가된 VIP, 노쇼, 대기 판별 로직
+                    // 상태 확인
                     const isVip = specialCustomers && specialCustomers[normalizeString(nick)]?.type === 'vip';
                     const isNoShow = noShowCustomers && noShowCustomers[nick];
                     const isWaitlist = waitlistCustomers && waitlistCustomers[nick];
 
-                    const statusColumn = isCard ? "카드결제" : (hasCashReceipt ? "현금영수증" : (isPaid ? "완납" : (depositTotal > 0 ? `부분입금(미수 ${balance.toLocaleString()})` : `미입금(미수 ${balance.toLocaleString()})`)));
+                    // 💡 [수정됨] 입금상태 열 1개에 모든 상태를 텍스트로 합쳐서 출력
+                    let statusColumn = "";
+                    if (isNoShow) {
+                        statusColumn = "노쇼";
+                    } else if (isWaitlist) {
+                        statusColumn = "거파대기";
+                    } else if (hasCashReceipt) {
+                        statusColumn = "현금영수증";
+                    } else if (isCard) {
+                        statusColumn = "카드결제";
+                    } else if (isPaid) {
+                        statusColumn = "완납";
+                    } else {
+                        statusColumn = depositTotal > 0 ? `부분입금(미수 ${balance.toLocaleString()})` : `미입금(미수 ${balance.toLocaleString()})`;
+                    }
                     
                     const createRow = (productValue) => ({ 
                         '날짜시간': new Date().toLocaleString(), 
                         '입금상태': statusColumn, 
-                        '닉네임': nick, 
+                        '닉네임': isVip ? `[VIP] ${nick}` : nick, // 열을 추가하는 대신 닉네임 옆에 VIP 표기
                         '주문제품(수량)': productValue, 
                         '이름': addrInfo.realname || '', 
                         '핸드폰번호': cleanPhone, 
                         '주소': fullAddress, 
-                        '배송메모': addrInfo.memo || '',
-                        'VIP': isVip ? 'O' : '',
-                        '노쇼': isNoShow ? 'O' : '',
-                        '대기': isWaitlist ? 'O' : ''
+                        '배송메모': addrInfo.memo || ''
                     }); 
                     
                     excelRows.push(createRow(`[ ${nick} ]`)); items.forEach(item => { const qtyPart = item.quantity > 1 ? ` ★${item.quantity}개` : ''; excelRows.push(createRow(`${item.product}${qtyPart}`)); }); 
@@ -2444,6 +2476,7 @@
             };
 
             const handleExportAllMessages = () => {
+         
                 const groups = {}; orders.forEach(o => { if (!groups[o.customer]) groups[o.customer] = []; groups[o.customer].push(o); });
                 const templateConfigStr = localStorage.getItem(getLsKey('templateConfig'));
                 const templateConfigLocal = templateConfigStr ? JSON.parse(templateConfigStr) : { emoji: '💙', paidMsg: '😍 완납 확인! 감사합니다 😍', unpaidPrefix: '[미입금]\n총 입금하실 금액\n👉', overpaidMsg: '과납 금액이 있습니다.\n환불 또는 적립 여부를 알려주세요!', addrNotice: '※ 배송지 변경 시 채팅으로 변경할 주소를 남겨주세요!', surveyNotice: '방송마다 1회 하단의 주문서(배송지입력) 필수!!', alwaysRequestAddress: false };
@@ -2737,7 +2770,7 @@
                         {activeTab === 'live' ? (
                             <LiveTab orders={orders} setOrders={setOrders} productHistory={productHistory} setProductHistory={setProductHistory} quickShipping={quickShipping} jejuShipping={jejuShipping} freeShippingThreshold={freeShippingThreshold} shippingOverrides={shippingOverrides} setShippingOverrides={setShippingOverrides} bankAccount={bankAccount} googleScriptUrl={googleScriptUrl} chatSheetId={chatSheetId} depSheetId={depSheetId} addrSheetId={addrSheetId} masterSheetId={masterSheetId} addresses={addresses} setAddresses={setAddresses} cardPayments={cardPayments} setCardPayments={setCardPayments} manualDeposits={manualDeposits} setManualDeposits={setManualDeposits} matchedDeposits={matchedDeposits} setMatchedDeposits={setMatchedDeposits} depositLinks={depositLinks} setDepositLinks={setDepositLinks} depositorNames={depositorNames} setDepositorNames={setDepositorNames} clickedChats={clickedChats} setClickedChats={setClickedChats} openModal={openModal} keywords={keywords} setKeywords={setKeywords} sentAddressRequests={sentAddressRequests} setSentAddressRequests={setSentAddressRequests} deletedDepositIds={deletedDepositIds} setDeletedDepositIds={setDeletedDepositIds} checkedOrders={checkedOrders} setCheckedOrders={setCheckedOrders} addressMapping={addressMapping} setAddressMapping={setAddressMapping} templateConfig={templateConfig} specialCustomers={specialCustomers} setSpecialCustomers={setSpecialCustomers} inventory={inventory} setInventory={setInventory} quickMessages={quickMessages} handleResetAllData={handleResetAllData} broadcastName={broadcastName} setGlobalError={setGlobalError} cashReceipts={cashReceipts} setCashReceipts={setCashReceipts} soundEnabled={soundEnabled} soundVolume={soundVolume} depositLinks={depositLinks} setDepositLinks={setDepositLinks} noShowCustomers={noShowCustomers} setNoShowCustomers={setNoShowCustomers} waitlistCustomers={waitlistCustomers} setWaitlistCustomers={setWaitlistCustomers} />
                         ) : (
-                            <OrderManagementTab orders={orders} shippingOverrides={shippingOverrides} quickShipping={quickShipping} jejuShipping={jejuShipping} freeShippingThreshold={freeShippingThreshold} broadcastName={broadcastName} addresses={addresses} handleExportBackup={handleExportBackup} handleImportBackup={handleImportBackup} addressMapping={addressMapping} cardPayments={cardPayments} specialCustomers={specialCustomers} openModal={openModal} cashReceipts={cashReceipts} inventory={inventory} productHistory={productHistory} />
+                            <OrderManagementTab orders={orders} shippingOverrides={shippingOverrides} quickShipping={quickShipping} jejuShipping={jejuShipping} freeShippingThreshold={freeShippingThreshold} broadcastName={broadcastName} addresses={addresses} handleExportBackup={handleExportBackup} handleImportBackup={handleImportBackup} addressMapping={addressMapping} cardPayments={cardPayments} specialCustomers={specialCustomers} openModal={openModal} cashReceipts={cashReceipts} inventory={inventory} productHistory={productHistory} noShowCustomers={noShowCustomers} waitlistCustomers={waitlistCustomers} />
                         )}
                     </div>
 
