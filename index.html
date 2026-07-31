@@ -1001,16 +1001,17 @@ useEffect(() => {
             const [chatSearch, setChatSearch] = useState('');
             const deferredChatSearch = React.useDeferredValue(chatSearch);
             
+            const [keywordInput, setKeywordInput] = useState('');
+            
             const [filterStatus, setFilterStatus] = useState('all');
             const [expandedInventoryItem, setExpandedInventoryItem] = useState(null);
             
             const [multiAddNick, setMultiAddNick] = useState(null);
             
-            const [chats, setChats] = useState([]);
-            const lastChatRowRef = useRef(0);
+            const [chats, setChats] = useLocalStorage('savedChats', []);
+            const lastChatRowRef = useRef(parseInt(window.localStorage.getItem(getLsKey('lastChatRow'))) || 0);
             const [hiddenChatIds, setHiddenChatIds] = useState(() => { try { const s = localStorage.getItem(getLsKey('hiddenChatIds')); const p = JSON.parse(s); return Array.isArray(p) ? p : []; } catch(e){ return []; } });
             const [showKeywordOnly, setShowKeywordOnly] = useState(false);
-            const [keywordInput, setKeywordInput] = useState('');
 
             const [newInvName, setNewInvName] = useState('');
             const [newInvPrice, setNewInvPrice] = useState('');
@@ -1260,12 +1261,17 @@ useEffect(() => {
                     if (res && res.status === 'success') {
                         let statusMsg = "동기화: ";
 
-                        // 💡 백엔드에서 알려준 마지막 줄 번호로 갱신
+                        // 💡 백엔드 줄 번호 초기화 감지 (시트가 비워졌는지 확인)
+                        let isReset = false;
                         if (res.lastChatRow !== undefined) {
+                            if (res.lastChatRow < lastChatRowRef.current) {
+                                isReset = true; // 시트가 초기화됨을 감지
+                            }
                             lastChatRowRef.current = res.lastChatRow;
+                            window.localStorage.setItem(getLsKey('lastChatRow'), res.lastChatRow);
                         }
 
-                                // 1. 채팅
+                        // 1. 채팅
                         if (res.chats && Array.isArray(res.chats)) {
                             let chatRows = res.chats;
                             if (chatRows.length > 0 && chatRows[0].some(c => typeof c === 'string' && (c.includes('날짜') || c.includes('닉네임') || c.includes('내용')))) {
@@ -1281,18 +1287,24 @@ useEffect(() => {
                                 return { id: `c_${time}_${nickname}_${content}`, time, nickname, content };
                             }).filter(c => c !== null && c.nickname && c.content);
                             
-                            if(newChats.length > 0) {
+                            if (newChats.length > 0 || isReset) {
                                 setChats(prevChats => {
-                                    const existingIds = new Set(prevChats.map(c => c.id));
-                                    const uniqueNewChats = newChats.filter(c => !existingIds.has(c.id));
+                                    // 시트가 지워졌으면 기존 채팅 내역도 비움
+                                    let baseChats = isReset ? [] : prevChats;
+                                    if (newChats.length === 0) return baseChats;
                                     
-                                    if (uniqueNewChats.length === 0) return prevChats;
+                                    const combined = [...newChats.reverse(), ...baseChats];
                                     
-                                    // ✨ [수정됨] 새로 들어온 채팅(uniqueNewChats)을 역순으로 뒤집어서 상단에 추가 (가장 최신이 위로 오도록)
-                                    // 구글 시트에서는 오래된 것(위) -> 최신 것(아래) 순서로 들어옵니다.
-                                    // 프론트엔드에서는 최신 것(위) -> 오래된 것(아래) 순서로 보여줘야 합니다.
-                                    const combined = [...uniqueNewChats.reverse(), ...prevChats];
-                                    return combined.slice(0, 1000); 
+                                    // 완벽한 중복 제거 (Map 활용)
+                                    const deduplicatedMap = new Map();
+                                    combined.forEach(c => {
+                                        if (!deduplicatedMap.has(c.id)) {
+                                            deduplicatedMap.set(c.id, c);
+                                        }
+                                    });
+                                    
+                                    // 최대 1000개까지만 로컬에 저장
+                                    return Array.from(deduplicatedMap.values()).slice(0, 1000); 
                                 });
                                 statusMsg += `채팅(${newChats.length}) `; 
                             } else { 
@@ -2724,7 +2736,7 @@ useEffect(() => {
             const [orders, setOrders] = useLocalStorage('youtubeOrders', []);
             const [activeTab, setActiveTab] = useState('live');
             
-            const [googleScriptUrl, setGoogleScriptUrl] = useLocalStorage('googleScriptUrl', 'https://script.google.com/macros/s/AKfycbxXEa-gMKOGWXJjS_RjOZHhz7UwSVwF0WTjxjgsfIBOw3P_74JP3LNazBA2L-GQjvKo/exec');
+            const [googleScriptUrl, setGoogleScriptUrl] = useLocalStorage('googleScriptUrl', 'https://script.google.com/macros/s/AKfycbyKLkXw705MVTcjr02UqCDUDg-BKUTwgF3wKDzo2ZFoshofc8BSse838PfsKd7ShtuM/exec');
             const [chatSheetId, setChatSheetId] = useLocalStorage('chatSheetId', '199YCBXzInxmG8GforoRCNHNps21NhVIf9wHA6NXXhtg');
             const [depSheetId, setDepSheetId] = useLocalStorage('depSheetId', '14bx2HMd_NID3zQN-Hb0x0At2Qmti7-p1Zfx1ZadNScY');
             const [addrSheetId, setAddrSheetId] = useLocalStorage('addrSheetId', '1ywl4gRvswQpvIYtPVbSROzz7a5elbLieYhqMZmt191U');
@@ -2739,12 +2751,10 @@ useEffect(() => {
 
             useEffect(() => {
                 const currentUrl = window.localStorage.getItem(getLsKey('googleScriptUrl'));
-                if (!currentUrl || currentUrl === '""' || currentUrl === 'null' || !currentUrl.includes('AKfycbxXEa-gMKOGWXJjS_RjOZHhz7UwSVwF0WTjxjgsfIBOw3P_74JP3LNazBA2L-GQjvKo')) {
-                    setGoogleScriptUrl('https://script.google.com/macros/s/AKfycbxXEa-gMKOGWXJjS_RjOZHhz7UwSVwF0WTjxjgsfIBOw3P_74JP3LNazBA2L-GQjvKo/exec');
-                    setChatSheetId('199YCBXzInxmG8GforoRCNHNps21NhVIf9wHA6NXXhtg');
-                    setDepSheetId('14bx2HMd_NID3zQN-Hb0x0At2Qmti7-p1Zfx1ZadNScY');
-                    setAddrSheetId('1ywl4gRvswQpvIYtPVbSROzz7a5elbLieYhqMZmt191U');
-                    setMasterSheetId('1B8SBMX18_Px1CpRHuDTxqodqudiTrf6NfVoptjHtnGQ');
+                // 💡 [수정됨] 악성코드 같았던 강제 롤백 로직을 고쳤습니다!
+                // 기존(구버전) URL이 남아있거나 비어있으면 새로 배포하신 '제한 해제 버전 URL'로 업데이트합니다.
+                if (!currentUrl || currentUrl === '""' || currentUrl === 'null' || currentUrl.includes('AKfycbxXEa-gMKOGWXJjS_RjOZHhz7UwSVwF0WTjxjgsfIBOw3P_74JP3LNazBA2L-GQjvKo')) {
+                    setGoogleScriptUrl('https://script.google.com/macros/s/AKfycbyKLkXw705MVTcjr02UqCDUDg-BKUTwgF3wKDzo2ZFoshofc8BSse838PfsKd7ShtuM/exec');
                 }
             }, []);
 
@@ -2814,6 +2824,7 @@ useEffect(() => {
                     setOrders([]); setProductHistory({}); setShippingOverrides({}); setCardPayments({}); setMatchedDeposits(new Set()); setDepositLinks({}); setDepositorNames({}); setClickedChats(new Set());
                     setKeywords([]); setSentAddressRequests(new Set()); setDeletedDepositIds(new Set()); setCheckedOrders(new Set()); setAddressMapping({}); setCashReceipts({}); setInventory([]); setManualDeposits([]); localStorage.removeItem(getLsKey('ignoredAutoMatch'));
                     setNoShowCustomers({}); setWaitlistCustomers({});
+                    setChats([]); window.localStorage.removeItem(getLsKey('lastChatRow')); lastChatRowRef.current = 0;
                     
                     if (googleScriptUrl && masterSheetId) {
                         fetchGas(googleScriptUrl, { action: 'save_inventory', masterId: getCleanSheetId(masterSheetId), data: [] }).catch(()=>{});
