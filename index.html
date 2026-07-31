@@ -1278,18 +1278,19 @@ useEffect(() => {
                                 if (row[1] && row[2]) { time = String(row[0] || ''); nickname = String(row[1] || ''); content = String(row[2] || ''); } 
                                 else { time = String(validCells[0] || ''); nickname = String(validCells[1] || ''); content = String(validCells[2] || ''); }
                                 nickname = nickname.replace(/@/g, '').trim();
-                                // 🚨 [수정됨] Math.random 대신 시간+닉네임+내용을 조합하여 고유 ID 생성 (중복 렌더링 원천 차단)
                                 return { id: `c_${time}_${nickname}_${content}`, time, nickname, content };
                             }).filter(c => c !== null && c.nickname && c.content);
                             
                             if(newChats.length > 0) {
                                 setChats(prevChats => {
-                                    // 🚨 [수정됨] 기존 채팅 배열을 검사하여 동일한 ID의 채팅이 들어오면 무시합니다.
                                     const existingIds = new Set(prevChats.map(c => c.id));
                                     const uniqueNewChats = newChats.filter(c => !existingIds.has(c.id));
                                     
                                     if (uniqueNewChats.length === 0) return prevChats;
                                     
+                                    // ✨ [수정됨] 새로 들어온 채팅(uniqueNewChats)을 역순으로 뒤집어서 상단에 추가 (가장 최신이 위로 오도록)
+                                    // 구글 시트에서는 오래된 것(위) -> 최신 것(아래) 순서로 들어옵니다.
+                                    // 프론트엔드에서는 최신 것(위) -> 오래된 것(아래) 순서로 보여줘야 합니다.
                                     const combined = [...uniqueNewChats.reverse(), ...prevChats];
                                     return combined.slice(0, 1000); 
                                 });
@@ -2119,7 +2120,6 @@ useEffect(() => {
                 const latestMap = {};
                 addresses.forEach(a => {
                     const cleanNick = normalizeString(a.nickname);
-                    if (addressMapping[a.nickname] === '__UNMAPPED__' || addressMapping[cleanNick] === '__UNMAPPED__') return;
                     const ts = parseSafeDate(a.timestamp).getTime();
                     if (!latestMap[cleanNick] || ts > parseSafeDate(latestMap[cleanNick].timestamp).getTime()) latestMap[cleanNick] = a;
                 });
