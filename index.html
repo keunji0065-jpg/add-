@@ -435,12 +435,22 @@ useEffect(() => {
             };
             
             const handleRemove = (key) => {
+                const targetNick = specialCustomers[key]?.originalName || key;
                 setSpecialCustomers(prev => { 
                     const next = {...prev}; 
                     delete next[key]; 
                     return next; 
                 });
-                // 삭제 시 시트에서도 지우는 로직이 필요하다면 추가 구현 필요 (현재는 프론트엔드 상태만 제거)
+                
+                if (googleScriptUrl && masterSheetId) {
+                    try {
+                        const payload = {
+                            nickname: targetNick,
+                            type: '' // 빈 값으로 보내서 상태 해제
+                        };
+                        fetchGas(googleScriptUrl, { action: 'save_customer_management', masterId: getCleanSheetId(masterSheetId), data: payload }).catch(()=>{});
+                    } catch (err) {}
+                }
             };
             
             return (
@@ -1392,6 +1402,34 @@ useEffect(() => {
                             }
                         }
 
+                        // 6. 통합 관리대장(고객상태) 데이터 읽기
+                        if (res.customerDb && Array.isArray(res.customerDb)) {
+                            setSpecialCustomers(prev => {
+                                const serverData = {};
+                                let isChanged = false;
+                                res.customerDb.forEach(row => {
+                                    const nick = String(row['닉네임'] || '').trim();
+                                    const status = String(row['고객상태'] || '').trim();
+                                    const ts = row['저장시간'] || '';
+                                    if (nick && (status === 'vip' || status === 'noshow' || status === 'manager')) {
+                                        const norm = normalizeString(nick);
+                                        serverData[norm] = { type: status, originalName: nick, timestamp: ts };
+                                    }
+                                });
+                                
+                                if (Object.keys(prev).length !== Object.keys(serverData).length) {
+                                    isChanged = true;
+                                } else {
+                                    for (let key in serverData) {
+                                        if (!prev[key] || prev[key].type !== serverData[key].type) {
+                                            isChanged = true; break;
+                                        }
+                                    }
+                                }
+                                return isChanged ? serverData : prev;
+                            });
+                        }
+
                         setSyncStatus(prev => prev === statusMsg ? prev : statusMsg);
                         setGlobalError('');
                     } else { 
@@ -1400,7 +1438,7 @@ useEffect(() => {
                 } catch(e) { 
                     setSyncStatus(prev => prev === "네트워크 에러 발생" ? prev : "네트워크 에러 발생"); 
                 }
-            }, [googleScriptUrl, chatSheetId, depSheetId, addrSheetId, masterSheetId, setAddresses, setInventory, setGlobalError, playCoinSound, playBellSound]);
+            }, [googleScriptUrl, chatSheetId, depSheetId, addrSheetId, masterSheetId, setAddresses, setInventory, setSpecialCustomers, setGlobalError, playCoinSound, playBellSound]);
             // 비동기식 폴링으로 변경 (이전 요청이 끝난 후 5초 대기)
             useEffect(() => { 
                 let isMounted = true;
