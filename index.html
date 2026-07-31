@@ -388,40 +388,100 @@ useEffect(() => {
             </div>
         );
 
-        const VipModal = ({ isOpen, onClose, specialCustomers, setSpecialCustomers }) => {
-            const [newVip, setNewVip] = useState('');
+        const CustomerStatusModal = ({ isOpen, onClose, specialCustomers, setSpecialCustomers, googleScriptUrl, masterSheetId, openModal }) => {
+            const [newNick, setNewNick] = useState('');
+            const [newStatus, setNewStatus] = useState('vip');
+            
             if (!isOpen) return null;
             
-            const handleAdd = (e) => {
+            const handleAdd = async (e) => {
                 e.preventDefault();
-                if(!newVip.trim()) return;
-                const norm = normalizeString(newVip);
-                setSpecialCustomers(prev => ({...prev, [norm]: { type: 'vip', originalName: newVip.trim() }}));
-                setNewVip('');
+                if(!newNick.trim()) return;
+                const norm = normalizeString(newNick);
+                const currentTime = new Date().toISOString();
+                
+                setSpecialCustomers(prev => ({
+                    ...prev, 
+                    [norm]: { type: newStatus, originalName: newNick.trim(), timestamp: currentTime }
+                }));
+                
+                if (googleScriptUrl && masterSheetId) {
+                    try {
+                        const payload = {
+                            nickname: newNick.trim(),
+                            type: newStatus // 스크립트의 targetType 변수에 맞춤
+                        };
+                        // 구글 시트에 상태 저장 (앱스 스크립트의 save_customer_management 액션 호출)
+                        fetchGas(googleScriptUrl, { action: 'save_customer_management', masterId: getCleanSheetId(masterSheetId), data: payload }).catch(()=>{});
+                    } catch (err) {
+                        console.error("고객 상태 동기화 실패:", err);
+                    }
+                }
+                
+                setNewNick('');
             };
+            
             const handleRemove = (key) => {
-                setSpecialCustomers(prev => { const next = {...prev}; delete next[key]; return next; });
+                setSpecialCustomers(prev => { 
+                    const next = {...prev}; 
+                    delete next[key]; 
+                    return next; 
+                });
+                // 삭제 시 시트에서도 지우는 로직이 필요하다면 추가 구현 필요 (현재는 프론트엔드 상태만 제거)
             };
             
             return (
                 <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-[9999] animate-pop" onClick={onClose}>
-                    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 w-full max-w-sm mx-4" onClick={e => e.stopPropagation()}>
+                    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 w-full max-w-md mx-4" onClick={e => e.stopPropagation()}>
                         <div className="mb-4 border-b dark:border-slate-700 pb-3 flex justify-between items-center">
-                            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2"><Icon name="crown" weight="fill" className="text-amber-500" /> VIP 관리대장</h3>
+                            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2"><Icon name="users-three" weight="fill" className="text-blue-500" /> 통합 고객상태 관리대장</h3>
                             <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><Icon name="x" weight="bold" size={20}/></button>
                         </div>
                         <form onSubmit={handleAdd} className="flex gap-2 mb-4">
-                            <input type="text" value={newVip} onChange={e=>setNewVip(e.target.value)} placeholder="VIP 닉네임 입력" className="flex-1 border dark:border-slate-600 rounded px-3 py-2 text-sm bg-slate-50 dark:bg-slate-900 dark:text-slate-100 outline-none" autoFocus />
-                            <button type="submit" className="bg-slate-700 text-white px-3 py-2 rounded text-sm font-bold whitespace-nowrap shadow-sm hover:bg-slate-800">추가</button>
+                            <select 
+                                value={newStatus} 
+                                onChange={(e) => setNewStatus(e.target.value)}
+                                className="border dark:border-slate-600 rounded px-2 py-2 text-sm bg-slate-50 dark:bg-slate-900 dark:text-slate-100 outline-none font-bold"
+                            >
+                                <option value="vip">👑 VIP</option>
+                                <option value="noshow">🚫 노쇼</option>
+                                <option value="manager">🛡️ 관리자</option>
+                            </select>
+                            <input type="text" value={newNick} onChange={e=>setNewNick(e.target.value)} placeholder="닉네임 입력" className="flex-1 border dark:border-slate-600 rounded px-3 py-2 text-sm bg-slate-50 dark:bg-slate-900 dark:text-slate-100 outline-none" autoFocus />
+                            <button type="submit" className="bg-slate-700 text-white px-3 py-2 rounded text-sm font-bold whitespace-nowrap shadow-sm hover:bg-slate-800">등록</button>
                         </form>
-                        <div className="max-h-60 overflow-y-auto space-y-1">
-                            {Object.entries(specialCustomers || {}).map(([key, val]) => (
-                                <div key={key} className="flex justify-between items-center bg-slate-50 dark:bg-slate-700/50 p-2 rounded border dark:border-slate-600">
-                                    <span className="font-bold text-sm text-slate-800 dark:text-slate-200">{val.originalName || key}</span>
-                                    <button onClick={()=>handleRemove(key)} className="text-red-500 hover:text-red-700 text-xs font-bold px-2 py-1 bg-red-50 dark:bg-red-900/30 rounded transition-colors">삭제</button>
-                                </div>
-                            ))}
-                            {Object.keys(specialCustomers || {}).length === 0 && <div className="text-center text-slate-500 text-sm py-4">등록된 VIP가 없습니다.</div>}
+                        <div className="max-h-80 overflow-y-auto space-y-1 pr-1">
+                            {Object.entries(specialCustomers || {}).map(([key, val]) => {
+                                let statusIcon = <Icon name="crown" weight="fill" className="text-amber-500 mr-1" />;
+                                let statusLabel = "VIP";
+                                let bgClass = "bg-amber-50 dark:bg-amber-900/10";
+                                
+                                if (val.type === 'noshow') {
+                                    statusIcon = <Icon name="user-minus" weight="fill" className="text-red-500 mr-1" />;
+                                    statusLabel = "노쇼";
+                                    bgClass = "bg-red-50 dark:bg-red-900/10";
+                                } else if (val.type === 'manager') {
+                                    statusIcon = <Icon name="shield-check" weight="fill" className="text-blue-500 mr-1" />;
+                                    statusLabel = "관리자";
+                                    bgClass = "bg-blue-50 dark:bg-blue-900/10";
+                                }
+
+                                return (
+                                    <div key={key} className={`flex justify-between items-center ${bgClass} p-2 rounded border dark:border-slate-600`}>
+                                        <div className="flex flex-col min-w-0 pr-2">
+                                            <div className="flex items-center">
+                                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-white dark:bg-slate-700 border dark:border-slate-600 shadow-sm mr-2 flex items-center">
+                                                    {statusIcon} {statusLabel}
+                                                </span>
+                                                <span className="font-bold text-sm text-slate-800 dark:text-slate-200 truncate">{val.originalName || key}</span>
+                                            </div>
+                                            {val.timestamp && <span className="text-[9px] text-slate-400 mt-0.5 pl-1">{formatTimeOnly(val.timestamp)} 등록</span>}
+                                        </div>
+                                        <button onClick={()=>handleRemove(key)} className="text-red-500 hover:text-red-700 text-xs font-bold px-2 py-1 bg-white dark:bg-slate-800 rounded transition-colors shadow-sm shrink-0 border border-red-100 dark:border-red-900/30">삭제</button>
+                                    </div>
+                                );
+                            })}
+                            {Object.keys(specialCustomers || {}).length === 0 && <div className="text-center text-slate-500 text-sm py-8 bg-slate-50 dark:bg-slate-800/50 rounded border border-dashed dark:border-slate-600">등록된 고객상태가 없습니다.</div>}
                         </div>
                     </div>
                 </div>
@@ -1553,7 +1613,7 @@ useEffect(() => {
             const renderChatContent = useCallback((content, keywordsArr) => {
                 const safeContent = String(content || ''); if (!keywordsArr || keywordsArr.length === 0) return safeContent; const kwArray = keywordsArr.filter(k => k.trim()); if (!kwArray.length) return safeContent;
                 const pattern = new RegExp(`(${kwArray.map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'gi');
-                return safeContent.split(pattern).map((part, i) => kwArray.includes(part) ? <span key={i} className="text-slate-700 dark:text-slate-300 font-bold bg-slate-200 dark:bg-slate-600 px-0.5 rounded">{part}</span> : part);
+                return safeContent.split(pattern).map((part, i) => kwArray.includes(part) ? <span key={i} className="text-blue-600 dark:text-blue-400 font-black bg-blue-50 dark:bg-blue-900/30 px-1 py-0.5 rounded shadow-sm">{part}</span> : part);
             }, []);
 
             const handleChatClick = (chat) => { bringToTopAndScroll(chat.nickname); setClickedChats(prev => new Set(prev).add(chat.id)); const finalProduct = (isFixedProductMode && manualProduct.trim() !== '') ? manualProduct.trim() : String(chat.content || ''); const finalPrice = isFixedProductMode ? manualPrice : null; addOrderLogic(chat.nickname, finalProduct, 1, true, null, finalPrice, isFixedProductMode, true); };
@@ -1905,7 +1965,32 @@ useEffect(() => {
                 });
             }, [setCheckedOrders, setOrders, setInventory, setProductHistory, saveInventoryToServer]);
 
-            const handleManualSubmit = (e) => { e.preventDefault(); if(!manualNick.trim()) return openModal("닉네임을 입력해주세요.", 'alert'); addOrderLogic(manualNick, manualProduct, 1, false, null, manualPrice, true); setManualNick(''); if (!isFixedProductMode) { setManualProduct(''); setManualPrice(''); } };
+            const handleManualSubmit = (e) => { 
+                e.preventDefault(); 
+                const cleanProduct = String(manualProduct).trim();
+                
+                if(!manualNick.trim()) {
+                    if(!cleanProduct) return openModal("닉네임 또는 상품명을 입력해주세요.", 'alert');
+                    const priceNum = Number(String(manualPrice).replace(/,/g, '')) || 0;
+                    
+                    if(inventory.some(i => i.name === cleanProduct)) return openModal("이미 등록된 상품명입니다.", "alert");
+                    
+                    setInventory(prev => {
+                        const newInv = [{ id: `inv_${Date.now()}_${Math.random()}`, name: cleanProduct, price: priceNum, stock: '', isSoldOut: false }, ...prev];
+                        saveInventoryToServer(newInv);
+                        return newInv;
+                    });
+                    
+                    if(priceNum > 0) setProductHistory(prev => ({...prev, [cleanProduct]: priceNum}));
+                    
+                    if (!isFixedProductMode) { setManualProduct(''); setManualPrice(''); }
+                    return; // 재고 등록 후 종료
+                }
+                
+                addOrderLogic(manualNick, manualProduct, 1, false, null, manualPrice, true); 
+                setManualNick(''); 
+                if (!isFixedProductMode) { setManualProduct(''); setManualPrice(''); } 
+            };
             
             const handleDepositClick = (dep, forceAction = null) => {
                 const isUsed = matchedDeposits?.has(dep.id);
@@ -2147,9 +2232,16 @@ useEffect(() => {
                             {filteredChats.map(c => {
                                 const safeContent = String(c.content || ''); const isMatched = (keywords || []).some(k => safeContent.includes(k)); const isProcessed = clickedChats?.has(c.id);
                                 const chatClasses = isProcessed ? 'opacity-80 bg-slate-100 dark:bg-slate-800/80 border-transparent' : (isMatched ? 'bg-slate-100 dark:bg-slate-800 border-slate-400 dark:border-slate-600 ring-1 ring-slate-400 dark:ring-slate-600 shadow-sm' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700');
+                                
+                                const custStatus = specialCustomers[normalizeString(c.nickname)]?.type;
+                                let statusBadge = null;
+                                if (custStatus === 'vip') statusBadge = <span className="text-[9px] bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400 px-1 py-0.5 rounded flex items-center gap-0.5 shrink-0"><Icon name="crown" weight="fill"/> VIP</span>;
+                                else if (custStatus === 'noshow') statusBadge = <span className="text-[9px] bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 px-1 py-0.5 rounded flex items-center gap-0.5 shrink-0"><Icon name="user-minus" weight="fill"/> 노쇼</span>;
+                                else if (custStatus === 'manager') statusBadge = <span className="text-[9px] bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 px-1 py-0.5 rounded flex items-center gap-0.5 shrink-0"><Icon name="shield-check" weight="fill"/> 관리자</span>;
+
                                 return (
                                     <div key={c.id} onClick={() => handleChatClick(c)} className={`py-1.5 px-2 border rounded cursor-pointer transition-all flex flex-col gap-1 ${chatClasses}`}>
-                                        <div className="flex justify-between items-start"><span className={`flex items-center gap-1 break-all text-[12px] font-bold ${isProcessed ? 'text-slate-400 dark:text-slate-500' : 'text-slate-800 dark:text-slate-200'}`}>{c.nickname}</span><span className="text-[10px] text-slate-400 dark:text-slate-500 shrink-0 mt-0.5">{formatTimeOnly(c.time)}</span></div>
+                                        <div className="flex justify-between items-start"><span className={`flex items-center gap-1 break-all text-[12px] font-bold ${isProcessed ? 'text-slate-400 dark:text-slate-500' : 'text-slate-800 dark:text-slate-200'}`}>{c.nickname} {statusBadge}</span><span className="text-[10px] text-slate-400 dark:text-slate-500 shrink-0 mt-0.5">{formatTimeOnly(c.time)}</span></div>
                                         <div className={`text-[12px] font-medium leading-snug break-all pl-1 ${isProcessed ? 'text-slate-400 dark:text-slate-500' : 'text-slate-700 dark:text-slate-300'}`}>{renderChatContent(safeContent, keywords || [])}</div>
                                     </div>
                                 );
@@ -2642,7 +2734,7 @@ useEffect(() => {
             const [globalError, setGlobalError] = useState('');
             const [modalConfig, setModalConfig] = useState({ isOpen: false, type: 'alert', message: '', onConfirm: null, onCancel: null, initialValue: '' });
             const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-            const [isVipModalOpen, setIsVipModalOpen] = useState(false);
+            const [isStatusModalOpen, setIsStatusModalOpen] = useState(false); // VIP 모달 상태를 통합 관리 모달 상태로 변경
 
             useEffect(() => {
                 if (isDarkMode) document.documentElement.classList.add('dark');
@@ -2758,7 +2850,7 @@ useEffect(() => {
                         </div>
                         <div className="flex items-center gap-2">
                             <button onClick={() => setSoundEnabled(!soundEnabled)} className={`p-2 rounded-full transition-colors flex items-center justify-center border shadow-sm ${soundEnabled ? 'bg-blue-50 border-blue-200 text-blue-600 dark:bg-blue-900/30 dark:border-blue-700/50 dark:text-blue-400' : 'bg-slate-100 border-slate-200 text-slate-400 dark:bg-slate-800 dark:border-slate-700'}`} title={soundEnabled ? "알림음 켜짐" : "알림음 꺼짐"}><Icon name={soundEnabled ? "speaker-high" : "speaker-slash"} weight="fill" size={18} /></button>
-                            <button onClick={() => setIsVipModalOpen(true)} className="p-2 bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800/50 hover:bg-amber-100 dark:hover:bg-amber-900/40 rounded-full transition-colors flex items-center justify-center shadow-sm" title="VIP 관리"><Icon name="crown" weight="fill" size={18} /></button>
+                            <button onClick={() => setIsStatusModalOpen(true)} className="p-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800/50 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded-full transition-colors flex items-center justify-center shadow-sm" title="통합 고객상태 관리 (VIP, 노쇼, 관리자)"><Icon name="users-three" weight="fill" size={18} /></button>
                             <button onClick={() => setIsSettingsOpen(!isSettingsOpen)} className="p-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full transition-colors flex items-center justify-center shadow-sm" title="환경설정"><Icon name="gear" weight="fill" size={18} /></button>
                             <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full transition-colors flex items-center justify-center shadow-sm" title={isDarkMode ? "라이트 모드로 전환" : "다크 모드로 전환"}><Icon name={isDarkMode ? "sun" : "moon"} weight="fill" size={18} /></button>
                         </div>
@@ -2775,7 +2867,7 @@ useEffect(() => {
                     </div>
 
                     <Modal isOpen={modalConfig.isOpen} type={modalConfig.type} message={modalConfig.message} onConfirm={modalConfig.onConfirm} onCancel={modalConfig.onCancel} initialValue={modalConfig.initialValue} />
-                    <VipModal isOpen={isVipModalOpen} onClose={() => setIsVipModalOpen(false)} specialCustomers={specialCustomers} setSpecialCustomers={setSpecialCustomers} />
+                    <CustomerStatusModal isOpen={isStatusModalOpen} onClose={() => setIsStatusModalOpen(false)} specialCustomers={specialCustomers} setSpecialCustomers={setSpecialCustomers} googleScriptUrl={googleScriptUrl} masterSheetId={masterSheetId} openModal={openModal} />
                 </div>
             );
         };
