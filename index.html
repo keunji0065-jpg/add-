@@ -118,6 +118,19 @@
             return new Date(0);
         };
 
+        const formatTimeOnly = (val) => { 
+            if (!val) return ''; const strVal = String(val); const dt = new Date(strVal.replace(/-/g, '/'));
+            if (!isNaN(dt) && strVal.length > 8) return dt.toLocaleTimeString('ko-KR', {hour12: false, hour:'2-digit', minute:'2-digit'});
+            const timeMatch = strVal.match(/(\d{1,2}):(\d{2})/);
+            if (timeMatch) {
+                let hour = parseInt(timeMatch[1], 10);
+                if ((strVal.includes('오후') || strVal.toUpperCase().includes('PM')) && hour < 12) hour += 12;
+                else if ((strVal.includes('오전') || strVal.toUpperCase().includes('AM')) && hour === 12) hour = 0;
+                return `${String(hour).padStart(2, '0')}:${timeMatch[2]}`;
+            }
+            return strVal; 
+        };
+
         const fetchGas = async (url, payload = null) => {
             const options = { method: payload ? 'POST' : 'GET', redirect: "follow" };
             if (payload) {
@@ -1223,19 +1236,6 @@ useEffect(() => {
                 }
                 return results;
             }, [addresses]);
-
-            const formatTimeOnly = useCallback((val) => { 
-                if (!val) return ''; const strVal = String(val); const dt = new Date(strVal.replace(/-/g, '/'));
-                if (!isNaN(dt) && strVal.length > 8) return dt.toLocaleTimeString('ko-KR', {hour12: false, hour:'2-digit', minute:'2-digit'});
-                const timeMatch = strVal.match(/(\d{1,2}):(\d{2})/);
-                if (timeMatch) {
-                    let hour = parseInt(timeMatch[1], 10);
-                    if ((strVal.includes('오후') || strVal.toUpperCase().includes('PM')) && hour < 12) hour += 12;
-                    else if ((strVal.includes('오전') || strVal.toUpperCase().includes('AM')) && hour === 12) hour = 0;
-                    return `${String(hour).padStart(2, '0')}:${timeMatch[2]}`;
-                }
-                return strVal; 
-            }, []);
 
          const fetchAllData = useCallback(async () => {
                 if (!googleScriptUrl) { 
@@ -2676,7 +2676,7 @@ useEffect(() => {
             const [orders, setOrders] = useLocalStorage('youtubeOrders', []);
             const [activeTab, setActiveTab] = useState('live');
             
-            const [googleScriptUrl, setGoogleScriptUrl] = useLocalStorage('googleScriptUrl', 'https://script.google.com/macros/s/AKfycby2xxo0OOEVYuGAEKK5-4fO_WZiqtoD7iNAPzq9VWqefOJY8ebFAP9fQ0qOaZQgsZzW/exec');
+            const [googleScriptUrl, setGoogleScriptUrl] = useLocalStorage('googleScriptUrl', 'https://script.google.com/macros/s/AKfycbxXEa-gMKOGWXJjS_RjOZHhz7UwSVwF0WTjxjgsfIBOw3P_74JP3LNazBA2L-GQjvKo/exec');
             const [chatSheetId, setChatSheetId] = useLocalStorage('chatSheetId', '199YCBXzInxmG8GforoRCNHNps21NhVIf9wHA6NXXhtg');
             const [depSheetId, setDepSheetId] = useLocalStorage('depSheetId', '14bx2HMd_NID3zQN-Hb0x0At2Qmti7-p1Zfx1ZadNScY');
             const [addrSheetId, setAddrSheetId] = useLocalStorage('addrSheetId', '1ywl4gRvswQpvIYtPVbSROzz7a5elbLieYhqMZmt191U');
@@ -2691,8 +2691,8 @@ useEffect(() => {
 
             useEffect(() => {
                 const currentUrl = window.localStorage.getItem(getLsKey('googleScriptUrl'));
-                if (!currentUrl || currentUrl === '""' || currentUrl === 'null' || !currentUrl.includes('AKfycby2xxo0OOEVYuGAEKK5-4fO_WZiqtoD7iNAPzq9VWqefOJY8ebFAP9fQ0qOaZQgsZzW')) {
-                    setGoogleScriptUrl('https://script.google.com/macros/s/AKfycby2xxo0OOEVYuGAEKK5-4fO_WZiqtoD7iNAPzq9VWqefOJY8ebFAP9fQ0qOaZQgsZzW/exec');
+                if (!currentUrl || currentUrl === '""' || currentUrl === 'null' || !currentUrl.includes('AKfycbxXEa-gMKOGWXJjS_RjOZHhz7UwSVwF0WTjxjgsfIBOw3P_74JP3LNazBA2L-GQjvKo')) {
+                    setGoogleScriptUrl('https://script.google.com/macros/s/AKfycbxXEa-gMKOGWXJjS_RjOZHhz7UwSVwF0WTjxjgsfIBOw3P_74JP3LNazBA2L-GQjvKo/exec');
                     setChatSheetId('199YCBXzInxmG8GforoRCNHNps21NhVIf9wHA6NXXhtg');
                     setDepSheetId('14bx2HMd_NID3zQN-Hb0x0At2Qmti7-p1Zfx1ZadNScY');
                     setAddrSheetId('1ywl4gRvswQpvIYtPVbSROzz7a5elbLieYhqMZmt191U');
