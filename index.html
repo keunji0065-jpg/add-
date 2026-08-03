@@ -1009,6 +1009,9 @@ useEffect(() => {
             const [multiAddNick, setMultiAddNick] = useState(null);
             
             const [chats, setChats] = useLocalStorage('savedChats', []);
+            const chatsRef = useRef(chats);
+            useEffect(() => { chatsRef.current = chats; }, [chats]);
+            
             const lastChatRowRef = useRef(parseInt(window.localStorage.getItem(getLsKey('lastChatRow'))) || 0);
             const [hiddenChatIds, setHiddenChatIds] = useState(() => { try { const s = localStorage.getItem(getLsKey('hiddenChatIds')); const p = JSON.parse(s); return Array.isArray(p) ? p : []; } catch(e){ return []; } });
             const [showKeywordOnly, setShowKeywordOnly] = useState(false);
@@ -1254,8 +1257,9 @@ useEffect(() => {
                     return; 
                 }
                 try {
-                    // 💡 URL 끝에 &lastChatRow 파라미터를 추가해서 내가 안 읽은 부분만 요청합니다.
-                    const fetchUrl = `${googleScriptUrl}?action=get_all&chatId=${getCleanSheetId(chatSheetId)}&depId=${getCleanSheetId(depSheetId)}&addrId=${getCleanSheetId(addrSheetId)}&masterId=${getCleanSheetId(masterSheetId)}&lastChatRow=${lastChatRowRef.current}&t=${Date.now()}`;
+                    // 💡 [버그 완벽 수정] 화면에 채팅이 0개라면 무조건 0번 줄부터 다시 싹 긁어오도록 강제 리셋합니다.
+                    const effectiveLastRow = chatsRef.current.length === 0 ? 0 : lastChatRowRef.current;
+                    const fetchUrl = `${googleScriptUrl}?action=get_all&chatId=${getCleanSheetId(chatSheetId)}&depId=${getCleanSheetId(depSheetId)}&addrId=${getCleanSheetId(addrSheetId)}&masterId=${getCleanSheetId(masterSheetId)}&lastChatRow=${effectiveLastRow}&t=${Date.now()}`;
                     const res = await fetchGas(fetchUrl);
                     
                     if (res && res.status === 'success') {
@@ -1264,7 +1268,7 @@ useEffect(() => {
                         // 💡 백엔드 줄 번호 초기화 감지 (시트가 비워졌는지 확인)
                         let isReset = false;
                         if (res.lastChatRow !== undefined) {
-                            if (res.lastChatRow < lastChatRowRef.current) {
+                            if (res.lastChatRow < effectiveLastRow) {
                                 isReset = true; // 시트가 초기화됨을 감지
                             }
                             lastChatRowRef.current = res.lastChatRow;
@@ -1284,7 +1288,10 @@ useEffect(() => {
                                 if (row[1] && row[2]) { time = String(row[0] || ''); nickname = String(row[1] || ''); content = String(row[2] || ''); } 
                                 else { time = String(validCells[0] || ''); nickname = String(validCells[1] || ''); content = String(validCells[2] || ''); }
                                 nickname = nickname.replace(/@/g, '').trim();
-                                return { id: `c_${time}_${nickname}_${content}`, time, nickname, content };
+                                
+                                // 💡 [수정] 날짜 포맷 변형으로 인한 중복 도배를 완벽 방지하는 고유 ID 생성
+                                const ts = new Date(String(time).replace(/-/g, '/')).getTime() || time;
+                                return { id: `c_${ts}_${nickname}_${content}`, time, nickname, content };
                             }).filter(c => c !== null && c.nickname && c.content);
                             
                             if (newChats.length > 0 || isReset) {
