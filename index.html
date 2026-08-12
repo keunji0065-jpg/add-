@@ -1281,31 +1281,29 @@ useEffect(() => {
                 return results;
             }, [addresses]);
 
-         const fetchAllData = useCallback(async () => {
+            const fetchAllData = useCallback(async (isHeavyFetch = true) => {
                 if (!googleScriptUrl) { 
                     setSyncStatus(prev => prev === "설정 ⚙️: 통합 앱스 스크립트 URL을 입력하세요!" ? prev : "설정 ⚙️: 통합 앱스 스크립트 URL을 입력하세요!"); 
                     return; 
                 }
                 try {
-                    // 💡 [버그 완벽 수정] 화면에 채팅이 0개라면 무조건 0번 줄부터 다시 싹 긁어오도록 강제 리셋합니다.
                     const effectiveLastRow = chatsRef.current.length === 0 ? 0 : lastChatRowRef.current;
-                    const fetchUrl = `${googleScriptUrl}?action=get_all&chatId=${getCleanSheetId(chatSheetId)}&depId=${getCleanSheetId(depSheetId)}&addrId=${getCleanSheetId(addrSheetId)}&masterId=${getCleanSheetId(masterSheetId)}&lastChatRow=${effectiveLastRow}&t=${Date.now()}`;
+                    // ✨ skipHeavy 파라미터 추가 (isHeavyFetch가 false면 무거운 데이터는 스킵하라는 신호 전달)
+                    const fetchUrl = `${googleScriptUrl}?action=get_all&chatId=${getCleanSheetId(chatSheetId)}&depId=${getCleanSheetId(depSheetId)}&addrId=${getCleanSheetId(addrSheetId)}&masterId=${getCleanSheetId(masterSheetId)}&lastChatRow=${effectiveLastRow}&skipHeavy=${!isHeavyFetch}&t=${Date.now()}`;
                     const res = await fetchGas(fetchUrl);
                     
                     if (res && res.status === 'success') {
                         let statusMsg = "동기화: ";
 
-                        // 💡 백엔드 줄 번호 초기화 감지 (시트가 비워졌는지 확인)
                         let isReset = false;
                         if (res.lastChatRow !== undefined) {
                             if (res.lastChatRow < effectiveLastRow) {
-                                isReset = true; // 시트가 초기화됨을 감지
+                                isReset = true; 
                             }
                             lastChatRowRef.current = res.lastChatRow;
                             window.localStorage.setItem(getLsKey('lastChatRow'), res.lastChatRow);
                         }
 
-                        // 1. 채팅
                         if (res.chats && Array.isArray(res.chats)) {
                             let chatRows = res.chats;
                             if (chatRows.length > 0 && chatRows[0].some(c => typeof c === 'string' && (c.includes('날짜') || c.includes('닉네임') || c.includes('내용')))) {
@@ -1319,20 +1317,17 @@ useEffect(() => {
                                 else { time = String(validCells[0] || ''); nickname = String(validCells[1] || ''); content = String(validCells[2] || ''); }
                                 nickname = nickname.replace(/@/g, '').trim();
                                 
-                                // 💡 [수정] 날짜 포맷 변형으로 인한 중복 도배를 완벽 방지하는 고유 ID 생성
                                 const ts = new Date(String(time).replace(/-/g, '/')).getTime() || time;
                                 return { id: `c_${ts}_${nickname}_${content}`, time, nickname, content };
                             }).filter(c => c !== null && c.nickname && c.content);
                             
                             if (newChats.length > 0 || isReset) {
                                 setChats(prevChats => {
-                                    // 시트가 지워졌으면 기존 채팅 내역도 비움
                                     let baseChats = isReset ? [] : prevChats;
                                     if (newChats.length === 0) return baseChats;
                                     
                                     const combined = [...newChats.reverse(), ...baseChats];
                                     
-                                    // 완벽한 중복 제거 (Map 활용)
                                     const deduplicatedMap = new Map();
                                     combined.forEach(c => {
                                         if (!deduplicatedMap.has(c.id)) {
@@ -1340,7 +1335,6 @@ useEffect(() => {
                                         }
                                     });
                                     
-                                    // 최대 1000개까지만 로컬에 저장
                                     return Array.from(deduplicatedMap.values()).slice(0, 1000); 
                                 });
                                 statusMsg += `채팅(${newChats.length}) `; 
@@ -1348,7 +1342,15 @@ useEffect(() => {
                                 statusMsg += `채팅(없음) `; 
                             }
                         } else { statusMsg += `채팅(연결실패) `; }
-                        // 2. 입금
+
+                        // ✨ 빠른 모드(채팅만 요청)일 경우 여기까지만 처리하고 밑에 무거운 작업은 생략!
+                        if (!isHeavyFetch) {
+                            setSyncStatus(prev => prev === statusMsg + " (채팅 쾌속 모드⚡)" ? prev : statusMsg + " (채팅 쾌속 모드⚡)");
+                            setGlobalError('');
+                            return;
+                        }
+
+                        // 2. 입금 (여기부터는 15초에 한 번만 실행됨)
                         if (res.deposits && Array.isArray(res.deposits)) {
                             let depRows = res.deposits;
                             if (depRows.length > 0 && depRows[0].some(c => typeof c === 'string' && (c.includes('이름') || c.includes('금액') || c.includes('닉네임')))) depRows = depRows.slice(1);
@@ -1461,7 +1463,7 @@ useEffect(() => {
                                     const nick = String(row['닉네임'] || '').trim();
                                     const status = String(row['고객상태'] || '').trim();
                                     const ts = row['저장시간'] || '';
-                                    if (nick && (status === 'vip' || status === 'noshow' || status === 'manager')) {
+                                    if (nick && (status === 'vip' || status === 'noshow' || status === 'manager' || status === 'waitlist')) {
                                         const norm = normalizeString(nick);
                                         serverData[norm] = { type: status, originalName: nick, timestamp: ts };
                                     }
@@ -1491,15 +1493,23 @@ useEffect(() => {
                     setSyncStatus(prev => prev === "네트워크 에러 발생" ? prev : "네트워크 에러 발생"); 
                 }
             }, [googleScriptUrl, chatSheetId, depSheetId, addrSheetId, masterSheetId, setAddresses, setInventory, setSpecialCustomers, setGlobalError, playCoinSound, playBellSound]);
-            // 비동기식 폴링으로 변경 (이전 요청이 끝난 후 5초 대기)
+
+            // ✨ 비동기식 스마트 폴링 (채팅 5초, 그외 무거운 건 15초 분리!)
             useEffect(() => { 
                 let isMounted = true;
                 let timerId = null;
+                let tick = 0;
+                
                 const poll = async () => {
                     if (!isMounted) return;
-                    await fetchAllData();
+                    
+                    // 3번에 1번꼴(약 15초)로만 전체 무거운 데이터를 긁어옵니다. 나머지는 채팅만 가져옵니다.
+                    const isHeavyFetch = (tick % 3 === 0);
+                    await fetchAllData(isHeavyFetch);
+                    tick++;
+
                     if (isMounted) {
-                        timerId = setTimeout(poll, 5000);
+                        timerId = setTimeout(poll, 5000); // 💡 라이브 채팅을 위해 다시 5초(5000)로 롤백!
                     }
                 };
                 poll();
@@ -1510,7 +1520,7 @@ useEffect(() => {
             }, [fetchAllData]);
 
             useEffect(() => {
-                const handleForceSync = () => { fetchAllData(); };
+                const handleForceSync = () => { fetchAllData(true); }; // ✨ [새로고침] 버튼 클릭 시엔 강제로 무거운 데이터를 모두 가져옴
                 window.addEventListener('force-sync', handleForceSync);
                 return () => window.removeEventListener('force-sync', handleForceSync);
             }, [fetchAllData]);
