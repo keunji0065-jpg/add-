@@ -2,7 +2,11 @@
 <html lang="ko" class="antialiased">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#0f172a">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
@@ -22,7 +26,18 @@
     </script>
     <style>
         @import url("https://cdn.jsdelivr.net/gh/moonspam/NanumSquareNeo/nanumsquareneo.css");
+        html, body { height: 100%; margin: 0; padding: 0; overscroll-behavior: none; }
         body { font-family: 'NanumSquareNeo', sans-serif; background-color: #f1f5f9; transition: background-color 0.3s, color 0.3s; overflow: hidden; }
+        #root { height: 100%; }
+        
+        /* 모바일/태블릿 브라우저 UI로 인한 하단 짤림 완벽 방지 */
+        @supports (height: 100dvh) {
+            .h-screen { height: 100dvh !important; }
+        }
+        @supports not (height: 100dvh) {
+            .h-screen { height: 100% !important; }
+        }
+
         body.dark { background-color: #0f172a; color: #f1f5f9; }
         ::-webkit-scrollbar { width: 5px; height: 5px; } ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
         .dark ::-webkit-scrollbar-thumb { background: #475569; }
@@ -2275,9 +2290,9 @@ useEffect(() => {
                     )}
 
                     <div className="flex flex-col bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-lg shadow-sm resizable-panel" style={{ width: '18%', minWidth: '150px' }}>
-                        <div className="p-1.5 bg-slate-100 dark:bg-slate-900 border-b dark:border-slate-700 grid grid-cols-4 gap-1 shrink-0">
+                        <div className="p-1.5 bg-slate-100 dark:bg-slate-900 border-b dark:border-slate-700 grid grid-cols-3 gap-1 shrink-0">
                             {quickMessages.map((msg, idx) => (
-                                <button key={idx} onClick={(e) => handleCopyQuickMessage(e, msg, idx)} className={`text-[10px] border rounded py-1 truncate transition-colors shadow-sm bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300`}>{msg || "빈 메시지"}</button>
+                                <button key={idx} onClick={(e) => handleCopyQuickMessage(e, msg, idx)} className={`text-[10px] border rounded py-1 truncate transition-colors shadow-sm bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300`}>{msg || "빈칸"}</button>
                             ))}
                         </div>
                         <div className="p-2 bg-slate-100 dark:bg-slate-800 border-b dark:border-slate-700 flex flex-col gap-2 shrink-0">
@@ -2743,7 +2758,7 @@ useEffect(() => {
             const [orders, setOrders] = useLocalStorage('youtubeOrders', []);
             const [activeTab, setActiveTab] = useState('live');
             
-            const [googleScriptUrl, setGoogleScriptUrl] = useLocalStorage('googleScriptUrl', 'https://script.google.com/macros/s/AKfycbyKLkXw705MVTcjr02UqCDUDg-BKUTwgF3wKDzo2ZFoshofc8BSse838PfsKd7ShtuM/exec');
+            const [googleScriptUrl, setGoogleScriptUrl] = useLocalStorage('googleScriptUrl', 'https://script.google.com/macros/s/AKfycbyujXVimwiq1y93a_th91vp1H6rXeFfi_mdfQ1o-RZHwm7sRJtMxxqQH0i-JNsl6IYa/exec');
             const [chatSheetId, setChatSheetId] = useLocalStorage('chatSheetId', '199YCBXzInxmG8GforoRCNHNps21NhVIf9wHA6NXXhtg');
             const [depSheetId, setDepSheetId] = useLocalStorage('depSheetId', '14bx2HMd_NID3zQN-Hb0x0At2Qmti7-p1Zfx1ZadNScY');
             const [addrSheetId, setAddrSheetId] = useLocalStorage('addrSheetId', '1ywl4gRvswQpvIYtPVbSROzz7a5elbLieYhqMZmt191U');
@@ -2758,10 +2773,9 @@ useEffect(() => {
 
             useEffect(() => {
                 const currentUrl = window.localStorage.getItem(getLsKey('googleScriptUrl'));
-                // 💡 [수정됨] 악성코드 같았던 강제 롤백 로직을 고쳤습니다!
-                // 기존(구버전) URL이 남아있거나 비어있으면 새로 배포하신 '제한 해제 버전 URL'로 업데이트합니다.
-                if (!currentUrl || currentUrl === '""' || currentUrl === 'null' || currentUrl.includes('AKfycbxXEa-gMKOGWXJjS_RjOZHhz7UwSVwF0WTjxjgsfIBOw3P_74JP3LNazBA2L-GQjvKo')) {
-                    setGoogleScriptUrl('https://script.google.com/macros/s/AKfycbyKLkXw705MVTcjr02UqCDUDg-BKUTwgF3wKDzo2ZFoshofc8BSse838PfsKd7ShtuM/exec');
+                // 💡 기존 구버전 URL들이 감지되면, 방금 배포하신 가장 안전한 새 버전 URL로 자동 교체합니다.
+                if (!currentUrl || currentUrl === '""' || currentUrl === 'null' || currentUrl.includes('AKfycbxXEa-gMKOGWXJjS_RjOZHhz7UwSVwF0WTjxjgsfIBOw3P_74JP3LNazBA2L-GQjvKo') || currentUrl.includes('AKfycbyKLkXw705MVTcjr02UqCDUDg-BKUTwgF3wKDzo2ZFoshofc8BSse838PfsKd7ShtuM') || currentUrl.includes('AKfycbzar453ATgpbTQ514NhSG9d3gvDQBVS84RHESB3ddWBR13gZjNDivVWyc_hQjoegFEw')) {
+                    setGoogleScriptUrl('https://script.google.com/macros/s/AKfycbyujXVimwiq1y93a_th91vp1H6rXeFfi_mdfQ1o-RZHwm7sRJtMxxqQH0i-JNsl6IYa/exec');
                 }
             }, []);
 
@@ -2794,8 +2808,17 @@ useEffect(() => {
             const [addressMapping, setAddressMapping] = useLocalStorage('addressMapping', {});
             const [specialCustomers, setSpecialCustomers] = useLocalStorage('specialCustomers', {});
             const [inventory, setInventory] = useLocalStorage('inventory', []);
-            const [quickMessages, setQuickMessages] = useLocalStorage('quickMessages', ["잠시만요!", "확인해드릴게요", "품절입니다😭", "합배송 해드릴게요", "감사합니다❤️", "다시 말씀해주세요", "입금확인완료!"]);
+            const [quickMessages, setQuickMessages] = useLocalStorage('quickMessages', ["잠시만요!", "확인해드릴게요", "품절입니다😭", "합배송 해드릴게요", "감사합니다❤️", "입금확인완료!"]);
             
+            // 💡 강제로 항상 6칸을 유지하도록 보정 (로컬스토리지에 4개가 남아있더라도 6칸으로 확장)
+            useEffect(() => {
+                if (Array.isArray(quickMessages) && quickMessages.length !== 6) {
+                    const next = [...quickMessages];
+                    while (next.length < 6) next.push(""); // 부족하면 빈칸 추가
+                    setQuickMessages(next.slice(0, 6));    // 6개가 넘으면 잘라내기
+                }
+            }, [quickMessages, setQuickMessages]);
+
             const [globalError, setGlobalError] = useState('');
             const [modalConfig, setModalConfig] = useState({ isOpen: false, type: 'alert', message: '', onConfirm: null, onCancel: null, initialValue: '' });
             const [isSettingsOpen, setIsSettingsOpen] = useState(false);
