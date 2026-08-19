@@ -1449,7 +1449,11 @@ useEffect(() => {
 
             useEffect(() => {
                 const getChatId = async () => {
-                    if (!activeApiKey || !youtubeVideoId) return;
+                    if (!activeApiKey || !youtubeVideoId) {
+                        setLiveChatId(null);
+                        chatNextPageTokenRef.current = '';
+                        return;
+                    }
                     try {
                         const res = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=liveStreamingDetails&id=${youtubeVideoId}&key=${activeApiKey}`);
                         const data = await res.json();
