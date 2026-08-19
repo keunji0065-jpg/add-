@@ -1041,6 +1041,116 @@ useEffect(() => {
             return true;
         });
 
+        const SmartMenuModal = ({ isOpen, onClose, inventory }) => {
+            const [groupedMenu, setGroupedMenu] = useState([]);
+
+            useEffect(() => {
+                if (isOpen) {
+                    const available = (inventory || []).filter(i => !i.isSoldOut);
+                    const groups = {};
+
+                    available.forEach(item => {
+                        const parts = String(item.name).trim().split(/\s+/);
+                        let baseName = item.name;
+                        let option = '';
+
+                        // 띄어쓰기로 단어가 2개 이상일 경우, 마지막 단어를 '옵션'으로 간주하고 나머지를 '기본상품명'으로 묶음
+                        if (parts.length > 1) {
+                            baseName = parts.slice(0, -1).join(' ');
+                            option = parts[parts.length - 1];
+                        }
+
+                        const key = `${baseName}_${item.price}`;
+                        if (!groups[key]) groups[key] = { baseName, price: item.price, options: [], rawNames: [] };
+                        
+                        if (option) groups[key].options.push(option);
+                        groups[key].rawNames.push(item.name);
+                    });
+
+                    // 옵션이 1개뿐이거나 묶이지 않는 단일 상품은 원래 이름 그대로 표시
+                    const finalMenu = Object.values(groups).map(g => {
+                        if (g.options.length <= 1) {
+                            return { baseName: g.rawNames[0], price: g.price, options: [] };
+                        }
+                        return g;
+                    });
+
+                    // 정렬: 가격 높은 순 -> 이름 오름차순
+                    finalMenu.sort((a, b) => b.price - a.price || a.baseName.localeCompare(b.baseName, 'ko-KR', {numeric: true}));
+                    setGroupedMenu(finalMenu);
+                }
+            }, [isOpen, inventory]);
+
+            if (!isOpen) return null;
+
+            const copyToClipboard = (text, e) => {
+                const textArea = document.createElement("textarea"); textArea.value = text.trim(); document.body.appendChild(textArea); textArea.select();
+                try { 
+                    document.execCommand('copy'); 
+                    const el = e.currentTarget; const origText = el.innerHTML; const origClass = el.className;
+                    el.innerHTML = '<i class="ph ph-check-circle" data-phosphor-icon-weight="bold"></i> 완료';
+                    el.className = 'px-2 py-1 rounded text-xs font-bold transition-colors bg-green-600 text-white shadow-sm flex items-center gap-1 shrink-0';
+                    setTimeout(() => { el.innerHTML = origText; el.className = origClass; }, 1000);
+                } catch (err) {} document.body.removeChild(textArea);
+            };
+
+            const handleCopyItem = (item, e) => {
+                const optText = item.options.length > 0 ? ` ${item.options.join(', ')}` : '';
+                const text = `${item.baseName}${optText} / ${Number(item.price).toLocaleString()}원`;
+                copyToClipboard(text, e);
+            };
+
+            const handleCopyAll = (e) => {
+                let text = "📌 현재 판매목록\n";
+                groupedMenu.forEach(item => {
+                    const optText = item.options.length > 0 ? ` ${item.options.join(', ')}` : '';
+                    text += `${item.baseName}${optText} / ${Number(item.price).toLocaleString()}원\n`;
+                });
+                copyToClipboard(text.trim(), e);
+            };
+
+            return (
+                <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-[9999] animate-pop" onClick={onClose}>
+                    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-5 w-full max-w-md mx-4 flex flex-col max-h-[85vh]" onClick={e => e.stopPropagation()}>
+                        <div className="mb-4 border-b dark:border-slate-700 pb-3 flex justify-between items-center shrink-0">
+                            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2"><Icon name="clipboard-text" weight="fill" className="text-blue-500"/> 스마트 메뉴판</h3>
+                            <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><Icon name="x" weight="bold" size={20}/></button>
+                        </div>
+                        
+                        <div className="flex-1 overflow-y-auto space-y-2 pr-1 pb-2">
+                            {groupedMenu.length === 0 ? (
+                                <div className="text-center py-6 text-slate-400 text-sm">판매 중인 상품이 없습니다.</div>
+                            ) : (
+                                groupedMenu.map((item, idx) => (
+                                    <div key={idx} className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-2.5 rounded-lg flex justify-between items-center gap-3">
+                                        <div className="flex flex-col min-w-0">
+                                            <div className="font-bold text-sm text-slate-800 dark:text-slate-200 truncate">{item.baseName}</div>
+                                            <div className="text-xs font-bold text-blue-600 dark:text-blue-400 mt-0.5">{Number(item.price).toLocaleString()}원</div>
+                                            {item.options.length > 0 && (
+                                                <div className="flex flex-wrap gap-1 mt-1.5">
+                                                    {item.options.map((opt, oIdx) => (
+                                                        <span key={oIdx} className="text-[10px] bg-white dark:bg-slate-800 border dark:border-slate-600 text-slate-600 dark:text-slate-300 px-1.5 py-0.5 rounded shadow-sm">{opt}</span>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                        <button onClick={(e) => handleCopyItem(item, e)} className="px-2 py-1 rounded text-xs font-bold transition-colors bg-white dark:bg-slate-800 border dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 shadow-sm shrink-0">
+                                            복사
+                                        </button>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                        
+                        <div className="mt-3 pt-3 border-t dark:border-slate-700 shrink-0 flex gap-2">
+                            <button onClick={onClose} className="flex-1 py-2.5 rounded-lg font-bold text-sm bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">닫기</button>
+                            <button onClick={handleCopyAll} className="flex-1 py-2.5 rounded-lg font-bold text-sm bg-blue-600 hover:bg-blue-700 text-white transition-colors shadow-sm flex items-center justify-center gap-1.5"><Icon name="copy" weight="bold"/> 전체 메뉴 복사</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
       const LiveTab = ({ youtubeApiKey, youtubeVideoId, orders, setOrders, productHistory, setProductHistory, quickShipping, jejuShipping, freeShippingThreshold, shippingOverrides, setShippingOverrides, bankAccount, googleScriptUrl, depSheetId, addrSheetId, masterSheetId, addresses, setAddresses, cardPayments, setCardPayments, manualDeposits, setManualDeposits, matchedDeposits, setMatchedDeposits, depositorNames, setDepositorNames, clickedChats, setClickedChats, openModal, keywords, setKeywords, sentAddressRequests, setSentAddressRequests, deletedDepositIds, setDeletedDepositIds, checkedOrders, setCheckedOrders, addressMapping, setAddressMapping, templateConfig, specialCustomers, setSpecialCustomers, inventory, setInventory, quickMessages, handleResetAllData, broadcastName, setGlobalError, cashReceipts, setCashReceipts, soundEnabled, soundVolume, depositLinks, setDepositLinks, noShowCustomers, setNoShowCustomers, waitlistCustomers, setWaitlistCustomers }) => {
             const [serverDeposits, setServerDeposits] = useState([]);
             const [selectedNick, setSelectedNick] = useState(null);
@@ -1112,6 +1222,7 @@ useEffect(() => {
             // YouTube Live Chat State
             const [liveChatId, setLiveChatId] = useState(null);
             const chatNextPageTokenRef = useRef('');
+            const unsavedChatsRef = useRef([]);
 
             const inventoryStats = useMemo(() => {
                 const stats = {};
@@ -1398,13 +1509,7 @@ useEffect(() => {
                                 });
                                 
                                 if (googleScriptUrl && masterSheetId && broadcastName) {
-                                    const chatRows = newChats.map(c => [c.time, c.nickname, c.content]);
-                                    fetchGas(googleScriptUrl, { 
-                                        action: 'save_chats', 
-                                        masterId: getCleanSheetId(masterSheetId),
-                                        broadcastName: broadcastName,
-                                        data: chatRows 
-                                    }).catch(()=>{});
+                                    unsavedChatsRef.current.push(...newChats);
                                 }
                                 
                                 statusMsg += `채팅(${newChats.length}) `;
@@ -1596,6 +1701,30 @@ useEffect(() => {
                 window.addEventListener('force-sync', handleForceSync);
                 return () => window.removeEventListener('force-sync', handleForceSync);
             }, [fetchAllData]);
+
+            // 🔥 구글 시트 쓰기 한도 초과(차단) 방지를 위한 10초 단위 일괄(Batch) 저장 로직
+            useEffect(() => {
+                const chatSaveInterval = setInterval(() => {
+                    if (unsavedChatsRef.current.length > 0 && googleScriptUrl && masterSheetId && broadcastName) {
+                        const chatsToSave = [...unsavedChatsRef.current];
+                        unsavedChatsRef.current = []; // 보내기 전에 임시보관함 비우기
+                        
+                        const chatRows = chatsToSave.map(c => [c.time, c.nickname, c.content]);
+                        
+                        fetchGas(googleScriptUrl, { 
+                            action: 'save_chats', 
+                            masterId: getCleanSheetId(masterSheetId),
+                            broadcastName: broadcastName,
+                            sheetName: broadcastName, // 앱스스크립트 호환성을 위해 추가
+                            data: chatRows 
+                        }).catch(()=>{
+                            // 통신 실패 시 다시 임시보관함에 복구
+                            unsavedChatsRef.current = [...chatsToSave, ...unsavedChatsRef.current];
+                        });
+                    }
+                }, 10000); // 10초마다 묶어서 전송
+                return () => clearInterval(chatSaveInterval);
+            }, [googleScriptUrl, masterSheetId, broadcastName]);
 
             const allDeposits = useMemo(() => [...manualDeposits, ...serverDeposits], [manualDeposits, serverDeposits]);
             const allDepositsRef = useRef(allDeposits);
@@ -1966,7 +2095,7 @@ useEffect(() => {
             }, [orders, cardPayments, getCalculatedShipping, googleScriptUrl, addressLookup, masterSheetId, broadcastName, specialCustomers, noShowCustomers, waitlistCustomers]);
 
             const autoSaveRef = useRef(); useEffect(() => { autoSaveRef.current = autoSaveToGoogleSheet; }, [autoSaveToGoogleSheet]);
-            useEffect(() => { const saveInterval = setInterval(() => { if (autoSaveRef.current) autoSaveRef.current(); }, 60000); return () => clearInterval(saveInterval); }, []); 
+            useEffect(() => { const saveInterval = setInterval(() => { if (autoSaveRef.current) autoSaveRef.current(); }, 10000); return () => clearInterval(saveInterval); }, []); 
             useEffect(() => { if (lastAddedOrderId) { const input = document.getElementById(`prod-input-${lastAddedOrderId}`); if (input) input.focus(); setLastAddedOrderId(null); } }, [lastAddedOrderId, orders]);
 
             const handleNicknameEdit = useCallback((old) => {
@@ -2369,116 +2498,6 @@ useEffect(() => {
                 setNewInvName(''); setNewInvPrice(''); setNewInvStock('');
             };
 
-            const SmartMenuModal = ({ isOpen, onClose, inventory }) => {
-                const [groupedMenu, setGroupedMenu] = useState([]);
-
-                useEffect(() => {
-                    if (isOpen) {
-                        const available = (inventory || []).filter(i => !i.isSoldOut);
-                        const groups = {};
-
-                        available.forEach(item => {
-                            const parts = String(item.name).trim().split(/\s+/);
-                            let baseName = item.name;
-                            let option = '';
-
-                            // 띄어쓰기로 단어가 2개 이상일 경우, 마지막 단어를 '옵션'으로 간주하고 나머지를 '기본상품명'으로 묶음
-                            if (parts.length > 1) {
-                                baseName = parts.slice(0, -1).join(' ');
-                                option = parts[parts.length - 1];
-                            }
-
-                            const key = `${baseName}_${item.price}`;
-                            if (!groups[key]) groups[key] = { baseName, price: item.price, options: [], rawNames: [] };
-                            
-                            if (option) groups[key].options.push(option);
-                            groups[key].rawNames.push(item.name);
-                        });
-
-                        // 옵션이 1개뿐이거나 묶이지 않는 단일 상품은 원래 이름 그대로 표시
-                        const finalMenu = Object.values(groups).map(g => {
-                            if (g.options.length <= 1) {
-                                return { baseName: g.rawNames[0], price: g.price, options: [] };
-                            }
-                            return g;
-                        });
-
-                        // 정렬: 가격 높은 순 -> 이름 오름차순
-                        finalMenu.sort((a, b) => b.price - a.price || a.baseName.localeCompare(b.baseName, 'ko-KR', {numeric: true}));
-                        setGroupedMenu(finalMenu);
-                    }
-                }, [isOpen, inventory]);
-
-                if (!isOpen) return null;
-
-                const copyToClipboard = (text, e) => {
-                    const textArea = document.createElement("textarea"); textArea.value = text.trim(); document.body.appendChild(textArea); textArea.select();
-                    try { 
-                        document.execCommand('copy'); 
-                        const el = e.currentTarget; const origText = el.innerHTML; const origClass = el.className;
-                        el.innerHTML = '<i class="ph ph-check-circle" data-phosphor-icon-weight="bold"></i> 완료';
-                        el.className = 'px-2 py-1 rounded text-xs font-bold transition-colors bg-green-600 text-white shadow-sm flex items-center gap-1 shrink-0';
-                        setTimeout(() => { el.innerHTML = origText; el.className = origClass; }, 1000);
-                    } catch (err) {} document.body.removeChild(textArea);
-                };
-
-                const handleCopyItem = (item, e) => {
-                    const optText = item.options.length > 0 ? `\n👉 옵션: ${item.options.join(', ')}` : '';
-                    const text = `[ ${item.baseName} ] ${Number(item.price).toLocaleString()}원${optText}`;
-                    copyToClipboard(text, e);
-                };
-
-                const handleCopyAll = (e) => {
-                    let text = "📌 현재 판매목록\n";
-                    groupedMenu.forEach(item => {
-                        text += `\n[ ${item.baseName} ] ${Number(item.price).toLocaleString()}원\n`;
-                        if (item.options.length > 0) text += `👉 옵션: ${item.options.join(', ')}\n`;
-                    });
-                    copyToClipboard(text, e);
-                };
-
-                return (
-                    <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-[9999] animate-pop" onClick={onClose}>
-                        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-5 w-full max-w-md mx-4 flex flex-col max-h-[85vh]" onClick={e => e.stopPropagation()}>
-                            <div className="mb-4 border-b dark:border-slate-700 pb-3 flex justify-between items-center shrink-0">
-                                <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2"><Icon name="clipboard-text" weight="fill" className="text-blue-500"/> 스마트 메뉴판</h3>
-                                <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><Icon name="x" weight="bold" size={20}/></button>
-                            </div>
-                            
-                            <div className="flex-1 overflow-y-auto space-y-2 pr-1 pb-2">
-                                {groupedMenu.length === 0 ? (
-                                    <div className="text-center py-6 text-slate-400 text-sm">판매 중인 상품이 없습니다.</div>
-                                ) : (
-                                    groupedMenu.map((item, idx) => (
-                                        <div key={idx} className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-2.5 rounded-lg flex justify-between items-center gap-3">
-                                            <div className="flex flex-col min-w-0">
-                                                <div className="font-bold text-sm text-slate-800 dark:text-slate-200 truncate">{item.baseName}</div>
-                                                <div className="text-xs font-bold text-blue-600 dark:text-blue-400 mt-0.5">{Number(item.price).toLocaleString()}원</div>
-                                                {item.options.length > 0 && (
-                                                    <div className="flex flex-wrap gap-1 mt-1.5">
-                                                        {item.options.map((opt, oIdx) => (
-                                                            <span key={oIdx} className="text-[10px] bg-white dark:bg-slate-800 border dark:border-slate-600 text-slate-600 dark:text-slate-300 px-1.5 py-0.5 rounded shadow-sm">{opt}</span>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </div>
-                                            <button onClick={(e) => handleCopyItem(item, e)} className="px-2 py-1 rounded text-xs font-bold transition-colors bg-white dark:bg-slate-800 border dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 shadow-sm shrink-0">
-                                                단독 복사
-                                            </button>
-                                        </div>
-                                    ))
-                                )}
-                            </div>
-                            
-                            <div className="mt-3 pt-3 border-t dark:border-slate-700 shrink-0 flex gap-2">
-                                <button onClick={onClose} className="flex-1 py-2.5 rounded-lg font-bold text-sm bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">닫기</button>
-                                <button onClick={handleCopyAll} className="flex-1 py-2.5 rounded-lg font-bold text-sm bg-blue-600 hover:bg-blue-700 text-white transition-colors shadow-sm flex items-center justify-center gap-1.5"><Icon name="copy" weight="bold"/> 전체 메뉴 복사</button>
-                            </div>
-                        </div>
-                    </div>
-                );
-            };
-
             return (
                 <div className="flex h-full gap-2 p-2 overflow-x-auto bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100">
                     <datalist id="product-list">{Array.isArray(inventory) && inventory.map(i => <option key={i.id} value={i.name} />)}</datalist>
@@ -2560,7 +2579,7 @@ useEffect(() => {
                              {(keywords || []).length > 0 && (<div className="flex gap-1 overflow-x-auto scrollbar-hide py-0.5">{(keywords || []).map(k => (<span key={k} onClick={() => handleRemoveKeyword(k)} className="bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 px-1.5 py-0.5 rounded-full text-[10px] cursor-pointer whitespace-nowrap hover:bg-red-100 hover:text-red-600 transition-colors flex items-center gap-0.5">{k} <Icon name="x" weight="bold" size={8}/></span>))}</div>)}
                         </div>
                         <div ref={chatScrollRef} className="flex-1 overflow-y-auto p-1.5 space-y-0.5 bg-slate-50 dark:bg-slate-900">
-                            {filteredChats.map(c => {
+                            {[...filteredChats].reverse().map(c => {
                                 const safeContent = String(c.content || ''); const isMatched = (keywords || []).some(k => safeContent.includes(k)); const isProcessed = clickedChats?.has(c.id);
                                 const chatClasses = isProcessed ? 'opacity-80 bg-slate-100 dark:bg-slate-800/80 border-transparent' : (isMatched ? 'bg-slate-100 dark:bg-slate-800 border-slate-400 dark:border-slate-600 ring-1 ring-slate-400 dark:ring-slate-600 shadow-sm' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700');
                                 
@@ -2664,7 +2683,7 @@ useEffect(() => {
                         </div>
                     </div>
 
-                    <div className="flex flex-col bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-lg shadow-sm resizable-panel" style={{ width: '14%', minWidth: '120px' }}>
+                    <div className="flex flex-col bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-lg shadow-sm resizable-panel" style={{ width: '11%', minWidth: '110px' }}>
                         <div className="p-2 bg-slate-100 dark:bg-slate-800 border-b dark:border-slate-700 flex flex-col gap-2 shrink-0">
                             <div className="font-bold text-slate-800 dark:text-slate-200 flex items-center justify-between">
                                 <span className="flex items-center gap-1"><Icon name="money" weight="fill"/> 입금 내역</span>
@@ -2716,7 +2735,7 @@ useEffect(() => {
                         <div className="p-1 bg-white dark:bg-slate-800 text-center font-bold text-[10px] border-t dark:border-slate-700 shrink-0">총: <span className="text-slate-800 dark:text-slate-200 text-xs">{totalDepositAmount.toLocaleString()}</span>원</div>
                     </div>
                     
-                    <div className="flex flex-col bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-lg shadow-sm resizable-panel" style={{ width: '13%', minWidth: '130px' }}>
+                    <div className="flex flex-col bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-lg shadow-sm resizable-panel" style={{ width: '16%', minWidth: '150px' }}>
                         <div className="p-2 bg-slate-100 dark:bg-slate-800 border-b dark:border-slate-700 flex flex-col gap-2 shrink-0">
                             <div className="font-bold text-slate-800 dark:text-slate-200 flex items-center justify-between">
                                 <span className="flex items-center gap-1"><Icon name="address-book" weight="fill"/> 실시간 주소록</span>
@@ -2727,11 +2746,13 @@ useEffect(() => {
                         <div className="flex-1 overflow-y-auto p-1 space-y-1 bg-slate-50 dark:bg-slate-900">
                             {visibleAddresses.map((addr, idx) => {
                                 const isUsed = usedAddressNicks.has(normalizeString(addr.nickname));
+                                const tsDate = parseSafeDate(addr.timestamp);
+                                const tsStr = tsDate.getTime() > 0 ? `${tsDate.getMonth()+1}/${tsDate.getDate()} ${String(tsDate.getHours()).padStart(2,'0')}:${String(tsDate.getMinutes()).padStart(2,'0')}` : '';
                                 return (
                                     <div key={`${addr.phone}-${idx}`} onClick={() => handleAddressClick(addr)} className={`relative flex flex-col p-1.5 border rounded cursor-pointer transition-all ${isUsed ? 'opacity-60 bg-slate-100 dark:bg-slate-800/80 border-transparent' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm'}`}>
                                         <div className="flex justify-between items-center gap-1">
                                             <div className="flex items-center min-w-0 flex-1"><span className={`text-[12px] font-bold truncate ${isUsed ? 'text-slate-500 dark:text-slate-400' : 'text-slate-800 dark:text-slate-200'}`} title={addr.nickname}>{addr.nickname}</span><button onClick={(e) => { e.stopPropagation(); handleAddressNickEdit(addr); }} className="text-slate-400 hover:text-blue-500 shrink-0 ml-1 p-0.5"><Icon name="pencil-simple" weight="bold" size={10}/></button></div>
-                                            <div className="flex items-center gap-1 shrink-0">{isUsed ? <span className="text-[8px] font-bold text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-1 py-0.5 rounded shrink-0">연결됨</span> : <span className="text-[9px] text-slate-400 dark:text-slate-500 shrink-0">수동매칭 대기</span>}<button onClick={(e) => { e.stopPropagation(); setQuickAddrModal({ isOpen: true, nick: addr.nickname, editData: addr }); }} className="text-slate-400 hover:text-slate-700 transition-colors bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 rounded p-0.5"><Icon name="pencil-simple" weight="bold" size={12}/></button></div>
+                                            <div className="flex items-center gap-1 shrink-0">{isUsed ? <span className="text-[8px] font-bold text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-1 py-0.5 rounded shrink-0">연결됨</span> : <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 shrink-0">{tsStr}</span>}<button onClick={(e) => { e.stopPropagation(); setQuickAddrModal({ isOpen: true, nick: addr.nickname, editData: addr }); }} className="text-slate-400 hover:text-slate-700 transition-colors bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 rounded p-0.5"><Icon name="pencil-simple" weight="bold" size={12}/></button></div>
                                         </div>
                                         <div className="text-[11px] text-slate-600 dark:text-slate-400 font-medium flex items-center gap-1 w-full overflow-hidden mt-0.5"><span className="shrink-0">{addr.realname}</span><span className="text-slate-400 shrink-0">|</span><span className="shrink-0">{fixPhoneNumber(addr.phone)}</span><span className="text-slate-700 dark:text-slate-300 truncate flex-1 ml-1" title={`${addr.address} ${addr.memo}`}>{addr.address}{addr.memo && <span className="text-red-500 font-bold ml-1.5">[{addr.memo}]</span>}</span></div>
                                     </div>
