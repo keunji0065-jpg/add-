@@ -1062,115 +1062,138 @@ useEffect(() => {
             return true;
         });
 
-        const SmartMenuModal = ({ isOpen, onClose, inventory }) => {
-            const [groupedMenu, setGroupedMenu] = useState([]);
+      const SmartMenuModal = ({ isOpen, onClose, inventory }) => {
+    const [groupedMenu, setGroupedMenu] = useState([]);
+    const [searchTerm, setSearchTerm] = useState('');
 
-            useEffect(() => {
-                if (isOpen) {
-                    const available = (inventory || []).filter(i => !i.isSoldOut);
-                    const groups = {};
+    useEffect(() => {
+        if (isOpen) {
+            setSearchTerm(''); // 모달 열릴 때 검색어 초기화
+            const available = (inventory || []).filter(i => !i.isSoldOut);
+            const groups = {};
 
-                    available.forEach(item => {
-                        const parts = String(item.name).trim().split(/\s+/);
-                        let baseName = item.name;
-                        let option = '';
+            available.forEach(item => {
+                const parts = String(item.name).trim().split(/\s+/);
+                let baseName = item.name;
+                let option = '';
 
-                        // 띄어쓰기로 단어가 2개 이상일 경우, 마지막 단어를 '옵션'으로 간주하고 나머지를 '기본상품명'으로 묶음
-                        if (parts.length > 1) {
-                            baseName = parts.slice(0, -1).join(' ');
-                            option = parts[parts.length - 1];
-                        }
-
-                        const key = `${baseName}_${item.price}`;
-                        if (!groups[key]) groups[key] = { baseName, price: item.price, options: [], rawNames: [] };
-                        
-                        if (option) groups[key].options.push(option);
-                        groups[key].rawNames.push(item.name);
-                    });
-
-                    // 옵션이 1개뿐이거나 묶이지 않는 단일 상품은 원래 이름 그대로 표시
-                    const finalMenu = Object.values(groups).map(g => {
-                        if (g.options.length <= 1) {
-                            return { baseName: g.rawNames[0], price: g.price, options: [] };
-                        }
-                        return g;
-                    });
-
-                    // 정렬: 가격 높은 순 -> 이름 오름차순
-                    finalMenu.sort((a, b) => b.price - a.price || a.baseName.localeCompare(b.baseName, 'ko-KR', {numeric: true}));
-                    setGroupedMenu(finalMenu);
+                // 띄어쓰기로 단어가 2개 이상일 경우, 마지막 단어를 '옵션'으로 간주하고 나머지를 '기본상품명'으로 묶음
+                if (parts.length > 1) {
+                    baseName = parts.slice(0, -1).join(' ');
+                    option = parts[parts.length - 1];
                 }
-            }, [isOpen, inventory]);
 
-            if (!isOpen) return null;
+                const key = `${baseName}_${item.price}`;
+                if (!groups[key]) groups[key] = { baseName, price: item.price, options: [], rawNames: [] };
+                
+                if (option) groups[key].options.push(option);
+                groups[key].rawNames.push(item.name);
+            });
 
-            const copyToClipboard = (text, e) => {
-                const textArea = document.createElement("textarea"); textArea.value = text.trim(); document.body.appendChild(textArea); textArea.select();
-                try { 
-                    document.execCommand('copy'); 
-                    const el = e.currentTarget; const origText = el.innerHTML; const origClass = el.className;
-                    el.innerHTML = '<i class="ph ph-check-circle" data-phosphor-icon-weight="bold"></i> 완료';
-                    el.className = 'px-2 py-1 rounded text-xs font-bold transition-colors bg-green-600 text-white shadow-sm flex items-center gap-1 shrink-0';
-                    setTimeout(() => { el.innerHTML = origText; el.className = origClass; }, 1000);
-                } catch (err) {} document.body.removeChild(textArea);
-            };
+            // 옵션이 1개뿐이거나 묶이지 않는 단일 상품은 원래 이름 그대로 표시
+            const finalMenu = Object.values(groups).map(g => {
+                if (g.options.length <= 1) {
+                    return { baseName: g.rawNames[0], price: g.price, options: [] };
+                }
+                return g;
+            });
 
-            const handleCopyItem = (item, e) => {
-                const optText = item.options.length > 0 ? ` ${item.options.join(', ')}` : '';
-                const text = `${item.baseName}${optText} / ${Number(item.price).toLocaleString()}원`;
-                copyToClipboard(text, e);
-            };
+            // ✨ 정렬: 이름순 '내림차순' (번호가 높은 것이 위로 오도록)
+            finalMenu.sort((a, b) => String(b.baseName).localeCompare(String(a.baseName), 'ko-KR', {numeric: true}));
+            
+            setGroupedMenu(finalMenu);
+        }
+    }, [isOpen, inventory]);
 
-            const handleCopyAll = (e) => {
-                let text = "📌 현재 판매목록\n";
-                groupedMenu.forEach(item => {
-                    const optText = item.options.length > 0 ? ` ${item.options.join(', ')}` : '';
-                    text += `${item.baseName}${optText} / ${Number(item.price).toLocaleString()}원\n`;
-                });
-                copyToClipboard(text.trim(), e);
-            };
+    if (!isOpen) return null;
 
-            return (
-                <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-[9999] animate-pop" onClick={onClose}>
-                    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-5 w-full max-w-md mx-4 flex flex-col max-h-[85vh]" onClick={e => e.stopPropagation()}>
-                        <div className="mb-4 border-b dark:border-slate-700 pb-3 flex justify-between items-center shrink-0">
-                            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2"><Icon name="clipboard-text" weight="fill" className="text-blue-500"/> 스마트 메뉴판</h3>
-                            <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><Icon name="x" weight="bold" size={20}/></button>
-                        </div>
-                        
-                        <div className="flex-1 overflow-y-auto space-y-2 pr-1 pb-2">
-                            {groupedMenu.length === 0 ? (
-                                <div className="text-center py-6 text-slate-400 text-sm">판매 중인 상품이 없습니다.</div>
-                            ) : (
-                                groupedMenu.map((item, idx) => (
-                                    <div key={idx} className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-2.5 rounded-lg flex justify-between items-center gap-3">
-                                        <div className="flex flex-col min-w-0">
-                                            <div className="font-bold text-sm text-slate-800 dark:text-slate-200 truncate">{item.baseName}</div>
-                                            <div className="text-xs font-bold text-blue-600 dark:text-blue-400 mt-0.5">{Number(item.price).toLocaleString()}원</div>
-                                            {item.options.length > 0 && (
-                                                <div className="flex flex-wrap gap-1 mt-1.5">
-                                                    {item.options.map((opt, oIdx) => (
-                                                        <span key={oIdx} className="text-[10px] bg-white dark:bg-slate-800 border dark:border-slate-600 text-slate-600 dark:text-slate-300 px-1.5 py-0.5 rounded shadow-sm">{opt}</span>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                        <button onClick={(e) => handleCopyItem(item, e)} className="px-2 py-1 rounded text-xs font-bold transition-colors bg-white dark:bg-slate-800 border dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 shadow-sm shrink-0">
-                                            복사
-                                        </button>
-                                    </div>
-                                ))
-                            )}
-                        </div>
-                        
-                        <div className="mt-3 pt-3 border-t dark:border-slate-700 shrink-0 flex gap-2">
-                            <button onClick={onClose} className="flex-1 py-2.5 rounded-lg font-bold text-sm bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">닫기</button>
-                            <button onClick={handleCopyAll} className="flex-1 py-2.5 rounded-lg font-bold text-sm bg-blue-600 hover:bg-blue-700 text-white transition-colors shadow-sm flex items-center justify-center gap-1.5"><Icon name="copy" weight="bold"/> 전체 메뉴 복사</button>
-                        </div>
-                    </div>
+    // ✨ 검색 기능 적용
+    const filteredMenu = groupedMenu.filter(item => {
+        if (!searchTerm) return true;
+        const term = searchTerm.toLowerCase();
+        return String(item.baseName).toLowerCase().includes(term) || item.options.some(opt => String(opt).toLowerCase().includes(term));
+    });
+
+    const copyToClipboard = (text, e) => {
+        const textArea = document.createElement("textarea"); textArea.value = text.trim(); document.body.appendChild(textArea); textArea.select();
+        try { 
+            document.execCommand('copy'); 
+            const el = e.currentTarget; const origText = el.innerHTML; const origClass = el.className;
+            el.innerHTML = '<i class="ph ph-check-circle" data-phosphor-icon-weight="bold"></i> 완료';
+            el.className = 'px-2 py-1 rounded text-xs font-bold transition-colors bg-green-600 text-white shadow-sm flex items-center gap-1 shrink-0';
+            setTimeout(() => { el.innerHTML = origText; el.className = origClass; }, 1000);
+        } catch (err) {} document.body.removeChild(textArea);
+    };
+
+    const handleCopyItem = (item, e) => {
+        const optText = item.options.length > 0 ? ` ${item.options.join(', ')}` : '';
+        const text = `${item.baseName}${optText} / ${Number(item.price).toLocaleString()}원`;
+        copyToClipboard(text, e);
+    };
+
+    const handleCopyAll = (e) => {
+        let text = "📌 현재 판매목록\n";
+        filteredMenu.forEach(item => {
+            const optText = item.options.length > 0 ? ` ${item.options.join(', ')}` : '';
+            text += `${item.baseName}${optText} / ${Number(item.price).toLocaleString()}원\n`;
+        });
+        copyToClipboard(text.trim(), e);
+    };
+
+    return (
+        <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-[9999] animate-pop" onClick={onClose}>
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-5 w-full max-w-md mx-4 flex flex-col max-h-[85vh]" onClick={e => e.stopPropagation()}>
+                <div className="mb-4 border-b dark:border-slate-700 pb-3 flex justify-between items-center shrink-0">
+                    <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2"><Icon name="clipboard-text" weight="fill" className="text-blue-500"/> 스마트 메뉴판</h3>
+                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><Icon name="x" weight="bold" size={20}/></button>
                 </div>
-            );
-        };
+                
+                {/* 검색창 UI */}
+                <div className="relative mb-3 shrink-0">
+                    <Icon name="magnifying-glass" className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 size={14}"/>
+                    <input 
+                        type="text" 
+                        placeholder="상품명 또는 옵션 검색..." 
+                        value={searchTerm}
+                        onChange={e => setSearchTerm(e.target.value)}
+                        autoFocus
+                        className="w-full border dark:border-slate-600 rounded-lg pl-8 pr-3 py-2 text-sm bg-slate-50 dark:bg-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                </div>
+
+                <div className="flex-1 overflow-y-auto space-y-2 pr-1 pb-2">
+                    {filteredMenu.length === 0 ? (
+                        <div className="text-center py-6 text-slate-400 text-sm">검색 결과가 없습니다.</div>
+                    ) : (
+                        filteredMenu.map((item, idx) => (
+                            <div key={idx} className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-2.5 rounded-lg flex justify-between items-center gap-3">
+                                <div className="flex flex-col min-w-0">
+                                    <div className="font-bold text-sm text-slate-800 dark:text-slate-200 truncate">{item.baseName}</div>
+                                    <div className="text-xs font-bold text-blue-600 dark:text-blue-400 mt-0.5">{Number(item.price).toLocaleString()}원</div>
+                                    {item.options.length > 0 && (
+                                        <div className="flex flex-wrap gap-1 mt-1.5">
+                                            {item.options.map((opt, oIdx) => (
+                                                <span key={oIdx} className="text-[10px] bg-white dark:bg-slate-800 border dark:border-slate-600 text-slate-600 dark:text-slate-300 px-1.5 py-0.5 rounded shadow-sm">{opt}</span>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                                <button onClick={(e) => handleCopyItem(item, e)} className="px-2 py-1 rounded text-xs font-bold transition-colors bg-white dark:bg-slate-800 border dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 shadow-sm shrink-0">
+                                    복사
+                                </button>
+                            </div>
+                        ))
+                    )}
+                </div>
+                
+                <div className="mt-3 pt-3 border-t dark:border-slate-700 shrink-0 flex gap-2">
+                    <button onClick={onClose} className="flex-1 py-2.5 rounded-lg font-bold text-sm bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">닫기</button>
+                    <button onClick={handleCopyAll} className="flex-1 py-2.5 rounded-lg font-bold text-sm bg-blue-600 hover:bg-blue-700 text-white transition-colors shadow-sm flex items-center justify-center gap-1.5"><Icon name="copy" weight="bold"/> {searchTerm ? '검색된 메뉴 복사' : '전체 메뉴 복사'}</button>
+                </div>
+            </div>
+        </div>
+    );
+};
 
       const LiveTab = ({ youtubeApiKey, youtubeVideoId, orders, setOrders, productHistory, setProductHistory, quickShipping, jejuShipping, freeShippingThreshold, shippingOverrides, setShippingOverrides, bankAccount, googleScriptUrl, depSheetId, addrSheetId, masterSheetId, addresses, setAddresses, cardPayments, setCardPayments, manualDeposits, setManualDeposits, matchedDeposits, setMatchedDeposits, depositorNames, setDepositorNames, clickedChats, setClickedChats, openModal, keywords, setKeywords, sentAddressRequests, setSentAddressRequests, deletedDepositIds, setDeletedDepositIds, checkedOrders, setCheckedOrders, addressMapping, setAddressMapping, templateConfig, specialCustomers, setSpecialCustomers, inventory, setInventory, quickMessages, handleResetAllData, broadcastName, setGlobalError, cashReceipts, setCashReceipts, soundEnabled, soundVolume, depositLinks, setDepositLinks, noShowCustomers, setNoShowCustomers, waitlistCustomers, setWaitlistCustomers }) => {
             const [serverDeposits, setServerDeposits] = useState([]);
