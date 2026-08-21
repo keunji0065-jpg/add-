@@ -663,7 +663,7 @@ useEffect(() => {
             );
         };
 
-        const InventoryItemRow = memo(({ item, itemStats, setOrders, setInventory, setProductHistory, openModal, expandedInventoryItem, setExpandedInventoryItem, setManualProduct, setCurrentSearchTerm, setManualPrice, setIsFixedProductMode, customerPaidStatus, saveInventoryToServer, cardPayments }) => {
+     const InventoryItemRow = memo(({ item, itemStats, setOrders, setInventory, setProductHistory, openModal, expandedInventoryItem, setExpandedInventoryItem, setManualProduct, setCurrentSearchTerm, setManualPrice, setIsFixedProductMode, customerPaidStatus, saveInventoryToServer, cardPayments }) => {
             const [isEditing, setIsEditing] = useState(false);
             const [localName, setLocalName] = useState(item.name);
             const [localPrice, setLocalPrice] = useState(item.price === 0 || item.price === '' ? '' : Number(item.price).toLocaleString());
@@ -675,6 +675,9 @@ useEffect(() => {
 
             const orderedCount = itemStats ? itemStats.count : 0;
             const aggregatedOrders = itemStats ? itemStats.aggregated : [];
+            // ✨ 핵심: 대기 수량과 대기 명단 데이터 가져오기
+            const waitlistCount = itemStats ? (itemStats.waitlistCount || 0) : 0;
+            const waitlistAggregated = itemStats ? (itemStats.waitlistAggregated || []) : [];
 
             const isExpanded = expandedInventoryItem === item.name;
 
@@ -798,6 +801,13 @@ useEffect(() => {
                                         <span className="flex items-center gap-1 shrink-0"><span className="text-slate-400">잔여</span> <span className={`font-bold ${item.stock !== undefined && item.stock !== '' && (item.stock - orderedCount <= 0) ? 'text-red-500' : 'text-blue-600 dark:text-blue-400'}`} title={`초기설정재고: ${item.stock !== undefined && item.stock !== '' ? item.stock : '무한'}`}>{item.stock !== undefined && item.stock !== '' ? item.stock - orderedCount : '∞'}</span></span>
                                         <span className="w-px h-3 bg-slate-300 dark:bg-slate-600 shrink-0"></span>
                                         <span className="flex items-center gap-1 shrink-0"><span className="text-slate-400">주문</span> <span className={`font-bold ${item.isSoldOut ? 'text-red-400' : 'text-slate-700 dark:text-slate-300'}`}>{orderedCount}</span></span>
+                                        {/* ✨ 대기 수량 표시 추가 */}
+                                        {waitlistCount > 0 && (
+                                            <>
+                                                <span className="w-px h-3 bg-slate-300 dark:bg-slate-600 shrink-0"></span>
+                                                <span className="flex items-center gap-1 shrink-0"><span className="text-orange-400">대기</span> <span className="font-bold text-orange-500">{waitlistCount}</span></span>
+                                            </>
+                                        )}
                                     </div>
                                     <button onClick={(e) => { e.stopPropagation(); setExpandedInventoryItem(isExpanded ? null : item.name); }} className={`p-0.5 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors shrink-0 flex justify-center ${isExpanded ? 'bg-slate-200 dark:bg-slate-600 text-slate-700 dark:text-slate-200' : ''}`}><Icon name="caret-down" weight="bold" size={14} className={`transition-transform ${isExpanded ? 'rotate-180' : ''}`} /></button>
                                 </div>
@@ -806,12 +816,13 @@ useEffect(() => {
                     </div>
                     {isExpanded && !isEditing && (
                         <div className="bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-700 p-1.5 flex flex-col gap-1">
+                            {/* 확정 명단 */}
                             <div className="flex justify-between items-center mb-1">
-                                <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 flex items-center gap-1"><Icon name="users" weight="fill" /> 주문 명단 (총 {orderedCount}개)</span>
+                                <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 flex items-center gap-1"><Icon name="users" weight="fill" /> 확정 명단 (총 {orderedCount}개)</span>
                                 <button onClick={handleCopyNames} className="text-[9px] bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-600 hover:bg-slate-300 px-1.5 py-0.5 rounded font-bold shadow-sm transition-colors">명단 복사</button>
                             </div>
                             {aggregatedOrders.length === 0 ? (
-                                <div className="text-center text-[10px] text-slate-400 py-2">주문 내역이 없습니다.</div>
+                                <div className="text-center text-[10px] text-slate-400 py-2">확정된 주문이 없습니다.</div>
                             ) : (
                                 <div className="grid grid-cols-2 gap-1 max-h-[160px] overflow-y-auto pr-1">
                                     {aggregatedOrders.map(agg => {
@@ -842,6 +853,35 @@ useEffect(() => {
                                     })}
                                 </div>
                             )}
+
+                            {/* ✨ 대기 명단 (주황색) 추가 */}
+                            {waitlistAggregated.length > 0 && (
+                                <>
+                                    <div className="flex justify-between items-center mt-2 mb-1 border-t dark:border-slate-700 pt-2">
+                                        <span className="text-[10px] font-bold text-orange-500 flex items-center gap-1"><Icon name="hourglass" weight="fill" /> 대기 명단 (총 {waitlistCount}개)</span>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-1 max-h-[160px] overflow-y-auto pr-1">
+                                        {waitlistAggregated.map(agg => {
+                                            return (
+                                                <div key={agg.customer} className="flex justify-between items-center bg-orange-50 dark:bg-orange-900/20 p-1 rounded border border-orange-200 dark:border-orange-800 shadow-sm text-[10px] group hover:border-orange-300 min-w-0">
+                                                    <span className="cursor-pointer hover:underline truncate flex-1 flex items-center gap-0.5 text-orange-700 dark:text-orange-400" onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        const textArea = document.createElement("textarea"); textArea.value = agg.customer; document.body.appendChild(textArea); textArea.select();
+                                                        try { document.execCommand('copy'); } catch (err) {} document.body.removeChild(textArea);
+                                                        const el = e.currentTarget; el.classList.add('text-green-500'); setTimeout(() => el.classList.remove('text-green-500'), 500);
+                                                    }} title="클릭하여 닉네임 복사">
+                                                        <span className="truncate">{agg.customer}</span> {agg.quantity > 1 && <span className="text-orange-500 ml-0.5 shrink-0">({agg.quantity}개)</span>}
+                                                    </span>
+                                                    <button onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        openModal(`'${agg.customer}'님의 '${item.name}' 대기를 삭제하시겠습니까?`, 'confirm', () => { setOrders(prev => prev.filter(order => !agg.orderIds.includes(order.id))); });
+                                                    }} className="text-red-400 hover:text-red-600 bg-red-50 hover:bg-red-100 px-1.5 py-0.5 rounded font-bold shrink-0 ml-1 opacity-0 group-hover:opacity-100">삭제</button>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </>
+                            )}
                         </div>
                     )}
                 </div>
@@ -861,11 +901,14 @@ useEffect(() => {
                 const prevCount = prev.itemStats ? prev.itemStats.count : 0;
                 const nextCount = next.itemStats ? next.itemStats.count : 0;
                 if (prevCount !== nextCount) return false;
+                const prevWCount = prev.itemStats ? (prev.itemStats.waitlistCount||0) : 0;
+                const nextWCount = next.itemStats ? (next.itemStats.waitlistCount||0) : 0;
+                if (prevWCount !== nextWCount) return false;
             }
             return true;
         });
 
-        const OrderItem = memo(({ item, nick, nextItemId, isLast, handleProductChange, handleQuantityUpdate, handleOrderCancel, handleOrderDelete, addOrderLogic, setSelectedNick, inventory, productHistory }) => {
+ const OrderItem = memo(({ item, nick, nextItemId, isLast, handleProductChange, handleQuantityUpdate, handleOrderCancel, handleOrderDelete, addOrderLogic, setSelectedNick, inventory, productHistory }) => {
             const [localProduct, setLocalProduct] = useState(item.product); 
             const [localQty, setLocalQty] = useState(item.quantity === '' ? '' : item.quantity); 
             const [localPrice, setLocalPrice] = useState(item.price === '' || item.price === 0 ? '' : Number(item.price).toLocaleString());
@@ -878,9 +921,12 @@ useEffect(() => {
             useEffect(() => { if (!isPriceFocused) setLocalPrice(item.price === '' || item.price === 0 ? '' : Number(item.price).toLocaleString()); }, [item.price, isPriceFocused]);
             
             return (
-                <div className={`flex justify-between items-center text-xs px-1 py-0.5 rounded group transition-colors ${item.isCancelled ? 'bg-red-50/80 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30' : (item.isUnmodified ? 'bg-blue-100 dark:bg-blue-900/50 border-2 border-blue-400 dark:border-blue-600 shadow-sm my-0.5' : 'hover:bg-slate-100 dark:hover:bg-slate-700 border-2 border-transparent')}`}>
+                <div className={`flex justify-between items-center text-xs px-1 py-0.5 rounded group transition-colors ${item.isCancelled ? 'bg-red-50/80 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30' : (item.isWaitlist ? 'bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800' : (item.isUnmodified ? 'bg-blue-100 dark:bg-blue-900/50 border-2 border-blue-400 dark:border-blue-600 shadow-sm my-0.5' : 'hover:bg-slate-100 dark:hover:bg-slate-700 border-2 border-transparent'))}`}>
                     <div className="flex-1 flex gap-1 items-center">
                         {item.isCancelled && <span className="text-[9px] text-red-500 font-bold shrink-0">[취소]</span>}
+                        {/* ✨ 대기 상태 뱃지 추가 */}
+                        {!item.isCancelled && item.isWaitlist && <span className="text-[9px] text-orange-500 font-bold shrink-0">[대기]</span>}
+                        
                         <input id={`prod-input-${item.id}`} type="text" list="product-list" value={localProduct} 
                             onChange={(e) => {
                                 const val = e.target.value; setLocalProduct(val);
@@ -892,7 +938,7 @@ useEffect(() => {
                             onFocus={(e) => { e.target.select(); setIsProductFocused(true); setSelectedNick(nick); if(item.isUnmodified) handleProductChange(item.id, 'isUnmodified', false); }} 
                             onBlur={() => { setIsProductFocused(false); if (localProduct !== item.product) handleProductChange(item.id, 'product', localProduct); }} 
                             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleProductChange(item.id, 'product', localProduct); setTimeout(() => document.getElementById(`qty-input-${item.id}`)?.focus(), 10); } }} 
-                            className={`w-full outline-none px-1 rounded bg-transparent font-bold ${item.isCancelled ? 'text-slate-400 line-through' : (item.isUnmodified ? 'text-blue-700 dark:text-blue-300' : 'dark:text-slate-200')}`} placeholder="상품명" disabled={item.isCancelled} />
+                            className={`w-full outline-none px-1 rounded bg-transparent font-bold ${item.isCancelled ? 'text-slate-400 line-through' : (item.isWaitlist ? 'text-orange-600 dark:text-orange-400' : (item.isUnmodified ? 'text-blue-700 dark:text-blue-300' : 'dark:text-slate-200'))}`} placeholder="상품명" disabled={item.isCancelled} />
                     </div>
                     <div className="flex items-center gap-1 group shrink-0">
                         <div className="relative flex items-center">
@@ -901,8 +947,8 @@ useEffect(() => {
                                 onFocus={(e) => { e.target.select(); setIsQtyFocused(true); setSelectedNick(nick); if(item.isUnmodified) handleProductChange(item.id, 'isUnmodified', false); }} 
                                 onBlur={() => { setIsQtyFocused(false); const q = localQty === '' || isNaN(parseInt(localQty)) ? '' : parseInt(localQty); if (q !== item.quantity) handleQuantityUpdate(item.id, q); }} 
                                 onKeyDown={(e) => { if(e.key==='Enter') { e.preventDefault(); setTimeout(() => document.getElementById(`price-input-${item.id}`)?.focus(), 10); } }} 
-                                className={`w-12 text-right pr-4 font-bold outline-none rounded py-0.5 ${item.isCancelled ? 'text-[11px] bg-transparent line-through text-slate-400 cursor-not-allowed' : `${Number(localQty) >= 2 ? 'text-[12px] text-red-600 bg-red-50' : (item.isUnmodified ? 'text-blue-700 dark:text-blue-300' : 'text-[11px] text-slate-800')} hover:bg-slate-200 bg-transparent`}`} disabled={item.isCancelled} />
-                            <span className={`absolute right-1 pointer-events-none ${Number(localQty) >= 2 && !item.isCancelled ? 'text-[10px] text-red-600 font-bold' : (item.isUnmodified ? 'text-blue-500' : 'text-[10px] text-slate-500')}`}>개</span>
+                                className={`w-12 text-right pr-4 font-bold outline-none rounded py-0.5 ${item.isCancelled ? 'text-[11px] bg-transparent line-through text-slate-400 cursor-not-allowed' : `${Number(localQty) >= 2 ? 'text-[12px] text-red-600 bg-red-50' : (item.isWaitlist ? 'text-[11px] text-orange-600 dark:text-orange-400' : (item.isUnmodified ? 'text-blue-700 dark:text-blue-300' : 'text-[11px] text-slate-800'))} hover:bg-slate-200 bg-transparent`}`} disabled={item.isCancelled} />
+                            <span className={`absolute right-1 pointer-events-none ${Number(localQty) >= 2 && !item.isCancelled ? 'text-[10px] text-red-600 font-bold' : (item.isWaitlist ? 'text-[10px] text-orange-500' : (item.isUnmodified ? 'text-blue-500' : 'text-[10px] text-slate-500'))}`}>개</span>
                         </div>
                         <input id={`price-input-${item.id}`} type="text" value={localPrice} 
                             onChange={(e) => { const val = e.target.value.replace(/,/g, ''); if (val === '' || val === '-') setLocalPrice(val); else if (!isNaN(val)) setLocalPrice(Number(val).toLocaleString()); }} 
@@ -910,7 +956,11 @@ useEffect(() => {
                             onFocus={(e) => { e.target.select(); setIsPriceFocused(true); setSelectedNick(nick); if(item.isUnmodified) handleProductChange(item.id, 'isUnmodified', false); }} 
                             onBlur={() => { setIsPriceFocused(false); const val = String(localPrice).replace(/,/g, ''); if (!isNaN(val) && Number(val) !== Number(item.price)) { handleProductChange(item.id, 'price', val); } }} 
                             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); const val = String(localPrice).replace(/,/g, ''); if (!isNaN(val) && Number(val) !== Number(item.price)) { handleProductChange(item.id, 'price', val); } if (!isLast && nextItemId) { setTimeout(() => document.getElementById(`prod-input-${nextItemId}`)?.focus(), 10); } else { addOrderLogic(nick, '', 1, true, item.id); } } }} 
-                            className={`w-16 text-right bg-transparent outline-none px-1 rounded font-bold ${item.isCancelled ? 'line-through text-slate-400 cursor-not-allowed' : (item.isUnmodified ? 'text-blue-700 dark:text-blue-300' : 'text-slate-700 hover:bg-slate-100')} ${Number(item.price) === 0 && !item.isCancelled ? 'bg-red-50 border-b border-red-300' : ''}`} disabled={item.isCancelled} />
+                            className={`w-16 text-right bg-transparent outline-none px-1 rounded font-bold ${item.isCancelled ? 'line-through text-slate-400 cursor-not-allowed' : (item.isWaitlist ? 'text-orange-600 dark:text-orange-400' : (item.isUnmodified ? 'text-blue-700 dark:text-blue-300' : 'text-slate-700 hover:bg-slate-100'))} ${Number(item.price) === 0 && !item.isCancelled ? 'bg-red-50 border-b border-red-300' : ''}`} disabled={item.isCancelled} />
+                        
+                        {/* ✨ 모래시계(대기) 버튼 탑재 */}
+                        <button onClick={(e)=>{e.stopPropagation(); if(!item.isCancelled) { handleProductChange(item.id, 'isWaitlist', !item.isWaitlist); setSelectedNick(nick); }}} className={`ml-1 ${item.isWaitlist ? "text-orange-500" : "text-slate-300 hover:text-orange-500"}`} title={item.isWaitlist ? "구매 대기 해제" : "품절 상품 대기"} disabled={item.isCancelled}><Icon name="hourglass" weight={item.isWaitlist ? "fill" : "bold"}/></button>
+
                         <button onClick={(e)=>{e.stopPropagation(); handleOrderCancel(item.id); setSelectedNick(nick);}} className={`ml-1 ${item.isCancelled ? "text-slate-500" : "text-slate-300 hover:text-red-500"}`} title={item.isCancelled ? "취소 철회" : "주문 취소"}><Icon name={item.isCancelled ? "arrow-u-up-left" : "prohibit"} weight="bold"/></button>
                         <button onClick={(e)=>{e.stopPropagation(); handleOrderDelete(item.id); setSelectedNick(nick);}} className="text-slate-300 hover:text-red-500 ml-1"><Icon name="trash" weight="bold"/></button>
                     </div>
@@ -1268,25 +1318,36 @@ useEffect(() => {
             const chatNextPageTokenRef = useRef('');
             const unsavedChatsRef = useRef([]);
 
-            const inventoryStats = useMemo(() => {
+          const inventoryStats = useMemo(() => {
                 const stats = {};
                 orders.forEach(o => {
                     if (!o.isCancelled && o.product) {
-                        if (!stats[o.product]) stats[o.product] = { count: 0, customers: {} };
-                        stats[o.product].count += Number(o.quantity || 0);
-                        if (!stats[o.product].customers[o.customer]) {
-                            stats[o.product].customers[o.customer] = { customer: o.customer, quantity: 0, orderIds: [] };
+                        // ✨ 핵심: 확정 명단(count)과 대기 명단(waitlistCount) 바구니를 각각 만듭니다.
+                        if (!stats[o.product]) stats[o.product] = { count: 0, waitlistCount: 0, customers: {}, waitlistCustomers: {} };
+                        
+                        if (o.isWaitlist) {
+                            stats[o.product].waitlistCount += Number(o.quantity || 0);
+                            if (!stats[o.product].waitlistCustomers[o.customer]) {
+                                stats[o.product].waitlistCustomers[o.customer] = { customer: o.customer, quantity: 0, orderIds: [] };
+                            }
+                            stats[o.product].waitlistCustomers[o.customer].quantity += Number(o.quantity || 0);
+                            stats[o.product].waitlistCustomers[o.customer].orderIds.push(o.id);
+                        } else {
+                            stats[o.product].count += Number(o.quantity || 0);
+                            if (!stats[o.product].customers[o.customer]) {
+                                stats[o.product].customers[o.customer] = { customer: o.customer, quantity: 0, orderIds: [] };
+                            }
+                            stats[o.product].customers[o.customer].quantity += Number(o.quantity || 0);
+                            stats[o.product].customers[o.customer].orderIds.push(o.id);
                         }
-                        stats[o.product].customers[o.customer].quantity += Number(o.quantity || 0);
-                        stats[o.product].customers[o.customer].orderIds.push(o.id);
                     }
                 });
                 for (let prod in stats) {
                     stats[prod].aggregated = Object.values(stats[prod].customers).sort((a, b) => String(a.customer).localeCompare(String(b.customer), 'ko'));
+                    stats[prod].waitlistAggregated = Object.values(stats[prod].waitlistCustomers).sort((a, b) => String(a.customer).localeCompare(String(b.customer), 'ko'));
                 }
                 return stats;
             }, [orders]);
-
             const [copyStatus, setCopyStatus] = useState({});
             const [quickMsgCopyStatus, setQuickMsgCopyStatus] = useState({});
             const [isSaving, setIsSaving] = useState(false);
@@ -1852,13 +1913,22 @@ useEffect(() => {
                 return decorated.map(d => d.item); 
             }, [allDeposits, deferredDepositSearch, selectedNick, deletedDepositIds, matchedDeposits, depositorNames, addressLookup]);
             
-            const dashboardStats = useMemo(() => {
-                let totalSales = 0, totalDeposit = 0, totalUnpaid = 0, totalOverpaid = 0, totalCardExpected = 0, missingAddressCount = 0;
+
+const dashboardStats = useMemo(() => {
+                let totalSales = 0, totalDeposit = 0, totalUnpaid = 0, totalOverpaid = 0, totalCardExpected = 0, missingAddressCount = 0, waitlistCount = 0;
                 const groups = {}; orders.forEach(o => { if (!groups[o.customer]) groups[o.customer] = []; groups[o.customer].push(o); });
                 Object.entries(groups).forEach(([nick, items]) => {
-                    const activeItems = items.filter(i => !i.isCancelled); const depositTotal = items.reduce((sum, i) => sum + (i.deposit || 0), 0); totalDeposit += depositTotal;
-                    if (activeItems.length === 0) return; 
-                    const addr = addressLookup.get(nick); if (!addr || !addr.data || !addr.data.address) missingAddressCount++;
+                    const activeItems = items.filter(i => !i.isCancelled && !i.isWaitlist); 
+                    const waitlistItems = items.filter(i => !i.isCancelled && i.isWaitlist);
+                    const depositTotal = items.reduce((sum, i) => sum + (i.deposit || 0), 0); totalDeposit += depositTotal;
+                    
+                    // ✨ 핵심: 개별 품목 대기(isWaitlist)가 하나라도 있거나, 닉네임 전체 대기를 걸었을 경우 모두 '대기' 카운트에 포함
+                    if (waitlistCustomers[nick] || waitlistItems.length > 0) waitlistCount++;
+                    
+                    if (activeItems.length === 0 && waitlistItems.length === 0) return; 
+                    if (activeItems.length > 0) {
+                        const addr = addressLookup.get(nick); if (!addr || !addr.data || !addr.data.address) missingAddressCount++;
+                    }
                     const isCard = cardPayments[nick]; const productTotal = activeItems.reduce((sum, i) => sum + Number(i.price), 0);
                     const shipping = getCalculatedShipping(nick, productTotal); const baseGrandTotal = productTotal + shipping; const baseBalance = baseGrandTotal - depositTotal;
                     const cardFee = (isCard && baseBalance > 0) ? baseBalance * 0.1 : 0; const finalGrandTotal = baseGrandTotal + cardFee; const finalBalance = baseBalance + cardFee;
@@ -1866,8 +1936,8 @@ useEffect(() => {
                     totalSales += finalGrandTotal; 
                     if (finalBalance > 0) { if (isCard) totalCardExpected += finalBalance; else totalUnpaid += finalBalance; } else if (finalBalance < 0 && !isCard) { totalOverpaid += Math.abs(finalBalance); }
                 });
-                return { totalSales, totalDeposit, totalUnpaid, totalOverpaid, totalCardExpected, missingAddressCount };
-            }, [orders, cardPayments, getCalculatedShipping, addressLookup]);
+                return { totalSales, totalDeposit, totalUnpaid, totalOverpaid, totalCardExpected, missingAddressCount, waitlistCount };
+            }, [orders, cardPayments, getCalculatedShipping, addressLookup, waitlistCustomers]);
 
             const noKakaoCount = useMemo(() => {
                 const activeCustomers = new Set();
@@ -1881,7 +1951,7 @@ useEffect(() => {
                 const status = {}; const groups = {};
                 orders.forEach(o => { if (!groups[o.customer]) groups[o.customer] = []; groups[o.customer].push(o); });
                 Object.entries(groups).forEach(([nick, items]) => {
-                    const activeItems = items.filter(i => !i.isCancelled);
+                    const activeItems = items.filter(i => !i.isCancelled && !i.isWaitlist);
                     if (activeItems.length === 0) { status[nick] = true; return; }
                     const isCard = cardPayments[nick]; const productTotal = activeItems.reduce((sum, i) => sum + Number(i.price), 0);
                     const shipping = getCalculatedShipping(nick, productTotal); const baseGrandTotal = productTotal + shipping;
@@ -1899,7 +1969,8 @@ useEffect(() => {
                     if (filterStatus === 'no-address') { return !(addressLookup.get(nick)?.data?.address); }
                     if (filterStatus === 'no-kakao') { return !checkedOrders.has(nick); }
                     if (filterStatus === 'noshow') { return noShowCustomers[nick]; }
-                    if (filterStatus === 'waitlist') { return waitlistCustomers[nick]; }
+                    // ✨ 핵심: 대기 탭을 눌렀을 때, 개별 품목 대기가 있는 사람도 표시
+                    if (filterStatus === 'waitlist') { return waitlistCustomers[nick] || items.some(i => !i.isCancelled && i.isWaitlist); }
 
                     if (deferredOrderSearch) {
                         const term = String(deferredOrderSearch).toLowerCase().replace(/\s/g, ''); const isChosung = /^[ㄱ-ㅎa-zA-Z0-9]+$/.test(term);
@@ -1909,7 +1980,8 @@ useEffect(() => {
                         return items.some(i => i.product && (String(i.product).toLowerCase().replace(/\s/g, '').includes(term) || (isChosung && getChosung(String(i.product).toLowerCase().replace(/\s/g, '')).includes(term))));
                     }
                     if (filterStatus === 'card') return cardPayments[nick];
-                    const activeItems = items.filter(i => !i.isCancelled); const activeProd = activeItems.reduce((s,i) => s + Number(i.price), 0);
+                    
+                    const activeItems = items.filter(i => !i.isCancelled && !i.isWaitlist); const activeProd = activeItems.reduce((s,i) => s + Number(i.price), 0);
                     const currentDep = items.reduce((s,i) => s + (i.deposit || 0), 0); const currentShip = getCalculatedShipping(nick, activeProd);
                     const baseBal = activeProd + (activeItems.length > 0 ? currentShip : 0) - currentDep; const isCard = cardPayments[nick];
                     const finalBal = baseBal + (isCard && baseBal > 0 ? baseBal * 0.1 : 0);
@@ -1936,8 +2008,7 @@ useEffect(() => {
                 if (newNicks.length > 0) { sortOrderCache.current = [...newNicks, ...sortOrderCache.current]; }
                 return entries;
             }, [orders, deferredOrderSearch, filterStatus, cardPayments, getCalculatedShipping, addressLookup, depositorNames, checkedOrders, noShowCustomers, waitlistCustomers]);
-
-            const totalItemsCount = useMemo(() => { let count = 0; filteredGroupedOrders.forEach(([_, items]) => { count += items.filter(i => !i.isCancelled).length; }); return count; }, [filteredGroupedOrders]);
+            const totalItemsCount = useMemo(() => { let count = 0; filteredGroupedOrders.forEach(([_, items]) => { count += items.filter(i => !i.isCancelled && !i.isWaitlist).length; }); return count; }, [filteredGroupedOrders]);
             useEffect(() => { setDisplayLimit(30); }, [deferredOrderSearch, filterStatus, selectedNick]);
             const handleOrderScroll = useCallback((e) => { const { scrollTop, clientHeight, scrollHeight } = e.target; if (scrollHeight - scrollTop <= clientHeight + 300) setDisplayLimit(prev => Math.min(prev + 30, filteredGroupedOrders.length)); }, [filteredGroupedOrders.length]);
             const displayedOrders = useMemo(() => filteredGroupedOrders.slice(0, displayLimit), [filteredGroupedOrders, displayLimit]);
@@ -2262,8 +2333,11 @@ useEffect(() => {
             const handleOrderCancel = useCallback((id) => setOrders(prev => prev.map(o => o.id === id ? { ...o, isCancelled: !o.isCancelled } : o)), [setOrders]);
             const handleOrderDelete = useCallback((id) => openModal("주문 삭제하시겠습니까?", 'confirm', () => setOrders(prev => prev.filter(o => o.id !== id))), [openModal, setOrders]);
 
-            const copyOrderSheet = useCallback((nick, items, grandTotal, depositTotal, balance, isCard, addrData, e) => {
-                const activeItems = items.filter(i => !i.isCancelled); const addr = addrData || addressLookup.get(nick)?.data || {};
+   const copyOrderSheet = useCallback((nick, items, grandTotal, depositTotal, balance, isCard, addrData, e) => {
+                // ✨ 확정 상품과 대기 상품 분리
+                const activeItems = items.filter(i => !i.isCancelled && !i.isWaitlist); 
+                const waitlistItems = items.filter(i => !i.isCancelled && i.isWaitlist);
+                const addr = addrData || addressLookup.get(nick)?.data || {};
                 const productTotal = activeItems.reduce((sum, i) => sum + Number(i.price), 0); const currentShipping = getCalculatedShipping(nick, productTotal);
                 const itemListText = activeItems.map(i => `${i.product}${i.quantity > 1 ? ` ★${i.quantity}개` : ''} ${Number(i.price).toLocaleString()}원`).join('\n');
                 const { emoji, paidMsg, unpaidPrefix, overpaidMsg = '과납 금액이 있습니다.\n환불 또는 적립 여부를 알려주세요!', addrNotice, surveyNotice, alwaysRequestAddress } = templateConfig;
@@ -2288,6 +2362,12 @@ useEffect(() => {
                     msg += `\n[배송지 확인]\n\n${addr.realname || nick}\n${dispPhone}\n${addr.address} ${addr.zipcode ? `(${addr.zipcode})` : ''}\n${addr.memo ? addr.memo + '\n' : ''}\n------------------\n${addrNotice}`;
                 } else if (!sentAddressRequests.has(nick) || alwaysRequestAddress) { 
                     msg += `\n${surveyNotice}`; setSentAddressRequests(prev => new Set(prev).add(nick)); 
+                }
+
+                // ✨ 대기 상품이 있다면 메시지 맨 끝에 별도 안내문 추가
+                if (waitlistItems.length > 0) {
+                    const waitlistText = waitlistItems.map(i => `${i.product}${i.quantity > 1 ? ` ★${i.quantity}개` : ''}`).join('\n');
+                    msg += `\n\n[⏱️ 품절 대기 상품]\n${waitlistText}\n* 대기 상품은 재고 발생 시 별도 연락드립니다.`;
                 }
                 
                 const textArea = document.createElement("textarea"); textArea.value = msg; document.body.appendChild(textArea); textArea.select();
@@ -2659,7 +2739,7 @@ useEffect(() => {
                               {id:'no-address', label:'주소없음', val:dashboardStats.missingAddressCount, isCurrency:false, onClick:handleNoAddressClick},
                               {id:'no-kakao', label:'카톡없음', val:noKakaoCount, isCurrency:false},
                               {id:'noshow', label:'노쇼', val:Object.values(noShowCustomers).filter(Boolean).length, isCurrency:false},
-                              {id:'waitlist', label:'대기', val:Object.values(waitlistCustomers).filter(Boolean).length, isCurrency:false},
+                              {id:'waitlist', label:'대기', val:dashboardStats.waitlistCount, isCurrency:false},
                               {id:'paid', label:'완납', val:dashboardStats.totalDeposit, isCurrency:true}, 
                               {id:'unpaid', label:'미수금', val:dashboardStats.totalUnpaid, isCurrency:true}, 
                               {id:'overpaid', label:'과납', val:dashboardStats.totalOverpaid, isCurrency:true},
@@ -2723,8 +2803,8 @@ useEffect(() => {
                             </div>
                         </div>
                         <div ref={orderListRef} className="flex-1 overflow-y-auto p-1.5 bg-slate-50 dark:bg-slate-900 relative z-0" onScroll={handleOrderScroll}>
-                            {displayedOrders.map(([nick, items]) => {
-                                const activeItems = items.filter(i => !i.isCancelled); const prodSum = activeItems.reduce((s, i) => s + Number(i.price), 0);
+                      {displayedOrders.map(([nick, items]) => {
+                                const activeItems = items.filter(i => !i.isCancelled && !i.isWaitlist); const prodSum = activeItems.reduce((s, i) => s + Number(i.price), 0);
                                 const ship = getCalculatedShipping(nick, prodSum); const depSum = items.reduce((s, i) => s + (i.deposit || 0), 0);
                                 const baseGrand = prodSum + (activeItems.length > 0 ? ship : 0); const baseBal = baseGrand - depSum;
                                 const isCard = cardPayments[nick]; const cardFee = (isCard && baseBal > 0) ? baseBal * 0.1 : 0;
@@ -2851,7 +2931,7 @@ useEffect(() => {
             );
         };
 
-        const OrderManagementTab = ({ orders, shippingOverrides, quickShipping, jejuShipping, freeShippingThreshold, broadcastName, addresses, handleExportBackup, handleImportBackup, addressMapping, cardPayments, specialCustomers, openModal, cashReceipts, inventory, productHistory, noShowCustomers, waitlistCustomers }) => {
+    const OrderManagementTab = ({ orders, shippingOverrides, quickShipping, jejuShipping, freeShippingThreshold, broadcastName, addresses, handleExportBackup, handleImportBackup, addressMapping, cardPayments, specialCustomers, openModal, cashReceipts, inventory, productHistory, noShowCustomers, waitlistCustomers }) => {
             const findAddress = (nick) => {
                 if (!nick) return undefined;
                 const cleanNick = normalizeString(nick);
@@ -2886,13 +2966,13 @@ useEffect(() => {
                 orders.forEach(o => { if(!customerGroups[o.customer]) customerGroups[o.customer] = []; customerGroups[o.customer].push(o); });
                 const savedCardPayments = cardPayments || {};
                 Object.entries(customerGroups).forEach(([nick, items]) => {
-                    const activeItems = items.filter(i => !i.isCancelled); if(activeItems.length === 0) { customerPaidStatus[nick] = false; return; }
+                    const activeItems = items.filter(i => !i.isCancelled && !i.isWaitlist); if(activeItems.length === 0) { customerPaidStatus[nick] = false; return; }
                     const isCard = savedCardPayments[nick]; const productTotal = activeItems.reduce((sum, i) => sum + Number(i.price), 0);
                     const shipping = getCalculatedShipping(nick, productTotal); const depositTotal = items.reduce((sum, i) => sum + (i.deposit || 0), 0);
                     const grandTotal = productTotal + (activeItems.length > 0 ? shipping : 0); customerPaidStatus[nick] = (depositTotal >= grandTotal) || isCard;
                 });
                 orders.forEach(o => { 
-                    if(o.isCancelled) return; const name = o.product || '(상품명 없음)'; 
+                    if(o.isCancelled || o.isWaitlist) return; const name = o.product || '(상품명 없음)'; 
                     if (!summary[name]) summary[name] = 0; if (!paidSummary[name]) paidSummary[name] = 0; if (!unpaidSummary[name]) unpaidSummary[name] = 0;
                     summary[name] += Number(o.quantity); if (customerPaidStatus[o.customer]) paidSummary[name] += Number(o.quantity); else unpaidSummary[name] += Number(o.quantity);
                 }); 
@@ -2905,10 +2985,12 @@ useEffect(() => {
                 downloadExcel(data, '상품별_발주리스트'); 
             };
 
-            const handleExportCustomers = () => { 
+         const handleExportCustomers = () => { 
                 const groups = {}; orders.forEach(o => { if (!groups[o.customer]) groups[o.customer] = []; groups[o.customer].push(o); }); 
                 let entries = Object.entries(groups).map(([nick, items]) => {
-                    const activeItems = items.filter(i => !i.isCancelled); const isCard = cardPayments[nick]; 
+                    const activeItems = items.filter(i => !i.isCancelled && !i.isWaitlist); 
+                    const waitlistItems = items.filter(i => !i.isCancelled && i.isWaitlist);
+                    const isCard = cardPayments[nick]; 
                     const hasCashReceipt = cashReceipts[nick];
                     const productTotal = activeItems.reduce((sum, i) => sum + Number(i.price), 0);
                     const currentShipping = getCalculatedShipping(nick, productTotal);
@@ -2916,7 +2998,8 @@ useEffect(() => {
                     const grandTotal = productTotal + (activeItems.length > 0 ? currentShipping : 0); 
                     const isPaid = (depositTotal >= grandTotal) || isCard;
                     const balance = grandTotal - depositTotal;
-                    return { nick, items: activeItems, isPaid, isCard, hasCashReceipt, depositTotal, grandTotal, balance };
+                    // ✨ 핵심: waitlistItems 배열도 같이 넘겨줍니다.
+                    return { nick, activeItems, waitlistItems, isPaid, isCard, hasCashReceipt, depositTotal, grandTotal, balance };
                 });
 
                 const getStatusPriority = (entry) => { if (entry.isPaid && !entry.isCard) return 1; if (entry.isCard) return 2; return 3; };
@@ -2927,24 +3010,23 @@ useEffect(() => {
                     return a.nick.localeCompare(b.nick); 
                 });
 
-                let excelRows = []; entries.forEach(({ nick, items, isPaid, isCard, hasCashReceipt, depositTotal, grandTotal, balance }) => { 
-                    if(items.length === 0) return; 
+                let excelRows = []; entries.forEach(({ nick, activeItems, waitlistItems, isPaid, isCard, hasCashReceipt, depositTotal, grandTotal, balance }) => { 
+                    if(activeItems.length === 0 && waitlistItems.length === 0) return; 
                     const addrInfo = findAddress(nick) || {}; 
-                  const fullAddress = addrInfo.zipcode ? `(${addrInfo.zipcode}) ${addrInfo.address || ''}` : (addrInfo.address || ''); 
+                    const fullAddress = addrInfo.zipcode ? `(${addrInfo.zipcode}) ${addrInfo.address || ''}` : (addrInfo.address || ''); 
                     
                     let cleanPhone = fixPhoneNumber(addrInfo.phone);
 
-                    // 상태 확인
                     const isVip = specialCustomers && specialCustomers[normalizeString(nick)]?.type === 'vip';
                     const isNoShow = noShowCustomers && noShowCustomers[nick];
-                    const isWaitlist = waitlistCustomers && waitlistCustomers[nick];
+                    const isWaitlistToggle = waitlistCustomers && waitlistCustomers[nick];
 
-                    // 💡 [수정됨] 입금상태 열 1개에 모든 상태를 텍스트로 합쳐서 출력
+                    // ✨ 핵심: 대기 상태면 엑셀 입금상태 열에 '대기'라고 명확히 찍힙니다.
                     let statusColumn = "";
                     if (isNoShow) {
                         statusColumn = "노쇼";
-                    } else if (isWaitlist) {
-                        statusColumn = "거파대기";
+                    } else if (isWaitlistToggle || (waitlistItems.length > 0 && activeItems.length === 0)) {
+                        statusColumn = "대기";
                     } else if (hasCashReceipt) {
                         statusColumn = "현금영수증";
                     } else if (isCard) {
@@ -2958,7 +3040,7 @@ useEffect(() => {
                     const createRow = (productValue) => ({ 
                         '날짜시간': new Date().toLocaleString(), 
                         '입금상태': statusColumn, 
-                        '닉네임': isVip ? `[VIP] ${nick}` : nick, // 열을 추가하는 대신 닉네임 옆에 VIP 표기
+                        '닉네임': isVip ? `[VIP] ${nick}` : nick,
                         '주문제품(수량)': productValue, 
                         '이름': addrInfo.realname || '', 
                         '핸드폰번호': cleanPhone, 
@@ -2966,13 +3048,15 @@ useEffect(() => {
                         '배송메모': addrInfo.memo || ''
                     }); 
                     
-                    excelRows.push(createRow(`[ ${nick} ]`)); items.forEach(item => { const qtyPart = item.quantity > 1 ? ` ★${item.quantity}개` : ''; excelRows.push(createRow(`${item.product}${qtyPart}`)); }); 
+                    excelRows.push(createRow(`[ ${nick} ]`)); 
+                    activeItems.forEach(item => { const qtyPart = item.quantity > 1 ? ` ★${item.quantity}개` : ''; excelRows.push(createRow(`${item.product}${qtyPart}`)); }); 
+                    // ✨ 핵심: 대기 상품은 앞에 [대기] 말머리가 붙어서 엑셀에 추가됩니다.
+                    waitlistItems.forEach(item => { const qtyPart = item.quantity > 1 ? ` ★${item.quantity}개` : ''; excelRows.push(createRow(`[대기] ${item.product}${qtyPart}`)); }); 
                 }); 
                 downloadExcel(excelRows, '고객별_정산_배송리스트'); 
             };
 
             const handleExportAllMessages = () => {
-         
                 const groups = {}; orders.forEach(o => { if (!groups[o.customer]) groups[o.customer] = []; groups[o.customer].push(o); });
                 const templateConfigStr = localStorage.getItem(getLsKey('templateConfig'));
                 const templateConfigLocal = templateConfigStr ? JSON.parse(templateConfigStr) : { emoji: '💙', paidMsg: '😍 완납 확인! 감사합니다 😍', unpaidPrefix: '[미입금]\n총 입금하실 금액\n👉', overpaidMsg: '과납 금액이 있습니다.\n환불 또는 적립 여부를 알려주세요!', addrNotice: '※ 배송지 변경 시 채팅으로 변경할 주소를 남겨주세요!', surveyNotice: '방송마다 1회 하단의 주문서(배송지입력) 필수!!', alwaysRequestAddress: false };
@@ -2981,7 +3065,10 @@ useEffect(() => {
                 const sentAddressRequestsStr = localStorage.getItem(getLsKey('sentAddressRequests')); const sentAddressRequestsLocal = sentAddressRequestsStr ? new Set(JSON.parse(sentAddressRequestsStr)) : new Set();
                 const data = []; 
                 Object.entries(groups).forEach(([nick, items]) => {
-                    const activeItems = items.filter(i => !i.isCancelled); if (activeItems.length === 0) return;
+                    const activeItems = items.filter(i => !i.isCancelled && !i.isWaitlist); 
+                    const waitlistItems = items.filter(i => !i.isCancelled && i.isWaitlist);
+                    if (activeItems.length === 0 && waitlistItems.length === 0) return;
+
                     const isCard = cardPayments && cardPayments[nick]; const productTotal = activeItems.reduce((sum, i) => sum + Number(i.price), 0);
                     const currentShipping = getCalculatedShipping(nick, productTotal); const baseGrandTotal = productTotal + currentShipping;
                     const depositTotal = items.reduce((sum, i) => sum + (i.deposit || 0), 0); const baseBalance = baseGrandTotal - depositTotal;
@@ -3006,10 +3093,16 @@ useEffect(() => {
                         } else if (balance < 0) { statusStr = '과납'; msg += `${templateConfigLocal.paidMsg}\n\n[과납 안내]\n과납액: ${Math.abs(balance).toLocaleString()}원\n${overpaidMsg}\n------------------\n`; } 
                         else { statusStr = '입금'; if (isPaid) msg += `${templateConfigLocal.paidMsg}\n------------------\n`; }
                     }
-                   if (addrInfo && addrInfo.address && !templateConfigLocal.alwaysRequestAddress) {
+                    if (addrInfo && addrInfo.address && !templateConfigLocal.alwaysRequestAddress) {
                         let cleanPhone = fixPhoneNumber(addrInfo.phone);
                         msg += `\n[배송지 확인]\n\n${addrInfo.realname || nick}\n${cleanPhone}\n${addrInfo.address} ${addrInfo.zipcode ? `(${addrInfo.zipcode})` : ''}\n${addrInfo.memo ? addrInfo.memo + '\n' : ''}\n------------------\n${templateConfigLocal.addrNotice}`; 
                     } else if (!sentAddressRequestsLocal.has(nick) || templateConfigLocal.alwaysRequestAddress) { msg += `\n${templateConfigLocal.surveyNotice}`; }
+                    
+                    if (waitlistItems.length > 0) {
+                        const waitlistText = waitlistItems.map(i => `${i.product}${i.quantity > 1 ? ` ★${i.quantity}개` : ''}`).join('\n');
+                        msg += `\n\n[⏱️ 품절 대기 상품]\n${waitlistText}\n* 대기 상품은 재고 발생 시 별도 연락드립니다.`;
+                    }
+
                     data.push({ '닉네임': nick, '상품명': itemListTextForExcel, '가격': grandTotal.toLocaleString() + '원', '입금액': depositTotal.toLocaleString() + '원', '상태': statusStr, '카톡전송메세지': msg });
                 });
                 if (data.length === 0) { openModal("주문 내역이 없습니다.", "alert"); return; }
@@ -3018,7 +3111,7 @@ useEffect(() => {
             };
 
             const handlePrintPackingList = () => {
-                const groups = {}; orders.forEach(o => { if (o.isCancelled) return; if (!groups[o.customer]) groups[o.customer] = []; groups[o.customer].push(o); });
+                const groups = {}; orders.forEach(o => { if (o.isCancelled || o.isWaitlist) return; if (!groups[o.customer]) groups[o.customer] = []; groups[o.customer].push(o); });
                 if (Object.keys(groups).length === 0) { openModal("인쇄할 주문 내역이 없습니다.", "alert"); return; }
                 let printContent = `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>포장리스트_인쇄</title><style>@import url("https://cdn.jsdelivr.net/gh/moonspam/NanumSquareNeo/nanumsquareneo.css");@page { size: 100mm 150mm; margin: 0 !important; }* { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }html, body { margin: 0; padding: 0; width: 100mm; background: #fff; color: #000; font-family: 'NanumSquareNeo', sans-serif; }.slip { width: 100mm; padding: 8mm 4mm 4mm 4mm; page-break-after: always; position: relative; }.nick { font-size: 26px; font-weight: 900; text-align: center; margin-bottom: 12px; border: 2px solid #000; padding: 8px 5px; border-radius: 8px; box-shadow: 3px 3px 0 #000; background-color: #fff; }table { width: 100%; border-collapse: collapse; margin-bottom: 10px; table-layout: fixed; }thead { display: table-header-group; }tr { page-break-inside: avoid; page-break-after: auto; }th, td { border-bottom: 1px solid #000; padding: 6px 2px; text-align: left; vertical-align: middle; }th { font-size: 13px; color: #000; border-bottom: 2px solid #000; padding-bottom: 4px; }.right { text-align: right; }.product-name { font-weight: 800; font-size: 15px; word-break: break-all; overflow-wrap: anywhere; line-height: 1.3; padding-right: 5px; }.qty { font-weight: 900; font-size: 16px; white-space: nowrap; text-align: right; width: 45px; }.total { font-size: 18px; font-weight: 900; text-align: right; border-top: 2px solid #000; padding-top: 8px; margin-top: 8px; }.footer { text-align: center; font-size: 12px; font-weight: bold; border-top: 1px dashed #000; padding-top: 8px; margin-top: 15px; margin-bottom: 5px; }</style></head><body>`;
                 const sortedCustomers = Object.keys(groups).sort((a, b) => a.localeCompare(b, 'ko'));
@@ -3041,22 +3134,22 @@ useEffect(() => {
                     <div className="grid grid-cols-2 gap-6 w-full max-w-5xl"> 
                         <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-lg border dark:border-slate-700 text-center">
                             <h2 className="text-lg font-bold mb-2 dark:text-slate-100 flex items-center justify-center gap-2"><Icon name="clipboard-text" weight="fill" className="text-slate-600"/> 발주용 품목 집계</h2>
-                            <p className="text-slate-500 dark:text-slate-400 mb-4 text-xs">상품별 전체 수량 요약 (취소건 제외)</p>
+                            <p className="text-slate-500 dark:text-slate-400 mb-4 text-xs">상품별 전체 수량 요약 (취소건 및 대기건 제외)</p>
                             <button onClick={handleExportProducts} className="w-full bg-slate-700 text-white font-bold py-3 rounded-lg transition-transform hover:scale-105 shadow-md flex items-center justify-center gap-2 hover:bg-slate-800"><Icon name="download-simple" weight="bold"/> 엑셀 다운로드</button>
                         </div>
                         <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-lg border dark:border-slate-700 text-center">
                             <h2 className="text-lg font-bold mb-2 dark:text-slate-100 flex items-center justify-center gap-2"><Icon name="users" weight="fill" className="text-slate-600"/> 배송용 고객 리스트 (전체)</h2>
-                            <p className="text-slate-500 dark:text-slate-400 mb-4 text-xs">완납 상단 / 카드 중간 / 노쇼 하단 자동 정렬</p>
+                            <p className="text-slate-500 dark:text-slate-400 mb-4 text-xs">완납 상단 / 카드 중간 / 노쇼 하단 자동 정렬 (대기건 제외)</p>
                             <button onClick={handleExportCustomers} className="w-full bg-slate-700 text-white font-bold py-3 rounded-lg transition-transform hover:scale-105 shadow-md flex items-center justify-center gap-2 hover:bg-slate-800"><Icon name="download-simple" weight="bold"/> 엑셀 다운로드</button>
                         </div>
                         <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-lg border dark:border-slate-700 text-center ring-2 ring-blue-100 dark:ring-blue-900/30">
                             <h2 className="text-lg font-bold mb-2 text-blue-600 dark:text-blue-400 flex items-center justify-center gap-2"><Icon name="chat-circle-dots" weight="fill"/> 전체 카톡 전송 메시지</h2>
-                            <p className="text-slate-500 dark:text-slate-400 mb-4 text-xs">전체 고객 대상 카톡 메시지 (과납/미입금 표기)</p>
+                            <p className="text-slate-500 dark:text-slate-400 mb-4 text-xs">카톡 메시지 일괄 (대기 상품 안내 포함)</p>
                             <button onClick={handleExportAllMessages} className="w-full bg-blue-500 text-white font-bold py-3 rounded-lg transition-transform hover:scale-105 shadow-md flex items-center justify-center gap-2 hover:bg-blue-600"><Icon name="download-simple" weight="bold"/> 엑셀 다운로드</button>
                         </div>
                         <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-lg border dark:border-slate-700 text-center ring-2 ring-slate-200 dark:ring-slate-900/30">
                             <h2 className="text-lg font-bold mb-2 text-slate-700 dark:text-slate-300 flex items-center justify-center gap-2"><Icon name="printer" weight="fill"/> 포장 리스트 인쇄</h2>
-                            <p className="text-slate-500 dark:text-slate-400 mb-4 text-xs">감열지 10x15cm 세로 양식 (닉네임 오름차순 정렬)</p>
+                            <p className="text-slate-500 dark:text-slate-400 mb-4 text-xs">감열지 10x15cm 프린트 (대기건 자동 제외)</p>
                             <button onClick={handlePrintPackingList} className="w-full bg-slate-600 text-white font-bold py-3 rounded-lg transition-transform hover:scale-105 shadow-md flex items-center justify-center gap-2 hover:bg-slate-700"><Icon name="printer" weight="bold"/> 10x15cm 인쇄</button>
                         </div>
                         
@@ -3074,7 +3167,7 @@ useEffect(() => {
                     </div>
                 </div>
             );
-        };
+        };    
 
       const App = () => {
             const [orders, setOrders] = useLocalStorage('youtubeOrders', []);
