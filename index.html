@@ -1702,7 +1702,7 @@ useEffect(() => {
                                 setChats(prev => {
                                     const deduplicatedMap = new Map();
                                     [...prev, ...newChats].forEach(c => deduplicatedMap.set(c.id, c));
-                                    return Array.from(deduplicatedMap.values()).slice(-700); 
+                                    return Array.from(deduplicatedMap.values()).slice(-7000); 
                                 });
                                 
                                 if (googleScriptUrl && masterSheetId && broadcastName) {
