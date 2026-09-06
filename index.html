@@ -1371,6 +1371,21 @@ useEffect(() => {
             
             const [chats, setChats] = useLocalStorage('savedChats', []);
             
+            // ✨ 엑셀 채팅 임포트 이벤트 리스너 추가
+            useEffect(() => {
+                const handleImportChats = (e) => {
+                    const importedChats = e.detail;
+                    setChats(prev => {
+                        const deduplicatedMap = new Map();
+                        [...prev, ...importedChats].forEach(c => deduplicatedMap.set(c.id, c));
+                        // 데이터 양 무한 유지
+                        return Array.from(deduplicatedMap.values()); 
+                    });
+                };
+                window.addEventListener('import-chats', handleImportChats);
+                return () => window.removeEventListener('import-chats', handleImportChats);
+            }, [setChats]);
+            
             const [hiddenChatIds, setHiddenChatIds] = useState(() => { try { const s = localStorage.getItem(getLsKey('hiddenChatIds')); const p = JSON.parse(s); return Array.isArray(p) ? p : []; } catch(e){ return []; } });
             const [showKeywordOnly, setShowKeywordOnly] = useState(false);
 
@@ -1702,7 +1717,7 @@ useEffect(() => {
                                 setChats(prev => {
                                     const deduplicatedMap = new Map();
                                     [...prev, ...newChats].forEach(c => deduplicatedMap.set(c.id, c));
-                                    return Array.from(deduplicatedMap.values()).slice(-7000); 
+                                    return Array.from(deduplicatedMap.values()); 
                                 });
                                 
                                 if (googleScriptUrl && masterSheetId && broadcastName) {
@@ -2922,7 +2937,7 @@ const dashboardStats = useMemo(() => {
                                 const { data: addrData, conflict: addrConflict, type: addrType } = addressLookup.get(nick);
                                 const customerDeps = allDeposits.filter(d => depositLinks[d.id] === nick && matchedDeposits.has(d.id));
                                 
-                                return (<CustomerBlock key={nick} nick={nick} items={items} isSelected={selectedNick === nick} currentShipping={ship} isCard={isCard} isPaidState={bal <= 0 && activeItems.length > 0} grandTotal={grand} depositTotal={depSum} balance={bal} baseGrandTotal={baseGrand} baseBalance={baseBal} addr={addrData} addrType={addrType} addrConflict={addrConflict} addressMapping={addressMapping} autoDepositorName={addrData?.realname || ''} displayDepositorName={depositorNames[nick] || addrData?.realname || '입금자'} isAutoDepositor={!depositorNames[nick] && addrData?.realname} depositorNames={depositorNames} copyStatus={copyStatus} isOrderConfirmed={checkedOrders.has(nick)} isEditingShipping={editingShippingNick === nick} setSelectedNick={setSelectedNick} addOrderLogic={addOrderLogic} handleNicknameEdit={handleNicknameEdit} toggleCardPayment={toggleCardPayment} handleShippingChange={handleShippingChange} setEditingShippingNick={setEditingShippingNick} openModal={openModal} setDepositorNames={setDepositorNames} handleFullDepositToggle={handleFullDepositToggle} copyOrderSheet={copyOrderSheet} handleOrderCheckToggle={handleOrderCheckToggle} handleAddressUnmapping={handleAddressUnmapping} handleAddressMapping={handleAddressMapping} handlePromoteAddress={handlePromoteAddress} handleProductChange={handleProductChange} handleQuantityUpdate={handleQuantityUpdate} handleOrderCancel={handleOrderCancel} handleOrderDelete={handleOrderDelete} toggleVIP={specialCustomers} handleOpenQuickAddress={handleOpenQuickAddress} findAddressSuggestions={findAddressSuggestions} cashReceiptStatus={cashReceipts[nick]} toggleCashReceipt={toggleCashReceipt} inventory={inventory} productHistory={productHistory} customerDeposits={customerDeps} handleDepositUnmatch={handleDepositUnmatch} handleMultiAddOpen={setMultiAddNick} toggleNoShow={toggleNoShow} toggleWaitlist={toggleWaitlist} noShowStatus={noShowCustomers[nick]} waitlistStatus={waitlistCustomers[nick]} />);
+                                return (<CustomerBlock key={nick} nick={nick} items={items} isSelected={selectedNick === nick} currentShipping={ship} isCard={isCard} isPaidState={bal <= 0 && activeItems.length > 0} grandTotal={grand} depositTotal={depSum} balance={bal} baseGrandTotal={baseGrand} baseBalance={baseBal} addr={addrData} addrType={addrType} addrConflict={addrConflict} addressMapping={addressMapping} autoDepositorName={addrData?.realname || ''} displayDepositorName={depositorNames[nick] || addrData?.realname || '입금자'} isAutoDepositor={!depositorNames[nick] && addrData?.realname} depositorNames={depositorNames} copyStatus={copyStatus} isOrderConfirmed={checkedOrders.has(nick)} isEditingShipping={editingShippingNick === nick} setSelectedNick={setSelectedNick} addOrderLogic={addOrderLogic} handleNicknameEdit={handleNicknameEdit} toggleCardPayment={toggleCardPayment} handleShippingChange={handleShippingChange} setEditingShippingNick={setEditingShippingNick} openModal={openModal} setDepositorNames={setDepositorNames} handleFullDepositToggle={handleFullDepositToggle} copyOrderSheet={copyOrderSheet} handleOrderCheckToggle={handleOrderCheckToggle} handleAddressUnmapping={handleAddressUnmapping} handleAddressMapping={handleAddressMapping} handlePromoteAddress={handlePromoteAddress} handleProductChange={handleProductChange} handleQuantityUpdate={handleQuantityUpdate} handleOrderCancel={handleOrderCancel} handleOrderDelete={handleOrderDelete} toggleVIP={specialCustomers} specialCustomers={specialCustomers} handleOpenQuickAddress={handleOpenQuickAddress} findAddressSuggestions={findAddressSuggestions} cashReceiptStatus={cashReceipts[nick]} toggleCashReceipt={toggleCashReceipt} inventory={inventory} productHistory={productHistory} customerDeposits={customerDeps} handleDepositUnmatch={handleDepositUnmatch} handleMultiAddOpen={setMultiAddNick} toggleNoShow={toggleNoShow} toggleWaitlist={toggleWaitlist} noShowStatus={noShowCustomers[nick]} waitlistStatus={waitlistCustomers[nick]} />);
                             })}
                         </div>
                     </div>
@@ -3239,6 +3254,58 @@ const dashboardStats = useMemo(() => {
             };
 
             const fileInputRef = useRef(null); 
+            const chatFileInputRef = useRef(null);
+
+            // ✨ 지난 방송 채팅 엑셀 파일 업로드 처리 로직
+            const handleExcelChatUpload = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const data = new Uint8Array(event.target.result);
+                        const workbook = window.XLSX.read(data, {type: 'array'});
+                        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                        const jsonData = window.XLSX.utils.sheet_to_json(firstSheet, {header: 1});
+                        
+                        const importedChats = [];
+                        let startIndex = 0;
+                        // 만약 첫 줄이 헤더(예: 시간, 닉네임, 내용)라면 스킵
+                        if (jsonData.length > 0 && String(jsonData[0][1] || '').includes('닉네임')) startIndex = 1;
+
+                        for (let i = startIndex; i < jsonData.length; i++) {
+                            const row = jsonData[i];
+                            if (!row || row.length < 2) continue; // 닉네임과 내용이 없으면 무시
+                            
+                            let time = row[0] ? String(row[0]) : '';
+                            let nickname = row[1] ? String(row[1]) : '';
+                            let content = row[2] ? String(row[2]) : '';
+                            
+                            if (nickname && content) {
+                                importedChats.push({
+                                    id: `imported_${Date.now()}_${i}`,
+                                    time: time,
+                                    nickname: nickname.replace(/@/g, '').trim(),
+                                    content: content
+                                });
+                            }
+                        }
+
+                        if (importedChats.length > 0) {
+                            // 라이브 탭으로 커스텀 이벤트를 쏴서 즉시 반영
+                            window.dispatchEvent(new CustomEvent('import-chats', { detail: importedChats }));
+                            openModal(`${importedChats.length}개의 채팅을 성공적으로 병합했습니다.`, 'alert');
+                        } else {
+                            openModal('업로드할 데이터가 없습니다.\n양식(A열:시간, B열:닉네임, C열:내용)을 확인해주세요.', 'alert');
+                        }
+                    } catch (error) {
+                        openModal('엑셀 파일을 읽는 중 오류가 발생했습니다.', 'alert');
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+                e.target.value = ''; // 같은 파일을 다시 올려도 동작하도록 리셋
+            };
+
             return (
                 <div className="flex flex-col items-center justify-center h-full p-10 gap-6 overflow-y-auto dark:bg-slate-900">
                     <div className="grid grid-cols-2 gap-6 w-full max-w-5xl"> 
@@ -3272,6 +3339,18 @@ const dashboardStats = useMemo(() => {
                                 <button onClick={handleExportBackup} className="flex-1 bg-slate-700 text-white font-bold py-3 rounded-lg transition-transform hover:scale-105 shadow-md flex items-center justify-center gap-1 hover:bg-slate-800"><Icon name="export" weight="bold"/> 파일로 저장</button>
                                 <input type="file" accept=".json" ref={fileInputRef} onChange={handleImportBackup} className="hidden" />
                                 <button onClick={() => fileInputRef.current.click()} className="flex-1 bg-slate-500 text-white font-bold py-3 rounded-lg transition-transform hover:scale-105 shadow-md flex items-center justify-center gap-1 hover:bg-slate-600"><Icon name="file-arrow-up" weight="bold"/> 파일 불러오기</button>
+                            </div>
+                        </div>
+
+                        {/* ✨ 새롭게 추가된 지난 방송 채팅 업로드 영역 */}
+                        <div className="col-span-2 bg-indigo-50 dark:bg-indigo-900/20 p-6 rounded-xl border border-indigo-100 dark:border-indigo-800 flex flex-row items-center justify-between">
+                            <div className="text-left">
+                                <h2 className="text-lg font-bold mb-2 text-indigo-800 dark:text-indigo-300 flex items-center gap-2"><Icon name="chat-teardrop-text" weight="fill"/> 지난 방송 채팅 불러오기</h2>
+                                <p className="text-indigo-600 dark:text-indigo-400 text-xs">엑셀 파일(A열:시간, B열:닉네임, C열:내용)을 업로드하여 라이브 탭 채팅 목록에 1초 만에 병합합니다.</p>
+                            </div>
+                            <div className="flex gap-3 w-1/2">
+                                <input type="file" accept=".xlsx, .xls" ref={chatFileInputRef} onChange={handleExcelChatUpload} className="hidden" />
+                                <button onClick={() => chatFileInputRef.current.click()} className="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg transition-transform hover:scale-105 shadow-md flex items-center justify-center gap-2 hover:bg-indigo-700"><Icon name="microsoft-excel-logo" weight="fill"/> 엑셀 채팅 업로드</button>
                             </div>
                         </div>
                     </div>
@@ -3458,7 +3537,6 @@ const dashboardStats = useMemo(() => {
                 e.target.value = '';
             };
 
-            const fileInputRef = useRef(null); 
             return (
                 <div className={`h-screen flex flex-col ${isDarkMode ? 'dark' : ''} text-slate-800 dark:text-slate-100 bg-slate-50 dark:bg-slate-900 overflow-hidden`}>
                     {globalError && (
