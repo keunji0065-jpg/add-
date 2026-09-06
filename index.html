@@ -569,7 +569,7 @@ useEffect(() => {
             );
         };
 
-      const SettingsModalContent = ({ 
+        const SettingsModalContent = ({ 
             googleScriptUrl, setGoogleScriptUrl, 
             youtubeApiKey, setYoutubeApiKey, youtubeVideoId, setYoutubeVideoId,
             depSheetId, setDepSheetId, addrSheetId, setAddrSheetId, masterSheetId, setMasterSheetId, 
@@ -663,7 +663,7 @@ useEffect(() => {
             );
         };
 
-     const InventoryItemRow = memo(({ item, itemStats, setOrders, setInventory, setProductHistory, openModal, expandedInventoryItem, setExpandedInventoryItem, setManualProduct, setCurrentSearchTerm, setManualPrice, setIsFixedProductMode, customerPaidStatus, saveInventoryToServer, cardPayments }) => {
+     const InventoryItemRow = memo(({ item, itemStats, getInventory, setOrders, setInventory, setProductHistory, openModal, expandedInventoryItem, setExpandedInventoryItem, setManualProduct, setCurrentSearchTerm, setManualPrice, setIsFixedProductMode, customerPaidStatus, saveInventoryToServer, cardPayments }) => {
             const [isEditing, setIsEditing] = useState(false);
             const [localName, setLocalName] = useState(item.name);
             const [localPrice, setLocalPrice] = useState(item.price === 0 || item.price === '' ? '' : Number(item.price).toLocaleString());
@@ -680,6 +680,72 @@ useEffect(() => {
             const waitlistAggregated = itemStats ? (itemStats.waitlistAggregated || []) : [];
 
             const isExpanded = expandedInventoryItem === item.name;
+
+            const doNormalCopy = (e) => {
+                e.stopPropagation();
+                // ✨ 수정: 일반 복사(좌클릭) 시에도 무조건 금액(원)이 붙도록 강력하게 변경
+                const priceNum = Number(String(item.price).replace(/,/g, '')) || 0;
+                const priceStr = priceNum > 0 ? priceNum.toLocaleString() + '원' : '0원';
+                const copyText = `${item.name} / ${priceStr}`.trim();
+                
+                const textArea = document.createElement("textarea"); textArea.value = copyText; document.body.appendChild(textArea); textArea.select();
+                try { document.execCommand('copy'); } catch (err) {} document.body.removeChild(textArea);
+                const el = e.currentTarget; 
+                el.classList.add('text-green-600', 'dark:text-green-400'); 
+                setTimeout(() => el.classList.remove('text-green-600', 'dark:text-green-400'), 500);
+            };
+
+            const handleSmartCopy = (e) => {
+                e.preventDefault(); // 우클릭 메뉴 방지
+                e.stopPropagation();
+                
+                const currentInventory = getInventory ? getInventory() : [];
+                const parts = String(item.name).trim().split(/\s+/);
+                
+                // 단일 단어거나 재고 목록이 없으면 일반 복사로 대체
+                if (parts.length <= 1 || currentInventory.length === 0) {
+                    doNormalCopy(e);
+                    return;
+                }
+                
+                const baseName = parts.slice(0, -1).join(' ');
+                
+                // 품절 안 된 동일 기본명, 동일 가격의 상품들 찾기
+                const siblings = currentInventory.filter(i => {
+                    if (i.isSoldOut) return false;
+                    const iParts = String(i.name).trim().split(/\s+/);
+                    if (iParts.length <= 1) return false;
+                    const iBaseName = iParts.slice(0, -1).join(' ');
+                    return iBaseName === baseName && Number(i.price) === Number(item.price);
+                });
+                
+                // 묶일 형제가 없으면 일반 복사로 대체
+                if (siblings.length <= 1) {
+                    doNormalCopy(e);
+                    return;
+                }
+                
+                // 오름차순(55, 66 순서) 정렬
+                siblings.sort((a, b) => String(a.name).localeCompare(String(b.name), 'ko-KR', {numeric: true}));
+
+                const options = siblings.map(i => {
+                    const iParts = String(i.name).trim().split(/\s+/);
+                    return iParts[iParts.length - 1];
+                });
+                
+                // ✨ 수정: 스마트 복사(우클릭) 시에도 금액 누락을 원천 차단
+                const priceNum = Number(String(item.price).replace(/,/g, '')) || 0;
+                const priceStr = priceNum > 0 ? priceNum.toLocaleString() + '원' : '0원';
+                const copyText = `${baseName} ${options.join(', ')} / ${priceStr}`;
+                
+                const textArea = document.createElement("textarea"); textArea.value = copyText; document.body.appendChild(textArea); textArea.select();
+                try { document.execCommand('copy'); } catch (err) {} document.body.removeChild(textArea);
+                
+                // 스마트 복사 성공 시 파란색으로 표시
+                const el = e.currentTarget; 
+                el.classList.add('text-blue-600', 'dark:text-blue-400'); 
+                setTimeout(() => el.classList.remove('text-blue-600', 'dark:text-blue-400'), 500);
+            };
 
             const handleSave = () => {
                 const newName = localName.trim();
@@ -772,14 +838,12 @@ useEffect(() => {
                         ) : (
                             <div className="flex flex-col gap-1.5">
                                 <div className="flex justify-between items-start gap-2">
-                                    <div className={`flex-1 font-bold text-[13px] leading-snug break-all cursor-pointer select-none ${item.isSoldOut ? 'text-red-500 dark:text-red-400 line-through opacity-80' : 'text-slate-800 dark:text-slate-200 hover:text-blue-600 dark:hover:text-blue-400'}`} title="클릭: 상품+단가 복사 / 더블클릭: 자동 고정 입력"
+                                    <div className={`flex-1 font-bold text-[13px] leading-snug break-all cursor-pointer select-none ${item.isSoldOut ? 'text-red-500 dark:text-red-400 line-through opacity-80' : 'text-slate-800 dark:text-slate-200 hover:text-blue-600 dark:hover:text-blue-400'}`} title="클릭: 상품 복사 / 우클릭(또는 Shift+클릭): 옵션 묶음 복사 / 더블클릭: 자동 고정"
                                         onClick={(e) => {
-                                            e.stopPropagation();
-                                            const copyText = `${item.name} ${item.price ? Number(item.price).toLocaleString() + '원' : ''}`.trim();
-                                            const textArea = document.createElement("textarea"); textArea.value = copyText; document.body.appendChild(textArea); textArea.select();
-                                            try { document.execCommand('copy'); } catch (err) {} document.body.removeChild(textArea);
-                                            const el = e.currentTarget; el.classList.add('text-green-600', 'dark:text-green-400'); setTimeout(() => el.classList.remove('text-green-600', 'dark:text-green-400'), 500);
+                                            if (e.shiftKey) { handleSmartCopy(e); } 
+                                            else { doNormalCopy(e); }
                                         }}
+                                        onContextMenu={handleSmartCopy}
                                         onDoubleClick={(e) => {
                                             e.stopPropagation(); setManualProduct(item.name); setManualPrice(item.price ? Number(item.price).toLocaleString() : '');
                                             setIsFixedProductMode(true); document.getElementById('manual-prod-input')?.focus();
@@ -1250,6 +1314,7 @@ useEffect(() => {
             const [selectedNick, setSelectedNick] = useState(null);
             
             const [currentApiKeyIndex, setCurrentApiKeyIndex] = useState(0);
+            const deadApiKeysRef = useRef(new Set()); // ✨ 403 에러난 키(죽은 키) 보관용 블랙리스트
 
             const apiKeysArray = useMemo(() => {
                 return String(youtubeApiKey || '').split(/[\n,]+/).map(k => k.trim()).filter(Boolean);
@@ -1258,17 +1323,25 @@ useEffect(() => {
             const activeApiKey = apiKeysArray[currentApiKeyIndex] || apiKeysArray[0] || '';
 
             const handleKeySwitch = useCallback(() => {
-                if (apiKeysArray.length > 1) {
-                    setCurrentApiKeyIndex(prev => {
-                        const next = (prev + 1) % apiKeysArray.length;
-                        setGlobalError(`⚠️ API 한도 초과(403): ${next + 1}번째 API 키로 자동 교체되었습니다. 🔄`);
-                        chatNextPageTokenRef.current = ''; // 키 교체 시 토큰 꼬임 방지를 위해 즉시 초기화
-                        return next;
-                    });
-                } else {
-                    setGlobalError('🚨 유튜브 API 일일 할당량 초과 (403). 등록된 여분의 API 키가 없습니다.');
+                if (activeApiKey) {
+                    deadApiKeysRef.current.add(activeApiKey); // ✨ 현재 키를 블랙리스트에 추가
                 }
-            }, [apiKeysArray, setGlobalError]);
+                
+                const aliveKeys = apiKeysArray.filter(k => !deadApiKeysRef.current.has(k));
+                
+                if (aliveKeys.length > 0) {
+                    // 다음 살아있는 키의 원래 배열 내 인덱스 찾기
+                    const nextAliveKey = aliveKeys[0];
+                    const nextIndex = apiKeysArray.indexOf(nextAliveKey);
+                    
+                    setCurrentApiKeyIndex(nextIndex);
+                    chatNextPageTokenRef.current = ''; // 키 교체 시 토큰 꼬임 방지
+                    // ✨ 에러창(setGlobalError) 안 띄우고 조용히 넘어감
+                } else {
+                    // 모든 키가 죽었을 때만 경고창 띄움
+                    setGlobalError('🚨 등록된 모든 유튜브 API 키의 일일 할당량이 초과되었습니다 (403). 내일 다시 시도하거나 새 키를 등록하세요.');
+                }
+            }, [apiKeysArray, activeApiKey, setGlobalError]);
             
             const [manualNick, setManualNick] = useState('');
             const deferredManualNick = React.useDeferredValue(manualNick);
@@ -1317,6 +1390,10 @@ useEffect(() => {
             const [liveChatId, setLiveChatId] = useState(null);
             const chatNextPageTokenRef = useRef('');
             const unsavedChatsRef = useRef([]);
+
+            // ✨ 추가: 유튜브 요구 폴링 간격 및 GAS 중복 실행 방지 락
+            const chatPollingIntervalRef = useRef(2000);
+            const isGasFetchingRef = useRef(false);
 
           const inventoryStats = useMemo(() => {
                 const stats = {};
@@ -1598,16 +1675,21 @@ useEffect(() => {
                         const data = await res.json();
                         
                         if (!res.ok) {
-                            let errMsg = `유튜브 채팅 오류 (${res.status})`;
                             if (res.status === 403) {
-                                errMsg = '유튜브 API 할당량 초과 (403) - 다음 키 교체 시도 중...';
+                                // ✨ 403이면 빨간 에러 배너 띄우지 않고 조용히 키 교체
                                 handleKeySwitch();
+                                statusMsg += `채팅(키교체중⚡) `;
+                            } else {
+                                statusMsg += `채팅(에러:${res.status}) `;
+                                // ✨ 수정: 404, 500, 503 등 기타 서버 오류가 나도 작업 방해를 막기 위해 setGlobalError(빨간 창)를 띄우지 않고 상태메시지만 남김
                             }
-                            else if (res.status === 404) errMsg = '해당 라이브 방송을 찾을 수 없습니다 (404)';
-                            statusMsg += `채팅(에러) `;
-                            setGlobalError(errMsg);
                         } else {
                             if (data.nextPageToken) chatNextPageTokenRef.current = data.nextPageToken;
+                            
+                            // ✨ 핵심 픽스 1: 유튜브 서버가 요구하는 폴링 간격(pollingIntervalMillis) 캡처 (최소 2초 유지)
+                            if (data.pollingIntervalMillis) {
+                                chatPollingIntervalRef.current = Math.max(2000, data.pollingIntervalMillis);
+                            }
                             
                             if (data.items && data.items.length > 0) {
                                 const newChats = data.items.map(item => ({
@@ -1631,6 +1713,19 @@ useEffect(() => {
                             } else {
                                 statusMsg += `채팅(없음) `;
                             }
+
+                            // ✨ 살아있는 키들 중에서만 순번 넘기기 (Round-Robin)
+                            const aliveKeys = apiKeysArray.filter(k => !deadApiKeysRef.current.has(k));
+                            if (aliveKeys.length > 1) {
+                                setCurrentApiKeyIndex(prev => {
+                                    const currentKey = apiKeysArray[prev];
+                                    const currentAliveIdx = aliveKeys.indexOf(currentKey);
+                                    // 만약 현재 키가 방금 죽어서 못 찾으면 0번, 아니면 다음 번호
+                                    const nextAliveIdx = currentAliveIdx === -1 ? 0 : (currentAliveIdx + 1) % aliveKeys.length;
+                                    const nextAliveKey = aliveKeys[nextAliveIdx];
+                                    return apiKeysArray.indexOf(nextAliveKey);
+                                });
+                            }
                         }
                     } catch (e) {
                         statusMsg += `채팅(오류) `;
@@ -1640,15 +1735,26 @@ useEffect(() => {
                 }
 
                 if (!isHeavyFetch) {
-                    setSyncStatus(prev => prev === statusMsg + " (채팅 쾌속 모드⚡)" ? prev : statusMsg + " (채팅 쾌속 모드⚡)");
-                    return;
-                }
+                setSyncStatus(prev => prev === statusMsg + " (채팅 쾌속 모드⚡)" ? prev : statusMsg + " (채팅 쾌속 모드⚡)");
+                return;
+            }
 
-                if (!googleScriptUrl) {
-                    setSyncStatus("설정 ⚙️: 통합 앱스 스크립트 URL을 입력하세요!");
-                    return;
-                }
+            if (!googleScriptUrl) {
+                setSyncStatus("설정 ⚙️: 통합 앱스 스크립트 URL을 입력하세요!");
+                return;
+            }
 
+            // ✨ 핵심 픽스 2: GAS(구글시트) 연동 로직이 유튜브 채팅 폴링을 블로킹(먹통)시키지 않도록 백그라운드로 분리
+            if (isGasFetchingRef.current) {
+                setSyncStatus(statusMsg + " (구글시트 로딩중...⏳)");
+                return;
+            }
+
+            isGasFetchingRef.current = true;
+
+            // async 래퍼로 감싸서 백그라운드로 던져버리고 즉시 함수를 반환(return)합니다.
+            (async () => {
+                let gasMsg = "";
                 try {
                     const fetchUrl = `${googleScriptUrl}?action=get_all&depId=${getCleanSheetId(depSheetId)}&addrId=${getCleanSheetId(addrSheetId)}&masterId=${getCleanSheetId(masterSheetId)}&skipHeavy=false&t=${Date.now()}`;
                     const res = await fetchGas(fetchUrl);
@@ -1684,9 +1790,9 @@ useEffect(() => {
                                 prevDepsStr.current = depIds;
                             }
                             prevDepCount.current = newDeps.length;
-                            if(newDeps.length > 0) statusMsg += `입금(${newDeps.length}) `; 
-                            else statusMsg += `입금(없음) `;
-                        } else { statusMsg += `입금(연결실패) `; }
+                            if(newDeps.length > 0) gasMsg += `입금(${newDeps.length}) `; 
+                            else gasMsg += `입금(없음) `;
+                        } else { gasMsg += `입금(연결실패) `; }
 
                         let mergedAddr = [];
                         if (res.rawAddresses && Array.isArray(res.rawAddresses)) {
@@ -1708,9 +1814,9 @@ useEffect(() => {
                                     };
                                 }).filter(a => a.nickname || a.realname);
                                 mergedAddr = [...mergedAddr, ...mappedRaw];
-                                statusMsg += `주소(${mappedRaw.length}) `;
-                            } else { statusMsg += `주소(없음) `; }
-                        } else { statusMsg += `주소(연결실패) `; }
+                                gasMsg += `주소(${mappedRaw.length}) `;
+                            } else { gasMsg += `주소(없음) `; }
+                        } else { gasMsg += `주소(연결실패) `; }
                         
                         if (res.masterAddresses && Array.isArray(res.masterAddresses)) {
                             const masterAddrs = res.masterAddresses.map(a => ({...a, phone: fixPhoneNumber(String(a.phone || '').trim()), _source: 'master'}));
@@ -1777,41 +1883,45 @@ useEffect(() => {
                             setWaitlistCustomers(prev => JSON.stringify(prev) !== JSON.stringify(parsedWaitlist) ? parsedWaitlist : prev);
                         }
 
-                        setSyncStatus(prev => prev === statusMsg ? prev : statusMsg);
+                        setSyncStatus(statusMsg + gasMsg);
                         setGlobalError('');
                     } else { 
                         const errMsg = res ? (res.message || res.error || "서버 응답 오류") : "서버 응답 없음";
-                        setSyncStatus(prev => prev === `통신 실패: ${errMsg}` ? prev : `통신 실패: ${errMsg}`); 
+                        setSyncStatus(`통신 실패: ${errMsg}`); 
                     }
                 } catch(e) { 
-                    setSyncStatus(prev => prev === "네트워크 에러 발생" ? prev : "네트워크 에러 발생"); 
+                    setSyncStatus("네트워크 에러 발생"); 
+                } finally {
+                    isGasFetchingRef.current = false;
                 }
-            }, [googleScriptUrl, activeApiKey, liveChatId, depSheetId, addrSheetId, masterSheetId, broadcastName, setAddresses, setInventory, setSpecialCustomers, setNoShowCustomers, setWaitlistCustomers, setGlobalError, playCoinSound, playBellSound, setChats, handleKeySwitch]);
+            })();
+        }, [googleScriptUrl, activeApiKey, liveChatId, depSheetId, addrSheetId, masterSheetId, broadcastName, setAddresses, setInventory, setSpecialCustomers, setNoShowCustomers, setWaitlistCustomers, setGlobalError, playCoinSound, playBellSound, setChats, handleKeySwitch]);
 
-            useEffect(() => { 
-                let isMounted = true;
-                let timerId = null;
-                let tick = 0;
+        useEffect(() => { 
+            let isMounted = true;
+            let timerId = null;
+            let tick = 0;
+            
+            const poll = async () => {
+                if (!isMounted) return;
                 
-                const poll = async () => {
-                    if (!isMounted) return;
-                    
-                    const isHeavyFetch = (tick % 3 === 0);
-                    await fetchAllData(isHeavyFetch);
-                    tick++;
+                const isHeavyFetch = (tick % 3 === 0);
+                await fetchAllData(isHeavyFetch);
+                tick++;
 
-                    if (isMounted) {
-                        timerId = setTimeout(poll, 2000); 
-                    }
-                };
-                poll();
-                return () => {
-                    isMounted = false;
-                    if (timerId) clearTimeout(timerId);
-                };
-            }, [fetchAllData]);
+                if (isMounted) {
+                    // ✨ 핵심 픽스 3: 동적으로 캡처한 폴링 간격을 적용하여 API 차단 방지 (기본 2초 이상)
+                    timerId = setTimeout(poll, chatPollingIntervalRef.current); 
+                }
+            };
+            poll();
+            return () => {
+                isMounted = false;
+                if (timerId) clearTimeout(timerId);
+            };
+        }, [fetchAllData]);
 
-            useEffect(() => {
+        useEffect(() => {
                 const handleForceSync = () => { fetchAllData(true); };
                 window.addEventListener('force-sync', handleForceSync);
                 return () => window.removeEventListener('force-sync', handleForceSync);
@@ -2345,7 +2455,7 @@ const dashboardStats = useMemo(() => {
                 let msg = `${emoji} ${nick} 님 ${emoji}\n\n[${broadcastName} 주문목록]\n${itemListText}\n배송비 ${currentShipping.toLocaleString()}원\n\n총 주문금액 ${grandTotal.toLocaleString()}원\n------------------\n`;
                 if (isCard) { 
                     const cardBase = Math.max(0, grandTotal - depositTotal);
-                    if (depositTotal > 0) { msg += `[카드결제]\n총 주문금액 ${grandTotal.toLocaleString()}원\n선입금 ${depositTotal.toLocaleString()}원\n수수료(10%) ${(cardBase * 0.1).toLocaleString()}원\n👉결제요청액 ${(cardBase * 1.1).toLocaleString()}원 예정\n\n핸드폰번호 남겨주세요🌸\n------------------\n\n`; } 
+                    if (depositTotal > 0) { msg += `[카드결제]\n총 주문금액 ${grandTotal.toLocaleString()}원\n선입금 ${depositTotal.toLocaleString()}원\n남은 결제금액 ${cardBase.toLocaleString()}원\n수수료(10%) ${(cardBase * 0.1).toLocaleString()}원\n👉최종 결제요청액 ${(cardBase * 1.1).toLocaleString()}원 예정\n\n핸드폰번호 남겨주세요🌸\n------------------\n\n`; } 
                     else { msg += `[카드결제]\n금액 ${cardBase.toLocaleString()}원\n수수료(10%) ${(cardBase * 0.1).toLocaleString()}원\n👉결제요청액 ${(cardBase * 1.1).toLocaleString()}원 예정\n\n핸드폰번호 남겨주세요🌸\n------------------\n\n`; }
                 } 
                 else { 
@@ -2923,7 +3033,7 @@ const dashboardStats = useMemo(() => {
                                 .filter(i => !deferredSearchTerm || String(i.name).toLowerCase().includes(String(deferredSearchTerm).toLowerCase()))
                                 .sort((a, b) => String(b.name).localeCompare(String(a.name), 'ko', { numeric: true }))
                                 .map(item => (
-                                    <InventoryItemRow key={item.id || item.name} item={item} itemStats={inventoryStats[item.name]} setOrders={setOrders} setInventory={setInventory} setProductHistory={setProductHistory} openModal={openModal} expandedInventoryItem={expandedInventoryItem} setExpandedInventoryItem={setExpandedInventoryItem} setManualProduct={setManualProduct} setCurrentSearchTerm={setCurrentSearchTerm} setManualPrice={setManualPrice} setIsFixedProductMode={setIsFixedProductMode} customerPaidStatus={customerPaidStatus} saveInventoryToServer={saveInventoryToServer} cardPayments={cardPayments} />
+                                    <InventoryItemRow key={item.id || item.name} item={item} itemStats={inventoryStats[item.name]} getInventory={() => inventoryRef.current} setOrders={setOrders} setInventory={setInventory} setProductHistory={setProductHistory} openModal={openModal} expandedInventoryItem={expandedInventoryItem} setExpandedInventoryItem={setExpandedInventoryItem} setManualProduct={setManualProduct} setCurrentSearchTerm={setCurrentSearchTerm} setManualPrice={setManualPrice} setIsFixedProductMode={setIsFixedProductMode} customerPaidStatus={customerPaidStatus} saveInventoryToServer={saveInventoryToServer} cardPayments={cardPayments} />
                             ))}
                         </div>
                     </div>
@@ -3080,7 +3190,7 @@ const dashboardStats = useMemo(() => {
                     let statusStr = '';
                     if (isCard) { 
                         statusStr = '카드결제'; const cardBase = Math.max(0, baseGrandTotal - depositTotal);
-                        if (depositTotal > 0) { msg += `[카드결제]\n총 주문금액 ${baseGrandTotal.toLocaleString()}원\n선입금 ${depositTotal.toLocaleString()}원\n수수료(10%) ${(cardBase * 0.1).toLocaleString()}원\n👉결제요청액 ${(cardBase * 1.1).toLocaleString()}원 예정\n\n핸드폰번호 남겨주세요🌸\n------------------\n\n`; } 
+                        if (depositTotal > 0) { msg += `[카드결제]\n총 주문금액 ${baseGrandTotal.toLocaleString()}원\n선입금 ${depositTotal.toLocaleString()}원\n남은 결제금액 ${cardBase.toLocaleString()}원\n수수료(10%) ${(cardBase * 0.1).toLocaleString()}원\n👉최종 결제요청액 ${(cardBase * 1.1).toLocaleString()}원 예정\n\n핸드폰번호 남겨주세요🌸\n------------------\n\n`; } 
                         else { msg += `[카드결제]\n금액 ${cardBase.toLocaleString()}원\n수수료(10%) ${(cardBase * 0.1).toLocaleString()}원\n👉결제요청액 ${(cardBase * 1.1).toLocaleString()}원 예정\n\n핸드폰번호 남겨주세요🌸\n------------------\n\n`; }
                     } else { 
                         const isPaid = (balance <= 0) && (grandTotal >= 0); 
