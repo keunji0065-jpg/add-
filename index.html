@@ -852,7 +852,9 @@ useEffect(() => {
 
             const handleCopyNames = () => {
                 if (aggregatedOrders.length === 0) return;
-                const text = aggregatedOrders.map(a => a.customer).join(', ');
+                const title = `🔹 ${item.name} (총 ${orderedCount}개)\n`;
+                const names = aggregatedOrders.map(a => a.quantity > 1 ? `${a.customer}(${a.quantity})` : a.customer).join(', ');
+                const text = title + names;
                 const textArea = document.createElement("textarea"); textArea.value = text; document.body.appendChild(textArea); textArea.select();
                 try { document.execCommand('copy'); openModal('명단이 복사되었습니다.', 'alert'); } catch (err) {} document.body.removeChild(textArea);
             };
