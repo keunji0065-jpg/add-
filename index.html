@@ -1698,257 +1698,258 @@ useEffect(() => {
                 getChatId();
             }, [activeApiKey, youtubeVideoId, setGlobalError, handleKeySwitch]);
 
-            const fetchAllData = useCallback(async (isHeavyFetch = true) => {
-                let statusMsg = "동기화: ";
+        const [youtubeStatus, setYoutubeStatus] = useState("채팅(대기)");
+        const [gasStatus, setGasStatus] = useState("입금(대기)");
 
-                if (activeApiKey && liveChatId) {
-                    try {
-                        let url = `https://www.googleapis.com/youtube/v3/liveChat/messages?liveChatId=${liveChatId}&part=snippet,authorDetails&maxResults=200&key=${activeApiKey}`;
-                        if (chatNextPageTokenRef.current) url += `&pageToken=${chatNextPageTokenRef.current}`;
-                        
-                        const res = await fetch(url);
-                        const data = await res.json();
-                        
-                        if (!res.ok) {
-                            if (res.status === 403) {
-                                // ✨ 403이면 빨간 에러 배너 띄우지 않고 조용히 키 교체
-                                handleKeySwitch();
-                                statusMsg += `채팅(키교체중⚡) `;
-                            } else {
-                                statusMsg += `채팅(에러:${res.status}) `;
-                                // ✨ 수정: 404, 500, 503 등 기타 서버 오류가 나도 작업 방해를 막기 위해 setGlobalError(빨간 창)를 띄우지 않고 상태메시지만 남김
-                            }
-                        } else {
-                            if (data.nextPageToken) chatNextPageTokenRef.current = data.nextPageToken;
-                            
-                            // ✨ 핵심 픽스 1: 유튜브 서버가 요구하는 폴링 간격(pollingIntervalMillis) 캡처 (최소 4초 유지)
-                            if (data.pollingIntervalMillis) {
-                                chatPollingIntervalRef.current = Math.max(4000, data.pollingIntervalMillis);
-                            }
-                            
-                            if (data.items && data.items.length > 0) {
-                                const newChats = data.items.map(item => ({
-                                    id: item.id,
-                                    time: new Date(item.snippet.publishedAt).toLocaleTimeString('ko-KR', {hour12: false, hour:'2-digit', minute:'2-digit', second:'2-digit'}),
-                                    nickname: item.authorDetails.displayName.replace(/@/g, '').trim(),
-                                    content: item.snippet.displayMessage
-                                }));
-                                
-                                setChats(prev => {
-                                    const deduplicatedMap = new Map();
-                                    [...prev, ...newChats].forEach(c => deduplicatedMap.set(c.id, c));
-                                    return Array.from(deduplicatedMap.values()); 
-                                });
-                                
-                                if (googleScriptUrl && masterSheetId && broadcastName) {
-                                    unsavedChatsRef.current.push(...newChats);
-                                }
-                                
-                                statusMsg += `채팅(${newChats.length}) `;
-                            } else {
-                                statusMsg += `채팅(없음) `;
-                            }
-                        }
-                    } catch (e) {
-                        statusMsg += `채팅(오류) `;
+        const fetchYoutubeData = useCallback(async () => {
+            if (!activeApiKey || !liveChatId) {
+                setYoutubeStatus("채팅(대기)");
+                return;
+            }
+            try {
+                let url = `https://www.googleapis.com/youtube/v3/liveChat/messages?liveChatId=${liveChatId}&part=snippet,authorDetails&maxResults=200&key=${activeApiKey}`;
+                if (chatNextPageTokenRef.current) url += `&pageToken=${chatNextPageTokenRef.current}`;
+                
+                const res = await fetch(url);
+                const data = await res.json();
+                
+                if (!res.ok) {
+                    if (res.status === 403) {
+                        handleKeySwitch();
+                        setYoutubeStatus(`채팅(키교체중⚡)`);
+                    } else {
+                        setYoutubeStatus(`채팅(에러:${res.status})`);
                     }
                 } else {
-                    statusMsg += `채팅(대기) `;
+                    if (data.nextPageToken) chatNextPageTokenRef.current = data.nextPageToken;
+                    if (data.pollingIntervalMillis) {
+                        chatPollingIntervalRef.current = Math.max(4000, data.pollingIntervalMillis);
+                    }
+                    if (data.items && data.items.length > 0) {
+                        const newChats = data.items.map(item => ({
+                            id: item.id,
+                            time: new Date(item.snippet.publishedAt).toLocaleTimeString('ko-KR', {hour12: false, hour:'2-digit', minute:'2-digit', second:'2-digit'}),
+                            nickname: item.authorDetails.displayName.replace(/@/g, '').trim(),
+                            content: item.snippet.displayMessage
+                        }));
+                        
+                        setChats(prev => {
+                            const deduplicatedMap = new Map();
+                            [...prev, ...newChats].forEach(c => deduplicatedMap.set(c.id, c));
+                            return Array.from(deduplicatedMap.values()); 
+                        });
+                        
+                        if (googleScriptUrl && masterSheetId && broadcastName) {
+                            unsavedChatsRef.current.push(...newChats);
+                        }
+                        setYoutubeStatus(`채팅(${newChats.length})`);
+                    } else {
+                        setYoutubeStatus(`채팅(없음)`);
+                    }
                 }
-
-                if (!isHeavyFetch) {
-                setSyncStatus(prev => prev === statusMsg + " (채팅 쾌속 모드⚡)" ? prev : statusMsg + " (채팅 쾌속 모드⚡)");
-                return;
+            } catch (e) {
+                setYoutubeStatus(`채팅(오류)`);
             }
+        }, [activeApiKey, liveChatId, handleKeySwitch, setChats, googleScriptUrl, masterSheetId, broadcastName]);
 
+        const fetchGasData = useCallback(async () => {
             if (!googleScriptUrl) {
-                setSyncStatus("설정 ⚙️: 통합 앱스 스크립트 URL을 입력하세요!");
+                setGasStatus("설정 ⚙️: 스크립트 URL 입력!");
                 return;
             }
-
-            // ✨ 핵심 픽스 2: GAS(구글시트) 연동 로직이 유튜브 채팅 폴링을 블로킹(먹통)시키지 않도록 백그라운드로 분리
-            if (isGasFetchingRef.current) {
-                setSyncStatus(statusMsg + " (구글시트 로딩중...⏳)");
-                return;
-            }
+            if (isGasFetchingRef.current) return;
 
             isGasFetchingRef.current = true;
-
-            // async 래퍼로 감싸서 백그라운드로 던져버리고 즉시 함수를 반환(return)합니다.
-            (async () => {
+            try {
                 let gasMsg = "";
-                try {
-                    const fetchUrl = `${googleScriptUrl}?action=get_all&depId=${getCleanSheetId(depSheetId)}&addrId=${getCleanSheetId(addrSheetId)}&masterId=${getCleanSheetId(masterSheetId)}&skipHeavy=false&t=${Date.now()}`;
-                    const res = await fetchGas(fetchUrl);
+                const fetchUrl = `${googleScriptUrl}?action=get_all&depId=${getCleanSheetId(depSheetId)}&addrId=${getCleanSheetId(addrSheetId)}&masterId=${getCleanSheetId(masterSheetId)}&skipHeavy=false&t=${Date.now()}`;
+                const res = await fetchGas(fetchUrl);
+                
+                if (res && res.status === 'success') {
+                    if (res.deposits && Array.isArray(res.deposits)) {
+                        let depRows = res.deposits;
+                        if (depRows.length > 0 && depRows[0].some(c => typeof c === 'string' && (c.includes('이름') || c.includes('금액') || c.includes('닉네임')))) depRows = depRows.slice(1);
+                        const newDeps = depRows.map((row, idx) => {
+                            const validCells = row.filter(cell => cell !== null && cell !== undefined && String(cell).trim() !== '');
+                            if (validCells.length < 2) return null;
+                            let amountIdx = -1;
+                            for (let i = 0; i < validCells.length; i++) {
+                                const val = String(validCells[i]).trim(); const num = Number(val.replace(/,/g, ''));
+                                if (!isNaN(num) && num > 0 && val.match(/^[0-9,]+$/)) { amountIdx = i; break; }
+                            }
+                            if (amountIdx === -1) return null;
+                            let nameIdx = amountIdx > 0 ? amountIdx - 1 : amountIdx + 1;
+                            let timeIdx = -1;
+                            if (amountIdx === 2 && String(validCells[0]).match(/[0-9]/)) { timeIdx = 0; nameIdx = 1; } 
+                            else if (amountIdx === 1 && validCells.length > 2) { nameIdx = 0; timeIdx = 2; }
+                            let rawName = String(validCells[nameIdx] || '').trim();
+                            let name = rawName.replace(/^[:"'\-\s]+/, '').replace(/^입\s+/, '').trim();
+                            let amount = Number(String(validCells[amountIdx]).replace(/,/g, ''));
+                            let time = timeIdx !== -1 ? String(validCells[timeIdx]).trim() : '';
+                            return { id: `d_${idx}_${time}_${name}_${amount}`, time, name, amount };
+                        }).filter(d => d !== null && d.name && d.amount > 0).reverse();
+                        
+                        const depIds = newDeps.map(d => d.id).join(',');
+                        if(depIds !== prevDepsStr.current) {
+                            if (newDeps.length > prevDepCount.current && prevDepCount.current !== 0) playCoinSound();
+                            setServerDeposits(newDeps);
+                            prevDepsStr.current = depIds;
+                        }
+                        prevDepCount.current = newDeps.length;
+                        if(newDeps.length > 0) gasMsg += `입금(${newDeps.length}) `; 
+                        else gasMsg += `입금(없음) `;
+                    } else { gasMsg += `입금(연결실패) `; }
+
+                    let mergedAddr = [];
+                    if (res.rawAddresses && Array.isArray(res.rawAddresses)) {
+                        if (res.rawAddresses.length > 1) {
+                            const headers = res.rawAddresses[0].map(h => String(h || '').trim());
+                            const addrRows = res.rawAddresses.slice(1);
+                            const mappedRaw = addrRows.map(row => {
+                                let obj = {}; headers.forEach((h, i) => { obj[h] = row[i]; });
+                                const getVal = (...keys) => { for (let k of keys) { if (obj[k]) return String(obj[k]).trim(); } return ''; };
+                                return {
+                                    nickname: getVal('닉네임', '아이디', '주문자', '유튜브닉네임'),
+                                    realname: getVal('이름', '수령인', '입금자명', '입금자'),
+                                    phone: fixPhoneNumber(getVal('연락처', '전화번호', '휴대폰')),
+                                    address: getVal('주소', '전체주소', '배송지', '주소(동,호수 필수)'),
+                                    zipcode: getVal('우편번호', '우편', '우편 번호'),
+                                    memo: getVal('배송메모', '메모', '요청사항'),
+                                    timestamp: getVal('타임스탬프', '날짜', '시간', '제출시간'),
+                                    _source: 'raw'
+                                };
+                            }).filter(a => a.nickname || a.realname);
+                            mergedAddr = [...mergedAddr, ...mappedRaw];
+                            gasMsg += `주소(${mappedRaw.length}) `;
+                        } else { gasMsg += `주소(없음) `; }
+                    } else { gasMsg += `주소(연결실패) `; }
                     
-                    if (res && res.status === 'success') {
-                        if (res.deposits && Array.isArray(res.deposits)) {
-                            let depRows = res.deposits;
-                            if (depRows.length > 0 && depRows[0].some(c => typeof c === 'string' && (c.includes('이름') || c.includes('금액') || c.includes('닉네임')))) depRows = depRows.slice(1);
-                            const newDeps = depRows.map((row, idx) => {
-                                const validCells = row.filter(cell => cell !== null && cell !== undefined && String(cell).trim() !== '');
-                                if (validCells.length < 2) return null;
-                                let amountIdx = -1;
-                                for (let i = 0; i < validCells.length; i++) {
-                                    const val = String(validCells[i]).trim(); const num = Number(val.replace(/,/g, ''));
-                                    if (!isNaN(num) && num > 0 && val.match(/^[0-9,]+$/)) { amountIdx = i; break; }
-                                }
-                                if (amountIdx === -1) return null;
-                                let nameIdx = amountIdx > 0 ? amountIdx - 1 : amountIdx + 1;
-                                let timeIdx = -1;
-                                if (amountIdx === 2 && String(validCells[0]).match(/[0-9]/)) { timeIdx = 0; nameIdx = 1; } 
-                                else if (amountIdx === 1 && validCells.length > 2) { nameIdx = 0; timeIdx = 2; }
-                                let rawName = String(validCells[nameIdx] || '').trim();
-                                let name = rawName.replace(/^[:"'\-\s]+/, '').replace(/^입\s+/, '').trim();
-                                let amount = Number(String(validCells[amountIdx]).replace(/,/g, ''));
-                                let time = timeIdx !== -1 ? String(validCells[timeIdx]).trim() : '';
-                                return { id: `d_${idx}_${time}_${name}_${amount}`, time, name, amount };
-                            }).filter(d => d !== null && d.name && d.amount > 0).reverse();
-                            
-                            const depIds = newDeps.map(d => d.id).join(',');
-                            if(depIds !== prevDepsStr.current) {
-                                if (newDeps.length > prevDepCount.current && prevDepCount.current !== 0) playCoinSound();
-                                setServerDeposits(newDeps);
-                                prevDepsStr.current = depIds;
-                            }
-                            prevDepCount.current = newDeps.length;
-                            if(newDeps.length > 0) gasMsg += `입금(${newDeps.length}) `; 
-                            else gasMsg += `입금(없음) `;
-                        } else { gasMsg += `입금(연결실패) `; }
-
-                        let mergedAddr = [];
-                        if (res.rawAddresses && Array.isArray(res.rawAddresses)) {
-                            if (res.rawAddresses.length > 1) {
-                                const headers = res.rawAddresses[0].map(h => String(h || '').trim());
-                                const addrRows = res.rawAddresses.slice(1);
-                                const mappedRaw = addrRows.map(row => {
-                                    let obj = {}; headers.forEach((h, i) => { obj[h] = row[i]; });
-                                    const getVal = (...keys) => { for (let k of keys) { if (obj[k]) return String(obj[k]).trim(); } return ''; };
-                                    return {
-                                        nickname: getVal('닉네임', '아이디', '주문자', '유튜브닉네임'),
-                                        realname: getVal('이름', '수령인', '입금자명', '입금자'),
-                                        phone: fixPhoneNumber(getVal('연락처', '전화번호', '휴대폰')),
-                                        address: getVal('주소', '전체주소', '배송지', '주소(동,호수 필수)'),
-                                        zipcode: getVal('우편번호', '우편', '우편 번호'),
-                                        memo: getVal('배송메모', '메모', '요청사항'),
-                                        timestamp: getVal('타임스탬프', '날짜', '시간', '제출시간'),
-                                        _source: 'raw'
-                                    };
-                                }).filter(a => a.nickname || a.realname);
-                                mergedAddr = [...mergedAddr, ...mappedRaw];
-                                gasMsg += `주소(${mappedRaw.length}) `;
-                            } else { gasMsg += `주소(없음) `; }
-                        } else { gasMsg += `주소(연결실패) `; }
-                        
-                        if (res.masterAddresses && Array.isArray(res.masterAddresses)) {
-                            const masterAddrs = res.masterAddresses.map(a => ({...a, phone: fixPhoneNumber(String(a.phone || '').trim()), _source: 'master'}));
-                            mergedAddr = [...mergedAddr, ...masterAddrs];
-                        }
-                        
-                        const addrKeys = mergedAddr.map(a => a.nickname + (a.timestamp||'')).join(',');
-                        if (addrKeys !== prevAddrsStr.current) {
-                            if (mergedAddr.length > prevAddrCount.current && prevAddrCount.current !== 0) playBellSound();
-                            if (mergedAddr.length > 0) setAddresses(mergedAddr);
-                            prevAddrsStr.current = addrKeys;
-                        }
-                        prevAddrCount.current = mergedAddr.length;
-
-                        if (res.inventory && Array.isArray(res.inventory)) {
-                            if (Date.now() - inventorySyncLock.current > 10000) {
-                                const invKeys = res.inventory.map(i => i.name + i.price + i.status).join(',');
-                                if (invKeys !== prevInvStr.current) {
-                                    setInventory(prevInv => {
-                                        const prevArray = Array.isArray(prevInv) ? prevInv : [];
-                                        const prevMap = new Map(prevArray.map(i => [i.name, i]));
-                                        
-                                        const serverNames = new Set(res.inventory.map(i => i.name));
-                                        const localOnly = prevArray.filter(i => !serverNames.has(i.name));
-
-                                        const merged = res.inventory.map(i => {
-                                            const existing = prevMap.get(i.name);
-                                            return {
-                                                id: existing && existing.id ? existing.id : `inv_${Date.now()}_${Math.random()}`, 
-                                                name: i.name, price: Number(i.price), 
-                                                stock: existing && existing.stock !== undefined ? existing.stock : '', 
-                                                isSoldOut: i.status === '품절' || (existing && existing.isSoldOut)
-                                            };
-                                        });
-                                        return [...localOnly, ...merged];
-                                    });
-                                    prevInvStr.current = invKeys;
-                                }
-                            }
-                        }
-
-                        if (res.customerDb && Array.isArray(res.customerDb)) {
-                            const parsedSpecial = {};
-                            const parsedNoShow = {};
-                            const parsedWaitlist = {};
-                            
-                            res.customerDb.forEach(row => {
-                                const nick = String(row['닉네임'] || '').trim();
-                                const status = String(row['고객상태'] || '').trim();
-                                const ts = row['저장시간'] || '';
-                                if (nick) {
-                                    if (status === 'vip' || status === 'manager') {
-                                        parsedSpecial[normalizeString(nick)] = { type: status, originalName: nick, timestamp: ts };
-                                    } else if (status === 'noshow') {
-                                        parsedNoShow[nick] = true;
-                                    } else if (status === 'waitlist') {
-                                        parsedWaitlist[nick] = true;
-                                    }
-                                }
-                            });
-                            
-                            setSpecialCustomers(prev => JSON.stringify(prev) !== JSON.stringify(parsedSpecial) ? parsedSpecial : prev);
-                            setNoShowCustomers(prev => JSON.stringify(prev) !== JSON.stringify(parsedNoShow) ? parsedNoShow : prev);
-                            setWaitlistCustomers(prev => JSON.stringify(prev) !== JSON.stringify(parsedWaitlist) ? parsedWaitlist : prev);
-                        }
-
-                        setSyncStatus(statusMsg + gasMsg);
-                        setGlobalError('');
-                    } else { 
-                        const errMsg = res ? (res.message || res.error || "서버 응답 오류") : "서버 응답 없음";
-                        setSyncStatus(`통신 실패: ${errMsg}`); 
+                    if (res.masterAddresses && Array.isArray(res.masterAddresses)) {
+                        const masterAddrs = res.masterAddresses.map(a => ({...a, phone: fixPhoneNumber(String(a.phone || '').trim()), _source: 'master'}));
+                        mergedAddr = [...mergedAddr, ...masterAddrs];
                     }
-                } catch(e) { 
-                    setSyncStatus("네트워크 에러 발생"); 
-                } finally {
-                    isGasFetchingRef.current = false;
+                    
+                    const addrKeys = mergedAddr.map(a => a.nickname + (a.timestamp||'')).join(',');
+                    if (addrKeys !== prevAddrsStr.current) {
+                        if (mergedAddr.length > prevAddrCount.current && prevAddrCount.current !== 0) playBellSound();
+                        if (mergedAddr.length > 0) setAddresses(mergedAddr);
+                        prevAddrsStr.current = addrKeys;
+                    }
+                    prevAddrCount.current = mergedAddr.length;
+
+                    if (res.inventory && Array.isArray(res.inventory)) {
+                        if (Date.now() - inventorySyncLock.current > 10000) {
+                            const invKeys = res.inventory.map(i => i.name + i.price + i.status).join(',');
+                            if (invKeys !== prevInvStr.current) {
+                                setInventory(prevInv => {
+                                    const prevArray = Array.isArray(prevInv) ? prevInv : [];
+                                    const prevMap = new Map(prevArray.map(i => [i.name, i]));
+                                    
+                                    const serverNames = new Set(res.inventory.map(i => i.name));
+                                    const localOnly = prevArray.filter(i => !serverNames.has(i.name));
+
+                                    const merged = res.inventory.map(i => {
+                                        const existing = prevMap.get(i.name);
+                                        return {
+                                            id: existing && existing.id ? existing.id : `inv_${Date.now()}_${Math.random()}`, 
+                                            name: i.name, price: Number(i.price), 
+                                            stock: existing && existing.stock !== undefined ? existing.stock : '', 
+                                            isSoldOut: i.status === '품절' || (existing && existing.isSoldOut)
+                                        };
+                                    });
+                                    return [...localOnly, ...merged];
+                                });
+                                prevInvStr.current = invKeys;
+                            }
+                        }
+                    }
+
+                    if (res.customerDb && Array.isArray(res.customerDb)) {
+                        const parsedSpecial = {};
+                        const parsedNoShow = {};
+                        const parsedWaitlist = {};
+                        
+                        res.customerDb.forEach(row => {
+                            const nick = String(row['닉네임'] || '').trim();
+                            const status = String(row['고객상태'] || '').trim();
+                            const ts = row['저장시간'] || '';
+                            if (nick) {
+                                if (status === 'vip' || status === 'manager') {
+                                    parsedSpecial[normalizeString(nick)] = { type: status, originalName: nick, timestamp: ts };
+                                } else if (status === 'noshow') {
+                                    parsedNoShow[nick] = true;
+                                } else if (status === 'waitlist') {
+                                    parsedWaitlist[nick] = true;
+                                }
+                            }
+                        });
+                        
+                        setSpecialCustomers(prev => JSON.stringify(prev) !== JSON.stringify(parsedSpecial) ? parsedSpecial : prev);
+                        setNoShowCustomers(prev => JSON.stringify(prev) !== JSON.stringify(parsedNoShow) ? parsedNoShow : prev);
+                        setWaitlistCustomers(prev => JSON.stringify(prev) !== JSON.stringify(parsedWaitlist) ? parsedWaitlist : prev);
+                    }
+
+                    setGasStatus(gasMsg);
+                    setGlobalError('');
+                } else { 
+                    const errMsg = res ? (res.message || res.error || "서버 응답 오류") : "서버 응답 없음";
+                    setGasStatus(`통신 실패: ${errMsg}`); 
                 }
-            })();
-        }, [googleScriptUrl, activeApiKey, liveChatId, depSheetId, addrSheetId, masterSheetId, broadcastName, setAddresses, setInventory, setSpecialCustomers, setNoShowCustomers, setWaitlistCustomers, setGlobalError, playCoinSound, playBellSound, setChats, handleKeySwitch]);
+            } catch(e) { 
+                setGasStatus("네트워크 에러 발생"); 
+            } finally {
+                isGasFetchingRef.current = false;
+            }
+        }, [googleScriptUrl, depSheetId, addrSheetId, masterSheetId, setAddresses, setInventory, setSpecialCustomers, setNoShowCustomers, setWaitlistCustomers, setGlobalError, playCoinSound, playBellSound]);
 
-        // ✨ 핵심 픽스 4: 리액트 렌더링으로 인해 타이머가 초기화되어 무한 루프 폭격을 하는 것을 방지하기 위해 Ref 사용
-        const fetchAllDataRef = useRef(fetchAllData);
-        useEffect(() => { fetchAllDataRef.current = fetchAllData; }, [fetchAllData]);
+        const fetchYoutubeDataRef = useRef(fetchYoutubeData);
+        const fetchGasDataRef = useRef(fetchGasData);
+        useEffect(() => { fetchYoutubeDataRef.current = fetchYoutubeData; }, [fetchYoutubeData]);
+        useEffect(() => { fetchGasDataRef.current = fetchGasData; }, [fetchGasData]);
 
+        // ✨ 1. YOUTUBE POLLING (유튜브 규칙에 맞춘 유동적 딜레이)
         useEffect(() => { 
             let isMounted = true;
             let timerId = null;
             
-            const poll = async () => {
+            const pollYoutube = async () => {
                 if (!isMounted) return;
-                
-                // ✨ 구글 시트 동기화 속도 대폭 향상: 채팅 폴링 주기(4초)마다 입금내역도 항상 가져옴!
-                await fetchAllDataRef.current(true);
-
+                await fetchYoutubeDataRef.current();
                 if (isMounted) {
-                    timerId = setTimeout(poll, chatPollingIntervalRef.current); 
+                    timerId = setTimeout(pollYoutube, chatPollingIntervalRef.current); 
                 }
             };
-            poll();
+            pollYoutube();
             return () => {
                 isMounted = false;
                 if (timerId) clearTimeout(timerId);
             };
-        }, []); // 빈 배열로 두어 컴포넌트 리렌더링 시 타이머가 파괴되고 다시 시작되는 현상을 원천 차단
+        }, []); 
+
+        // ✨ 2. GAS POLLING (무조건 3초 고정 초고속 동기화)
+        useEffect(() => { 
+            let isMounted = true;
+            let timerId = null;
+            
+            const pollGas = async () => {
+                if (!isMounted) return;
+                await fetchGasDataRef.current();
+                if (isMounted) {
+                    timerId = setTimeout(pollGas, 3000); // 3초마다 고정 갱신!
+                }
+            };
+            pollGas();
+            return () => {
+                isMounted = false;
+                if (timerId) clearTimeout(timerId);
+            };
+        }, []); 
 
         useEffect(() => {
-                const handleForceSync = () => { fetchAllData(true); };
-                window.addEventListener('force-sync', handleForceSync);
-                return () => window.removeEventListener('force-sync', handleForceSync);
-            }, [fetchAllData]);
+            const handleForceSync = () => { fetchYoutubeDataRef.current(); fetchGasDataRef.current(); };
+            window.addEventListener('force-sync', handleForceSync);
+            return () => window.removeEventListener('force-sync', handleForceSync);
+        }, []);
 
             // 🔥 구글 시트 쓰기 한도 초과(차단) 방지를 위한 10초 단위 일괄(Batch) 저장 로직
             useEffect(() => {
@@ -2872,8 +2873,8 @@ const dashboardStats = useMemo(() => {
                                      <button onClick={() => { setChats([]); window.localStorage.removeItem(getLsKey('savedChats')); }} className="bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 px-1.5 py-0.5 rounded text-[9px] shadow-sm transition-colors flex items-center gap-0.5" title="구글 시트 기록은 남기고 화면에서만 채팅 삭제"><Icon name="trash" weight="bold"/> 비우기</button>
                                  </div>
                              </div>
-                             <div className={`text-[9px] p-1 rounded flex justify-between items-center ${syncStatus.includes('에러') || syncStatus.includes('실패') || syncStatus.includes('입력하세요') || syncStatus.includes('차단') ? 'bg-red-100 text-red-600 font-bold' : 'text-slate-600 dark:text-slate-400 bg-slate-200 dark:bg-slate-700'}`}>
-                                 <span className="truncate flex-1">{syncStatus}</span>
+                             <div className={`text-[10px] p-1.5 rounded flex justify-between items-center ${gasStatus.includes('에러') || gasStatus.includes('실패') || gasStatus.includes('입력하세요') || gasStatus.includes('차단') ? 'bg-red-100 text-red-600 font-bold' : 'text-slate-700 dark:text-slate-300 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 shadow-sm'}`}>
+                                 <span className="truncate flex-1 font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1"><Icon name="lightning" weight="fill" className="text-yellow-500"/> 3초 초고속 스캔중 <span className="text-slate-500 dark:text-slate-400 font-normal ml-1">| {youtubeStatus} | {gasStatus}</span></span>
                              </div>
                              <div className="flex gap-2">
                                  <div className="relative flex-1"><Icon name="magnifying-glass" className="absolute left-1.5 top-1/2 -translate-y-1/2 text-slate-400 text-[10px]"/><input type="text" placeholder="검색" value={chatSearch} onChange={e => setChatSearch(e.target.value)} onKeyDown={e => { if(e.key==='Escape'){ setChatSearch(''); e.target.blur(); } }} className="w-full text-[10px] pl-5 py-1.5 border dark:border-slate-600 rounded outline-none bg-white dark:bg-slate-900 focus:ring-1 focus:ring-slate-400" /></div>
