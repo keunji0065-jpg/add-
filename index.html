@@ -1760,10 +1760,18 @@ useEffect(() => {
             if (isGasFetchingRef.current) return;
 
             isGasFetchingRef.current = true;
+            
+            // ✨ 추가: 8초 이상 응답이 없을 경우 지연 경고 표시 (빈 행 삭제 유도)
+            const slowWarningTimer = setTimeout(() => {
+                setGasStatus("⏳ 시트 로딩 지연 (빈 행/열을 삭제해주세요!)");
+            }, 8000);
+
             try {
                 let gasMsg = "";
                 const fetchUrl = `${googleScriptUrl}?action=get_all&depId=${getCleanSheetId(depSheetId)}&addrId=${getCleanSheetId(addrSheetId)}&masterId=${getCleanSheetId(masterSheetId)}&skipHeavy=false&t=${Date.now()}`;
                 const res = await fetchGas(fetchUrl);
+                
+                clearTimeout(slowWarningTimer); // ✨ 정상 응답 시 경고 타이머 해제
                 
                 if (res && res.status === 'success') {
                     if (res.deposits && Array.isArray(res.deposits)) {
@@ -1896,6 +1904,7 @@ useEffect(() => {
                     setGasStatus(`통신 실패: ${errMsg}`); 
                 }
             } catch(e) { 
+                clearTimeout(slowWarningTimer); // ✨ 에러 시에도 경고 타이머 해제
                 setGasStatus("네트워크 에러 발생"); 
             } finally {
                 isGasFetchingRef.current = false;
@@ -3163,8 +3172,12 @@ const dashboardStats = useMemo(() => {
          const handleExportCustomers = () => { 
                 const groups = {}; orders.forEach(o => { if (!groups[o.customer]) groups[o.customer] = []; groups[o.customer].push(o); }); 
                 let entries = Object.entries(groups).map(([nick, items]) => {
-                    const activeItems = items.filter(i => !i.isCancelled && !i.isWaitlist); 
-                    const waitlistItems = items.filter(i => !i.isCancelled && i.isWaitlist);
+                    const isNoShow = noShowCustomers && noShowCustomers[nick];
+                    
+                    // ✨ 핵심: 노쇼 고객일 경우, '자동 취소' 처리된 아이템들도 엑셀에 내보내기 위해 필터에서 예외 처리로 살려줍니다.
+                    const activeItems = items.filter(i => !i.isWaitlist && (!i.isCancelled || isNoShow)); 
+                    const waitlistItems = items.filter(i => i.isWaitlist && (!i.isCancelled || isNoShow));
+                    
                     const isCard = cardPayments[nick]; 
                     const hasCashReceipt = cashReceipts[nick];
                     const productTotal = activeItems.reduce((sum, i) => sum + Number(i.price), 0);
@@ -3173,11 +3186,17 @@ const dashboardStats = useMemo(() => {
                     const grandTotal = productTotal + (activeItems.length > 0 ? currentShipping : 0); 
                     const isPaid = (depositTotal >= grandTotal) || isCard;
                     const balance = grandTotal - depositTotal;
-                    // ✨ 핵심: waitlistItems 배열도 같이 넘겨줍니다.
-                    return { nick, activeItems, waitlistItems, isPaid, isCard, hasCashReceipt, depositTotal, grandTotal, balance };
+                    
+                    return { nick, activeItems, waitlistItems, isPaid, isCard, hasCashReceipt, depositTotal, grandTotal, balance, isNoShow };
                 });
 
-                const getStatusPriority = (entry) => { if (entry.isPaid && !entry.isCard) return 1; if (entry.isCard) return 2; return 3; };
+                const getStatusPriority = (entry) => { 
+                    if (entry.isNoShow) return 99; // ✨ 노쇼는 무조건 맨 밑바닥으로 정렬
+                    if (entry.isPaid && !entry.isCard) return 1; 
+                    if (entry.isCard) return 2; 
+                    return 3; 
+                };
+
                 entries.sort((a, b) => { 
                     const pA = getStatusPriority(a); 
                     const pB = getStatusPriority(b); 
@@ -3185,7 +3204,7 @@ const dashboardStats = useMemo(() => {
                     return a.nick.localeCompare(b.nick); 
                 });
 
-                let excelRows = []; entries.forEach(({ nick, activeItems, waitlistItems, isPaid, isCard, hasCashReceipt, depositTotal, grandTotal, balance }) => { 
+                let excelRows = []; entries.forEach(({ nick, activeItems, waitlistItems, isPaid, isCard, hasCashReceipt, depositTotal, grandTotal, balance, isNoShow }) => { 
                     if(activeItems.length === 0 && waitlistItems.length === 0) return; 
                     const addrInfo = findAddress(nick) || {}; 
                     const fullAddress = addrInfo.zipcode ? `(${addrInfo.zipcode}) ${addrInfo.address || ''}` : (addrInfo.address || ''); 
@@ -3193,13 +3212,11 @@ const dashboardStats = useMemo(() => {
                     let cleanPhone = fixPhoneNumber(addrInfo.phone);
 
                     const isVip = specialCustomers && specialCustomers[normalizeString(nick)]?.type === 'vip';
-                    const isNoShow = noShowCustomers && noShowCustomers[nick];
                     const isWaitlistToggle = waitlistCustomers && waitlistCustomers[nick];
 
-                    // ✨ 핵심: 대기 상태면 엑셀 입금상태 열에 '대기'라고 명확히 찍힙니다.
                     let statusColumn = "";
                     if (isNoShow) {
-                        statusColumn = "노쇼";
+                        statusColumn = "🚨 노쇼 (취소됨)";
                     } else if (isWaitlistToggle || (waitlistItems.length > 0 && activeItems.length === 0)) {
                         statusColumn = "대기";
                     } else if (hasCashReceipt) {
@@ -3224,9 +3241,8 @@ const dashboardStats = useMemo(() => {
                     }); 
                     
                     excelRows.push(createRow(`[ ${nick} ]`)); 
-                    activeItems.forEach(item => { const qtyPart = item.quantity > 1 ? ` ★${item.quantity}개` : ''; excelRows.push(createRow(`${item.product}${qtyPart}`)); }); 
-                    // ✨ 핵심: 대기 상품은 앞에 [대기] 말머리가 붙어서 엑셀에 추가됩니다.
-                    waitlistItems.forEach(item => { const qtyPart = item.quantity > 1 ? ` ★${item.quantity}개` : ''; excelRows.push(createRow(`[대기] ${item.product}${qtyPart}`)); }); 
+                    activeItems.forEach(item => { const qtyPart = item.quantity > 1 ? ` ★${item.quantity}개` : ''; excelRows.push(createRow(`${isNoShow ? '[노쇼] ' : ''}${item.product}${qtyPart}`)); }); 
+                    waitlistItems.forEach(item => { const qtyPart = item.quantity > 1 ? ` ★${item.quantity}개` : ''; excelRows.push(createRow(`${isNoShow ? '[노쇼] ' : '[대기] '}${item.product}${qtyPart}`)); }); 
                 }); 
                 downloadExcel(excelRows, '고객별_정산_배송리스트'); 
             };
