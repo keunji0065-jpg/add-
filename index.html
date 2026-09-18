@@ -1082,11 +1082,11 @@ useEffect(() => {
 
         const CustomerBlock = memo(({ nick, items, isSelected, currentShipping, isCard, isPaidState, grandTotal, depositTotal, balance, baseGrandTotal, baseBalance, addr, addrType, addrConflict, addressMapping, autoDepositorName, displayDepositorName, isAutoDepositor, depositorNames, copyStatus, isOrderConfirmed, isEditingShipping, setSelectedNick, addOrderLogic, handleNicknameEdit, toggleCardPayment, handleShippingChange, setEditingShippingNick, openModal, setDepositorNames, handleFullDepositToggle, copyOrderSheet, handleOrderCheckToggle, handleAddressUnmapping, handleAddressMapping, handlePromoteAddress, handleProductChange, handleQuantityUpdate, handleOrderCancel, handleOrderDelete, toggleVIP, specialCustomers, handleOpenQuickAddress, findAddressSuggestions, cashReceiptStatus, toggleCashReceipt, inventory, productHistory, customerDeposits, handleDepositUnmatch, handleMultiAddOpen, toggleNoShow, toggleWaitlist, noShowStatus, waitlistStatus }) => {
             let borderClass = 'border-transparent', headerBgClass = 'bg-white dark:bg-slate-800';
-            if (isCard) { borderClass = 'border-slate-300 ring-1 ring-slate-300'; headerBgClass = 'bg-slate-50'; } 
-            else if (!isPaidState && balance > 0) { borderClass = 'border-red-200 ring-1 ring-red-200'; headerBgClass = 'bg-red-50'; } 
-            else if (balance < 0 && !isCard) { borderClass = 'border-slate-300 ring-1 ring-slate-300'; headerBgClass = 'bg-slate-100'; } 
-            else if (isPaidState) { borderClass = 'border-slate-200'; headerBgClass = 'bg-white'; } 
-            if (isSelected) { headerBgClass = 'bg-slate-100'; borderClass = 'border-slate-500 ring-2 ring-slate-400 shadow-lg relative z-10'; }
+            if (isCard) { borderClass = 'border-slate-300 ring-1 ring-slate-300'; headerBgClass = 'bg-slate-50 dark:bg-slate-800/80'; } 
+            else if (!isPaidState && balance > 0) { borderClass = 'border-red-500 ring-2 ring-red-400 dark:ring-red-900/50 shadow-sm'; headerBgClass = 'bg-red-50 dark:bg-red-900/20'; } 
+            else if (balance < 0 && !isCard) { borderClass = 'border-blue-500 ring-2 ring-blue-400 dark:ring-blue-900/50 shadow-sm'; headerBgClass = 'bg-blue-50 dark:bg-blue-900/20'; } 
+            else if (isPaidState) { borderClass = 'border-slate-200 dark:border-slate-700'; headerBgClass = 'bg-white dark:bg-slate-800'; } 
+            if (isSelected) { headerBgClass = 'bg-slate-100 dark:bg-slate-700'; borderClass = 'border-slate-500 ring-2 ring-slate-400 shadow-lg relative z-10'; }
             
             const suggestions = useMemo(() => findAddressSuggestions ? findAddressSuggestions(nick) : [], [nick, findAddressSuggestions]);
             const isVip = useMemo(() => { const nickNorm = normalizeString(nick); const key = Object.keys(specialCustomers || {}).find(k => normalizeString(k) === nickNorm); return key && specialCustomers[key].type === 'vip'; }, [specialCustomers, nick]);
@@ -1145,14 +1145,14 @@ useEffect(() => {
                             </div>
                         </div>
                         <div className="flex flex-col items-end justify-start gap-0.5 text-xs shrink-0 whitespace-nowrap ml-2 mt-0.5">
-                            <div className={`font-bold text-sm text-right ${isPaidState && balance === 0 ? 'text-green-600' : (balance < 0 ? 'text-slate-600' : 'text-slate-800')}`}>{grandTotal.toLocaleString()}원</div>
+                            <div className={`text-right ${isCard ? 'font-bold text-sm text-slate-800 dark:text-slate-200' : (isPaidState && balance === 0 ? 'font-bold text-sm text-green-600 dark:text-green-400' : (balance > 0 ? 'font-black text-base text-red-600 dark:text-red-400' : 'font-black text-base text-blue-600 dark:text-blue-400'))}`}>{grandTotal.toLocaleString()}원</div>
                             {isCard ? (
-                                <div className="flex flex-col items-end"><div className="text-[10px] text-slate-600 font-bold text-right leading-tight mt-0.5">입금: {depositTotal.toLocaleString()}<br/>카드: {Math.max(0, balance).toLocaleString()}</div></div>
+                                <div className="flex flex-col items-end"><div className="text-[10px] text-slate-600 dark:text-slate-400 font-bold text-right leading-tight mt-0.5">입금: {depositTotal.toLocaleString()}<br/>카드: {Math.max(0, balance).toLocaleString()}</div></div>
                             ) : (
                                 <>
-                                    {balance !== 0 && depositTotal > 0 && (<div className="text-[10px] text-slate-500 text-right mt-0.5">입금: {depositTotal.toLocaleString()}</div>)}
-                                    {balance > 0 && (<div className="text-[10px] font-bold text-red-500 text-right mt-0.5">미납: {balance.toLocaleString()}</div>)}
-                                    {balance < 0 && (<div className="text-[10px] font-bold text-slate-600 text-right mt-0.5">과납: {Math.abs(balance).toLocaleString()}</div>)}
+                                    {balance !== 0 && depositTotal > 0 && (<div className={`text-[10px] text-right mt-0.5 ${balance > 0 ? 'text-red-600 dark:text-red-400 font-bold' : 'text-blue-600 dark:text-blue-400 font-bold'}`}>입금: {depositTotal.toLocaleString()}</div>)}
+                                    {balance > 0 && (<div className="text-[11px] font-black text-red-600 bg-red-100 dark:bg-red-900/50 px-1.5 py-0.5 rounded mt-0.5 text-right border border-red-200 dark:border-red-800">미납: {balance.toLocaleString()}</div>)}
+                                    {balance < 0 && (<div className="text-[11px] font-black text-blue-600 bg-blue-100 dark:bg-blue-900/50 px-1.5 py-0.5 rounded mt-0.5 text-right border border-blue-200 dark:border-blue-800">과납: {Math.abs(balance).toLocaleString()}</div>)}
                                 </>
                             )}
                         </div>
@@ -2987,7 +2987,18 @@ const dashboardStats = useMemo(() => {
                             </div>
                         </div>
                         <div ref={orderListRef} className="flex-1 overflow-y-auto p-1.5 bg-slate-50 dark:bg-slate-900 relative z-0" onScroll={handleOrderScroll}>
-                      {displayedOrders.map(([nick, items]) => {
+                            {displayedOrders.length === 0 && (
+                                <div className="flex flex-col items-center justify-center h-full text-slate-400 gap-3 opacity-80 pt-10 pb-10">
+                                    <Icon name="cloud-arrow-down" size={48} weight="light" className="text-blue-400 dark:text-blue-500" />
+                                    <div className="text-center text-xs leading-relaxed">
+                                        <p className="font-bold text-slate-500 dark:text-slate-300 text-sm mb-1">현재 입력된 주문이 없습니다.</p>
+                                        다른 PC나 브라우저에서 이어서 작업하시려면<br/>
+                                        우측 상단의 <strong className="text-blue-500">정산 / 내보내기</strong> 탭으로 이동하여<br/>
+                                        <strong className="bg-slate-200 dark:bg-slate-700 px-1.5 py-0.5 rounded mx-0.5 text-slate-600 dark:text-slate-200 shadow-sm">파일 불러오기 (.json)</strong> 를 이용해주세요!
+                                    </div>
+                                </div>
+                            )}
+                            {displayedOrders.map(([nick, items]) => {
                                 const activeItems = items.filter(i => !i.isCancelled && !i.isWaitlist); const prodSum = activeItems.reduce((s, i) => s + Number(i.price), 0);
                                 const ship = getCalculatedShipping(nick, prodSum); const depSum = items.reduce((s, i) => s + (i.deposit || 0), 0);
                                 const baseGrand = prodSum + (activeItems.length > 0 ? ship : 0); const baseBal = baseGrand - depSum;
