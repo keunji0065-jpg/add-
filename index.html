@@ -1082,11 +1082,19 @@ useEffect(() => {
 
         const CustomerBlock = memo(({ nick, items, isSelected, currentShipping, isCard, isPaidState, grandTotal, depositTotal, balance, baseGrandTotal, baseBalance, addr, addrType, addrConflict, addressMapping, autoDepositorName, displayDepositorName, isAutoDepositor, depositorNames, copyStatus, isOrderConfirmed, isEditingShipping, setSelectedNick, addOrderLogic, handleNicknameEdit, toggleCardPayment, handleShippingChange, setEditingShippingNick, openModal, setDepositorNames, handleFullDepositToggle, copyOrderSheet, handleOrderCheckToggle, handleAddressUnmapping, handleAddressMapping, handlePromoteAddress, handleProductChange, handleQuantityUpdate, handleOrderCancel, handleOrderDelete, toggleVIP, specialCustomers, handleOpenQuickAddress, findAddressSuggestions, cashReceiptStatus, toggleCashReceipt, inventory, productHistory, customerDeposits, handleDepositUnmatch, handleMultiAddOpen, toggleNoShow, toggleWaitlist, noShowStatus, waitlistStatus }) => {
             let borderClass = 'border-transparent', headerBgClass = 'bg-white dark:bg-slate-800';
-            if (isCard) { borderClass = 'border-slate-300 ring-1 ring-slate-300'; headerBgClass = 'bg-slate-50 dark:bg-slate-800/80'; } 
-            else if (!isPaidState && balance > 0) { borderClass = 'border-red-500 ring-2 ring-red-400 dark:ring-red-900/50 shadow-sm'; headerBgClass = 'bg-red-50 dark:bg-red-900/20'; } 
-            else if (balance < 0 && !isCard) { borderClass = 'border-blue-500 ring-2 ring-blue-400 dark:ring-blue-900/50 shadow-sm'; headerBgClass = 'bg-blue-50 dark:bg-blue-900/20'; } 
-            else if (isPaidState) { borderClass = 'border-slate-200 dark:border-slate-700'; headerBgClass = 'bg-white dark:bg-slate-800'; } 
-            if (isSelected) { headerBgClass = 'bg-slate-100 dark:bg-slate-700'; borderClass = 'border-slate-500 ring-2 ring-slate-400 shadow-lg relative z-10'; }
+            
+            // ✨ 미납/과납 시 카드 전체 테두리와 배경색을 강력하게 변경
+            if (isSelected) { 
+                headerBgClass = 'bg-slate-100 dark:bg-slate-700'; borderClass = 'border-slate-500 ring-2 ring-slate-500 shadow-lg relative z-10'; 
+            } else if (isCard) { 
+                borderClass = 'border-slate-300 ring-1 ring-slate-300'; headerBgClass = 'bg-slate-50 dark:bg-slate-800/80'; 
+            } else if (!isPaidState && balance > 0) { 
+                borderClass = 'border-red-500 ring-2 ring-red-500 shadow-md'; headerBgClass = 'bg-red-50 dark:bg-red-900/20'; // 🔥 미납 시 강력한 빨간색
+            } else if (balance < 0 && !isCard) { 
+                borderClass = 'border-blue-500 ring-2 ring-blue-500 shadow-md'; headerBgClass = 'bg-blue-50 dark:bg-blue-900/20'; // 💧 과납 시 강력한 파란색
+            } else if (isPaidState) { 
+                borderClass = 'border-slate-200 dark:border-slate-700'; headerBgClass = 'bg-white dark:bg-slate-800'; 
+            }
             
             const suggestions = useMemo(() => findAddressSuggestions ? findAddressSuggestions(nick) : [], [nick, findAddressSuggestions]);
             const isVip = useMemo(() => { const nickNorm = normalizeString(nick); const key = Object.keys(specialCustomers || {}).find(k => normalizeString(k) === nickNorm); return key && specialCustomers[key].type === 'vip'; }, [specialCustomers, nick]);
@@ -1145,14 +1153,16 @@ useEffect(() => {
                             </div>
                         </div>
                         <div className="flex flex-col items-end justify-start gap-0.5 text-xs shrink-0 whitespace-nowrap ml-2 mt-0.5">
-                            <div className={`text-right ${isCard ? 'font-bold text-sm text-slate-800 dark:text-slate-200' : (isPaidState && balance === 0 ? 'font-bold text-sm text-green-600 dark:text-green-400' : (balance > 0 ? 'font-black text-base text-red-600 dark:text-red-400' : 'font-black text-base text-blue-600 dark:text-blue-400'))}`}>{grandTotal.toLocaleString()}원</div>
+                            {/* ✨ 총 주문금액 숫자 자체도 금액이 안 맞으면 크기를 키우고 빨간/파란색으로 강조 */}
+                            <div className={`font-black text-right ${isPaidState && balance === 0 ? 'text-green-600 text-sm' : (balance < 0 ? 'text-blue-600 text-[15px]' : (balance > 0 ? 'text-red-600 text-[15px]' : 'text-slate-800 text-sm'))}`}>{grandTotal.toLocaleString()}원</div>
                             {isCard ? (
-                                <div className="flex flex-col items-end"><div className="text-[10px] text-slate-600 dark:text-slate-400 font-bold text-right leading-tight mt-0.5">입금: {depositTotal.toLocaleString()}<br/>카드: {Math.max(0, balance).toLocaleString()}</div></div>
+                                <div className="flex flex-col items-end"><div className="text-[10px] text-slate-600 font-bold text-right leading-tight mt-0.5">입금: {depositTotal.toLocaleString()}<br/>카드: {Math.max(0, balance).toLocaleString()}</div></div>
                             ) : (
                                 <>
-                                    {balance !== 0 && depositTotal > 0 && (<div className={`text-[10px] text-right mt-0.5 ${balance > 0 ? 'text-red-600 dark:text-red-400 font-bold' : 'text-blue-600 dark:text-blue-400 font-bold'}`}>입금: {depositTotal.toLocaleString()}</div>)}
-                                    {balance > 0 && (<div className="text-[11px] font-black text-red-600 bg-red-100 dark:bg-red-900/50 px-1.5 py-0.5 rounded mt-0.5 text-right border border-red-200 dark:border-red-800">미납: {balance.toLocaleString()}</div>)}
-                                    {balance < 0 && (<div className="text-[11px] font-black text-blue-600 bg-blue-100 dark:bg-blue-900/50 px-1.5 py-0.5 rounded mt-0.5 text-right border border-blue-200 dark:border-blue-800">과납: {Math.abs(balance).toLocaleString()}</div>)}
+                                    {/* ✨ 미납/과납 발생 시 입금액과 미납액을 색상 박스와 굵은 폰트로 확 띄게 처리 */}
+                                    {balance !== 0 && depositTotal > 0 && (<div className={`text-[11px] font-black text-right mt-0.5 ${balance > 0 ? 'text-red-500' : 'text-blue-500'}`}>입금: {depositTotal.toLocaleString()}</div>)}
+                                    {balance > 0 && (<div className="text-[12px] font-black text-red-600 bg-red-100 dark:bg-red-900/40 px-1.5 py-0.5 rounded text-right mt-0.5">미납: {balance.toLocaleString()}</div>)}
+                                    {balance < 0 && (<div className="text-[12px] font-black text-blue-600 bg-blue-100 dark:bg-blue-900/40 px-1.5 py-0.5 rounded text-right mt-0.5">과납: {Math.abs(balance).toLocaleString()}</div>)}
                                 </>
                             )}
                         </div>
