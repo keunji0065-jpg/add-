@@ -2082,8 +2082,11 @@ const dashboardStats = useMemo(() => {
                     if (activeItems.length > 0) {
                         const addr = addressLookup.get(nick); if (!addr || !addr.data || !addr.data.address) missingAddressCount++;
                     }
-                    const isCard = cardPayments[nick]; const productTotal = activeItems.reduce((sum, i) => sum + Number(i.price), 0);
-                    const shipping = getCalculatedShipping(nick, productTotal); const baseGrandTotal = productTotal + shipping; const baseBalance = baseGrandTotal - depositTotal;
+                    const isCard = cardPayments[nick]; 
+                    const productTotal = activeItems.reduce((sum, i) => sum + Number(i.price), 0);
+                    const productTotalForShipping = activeItems.reduce((sum, i) => sum + (Number(i.price) > 0 ? Number(i.price) : 0), 0);
+                    const shipping = getCalculatedShipping(nick, productTotalForShipping); 
+                    const baseGrandTotal = productTotal + shipping; const baseBalance = baseGrandTotal - depositTotal;
                     const cardFee = (isCard && baseBalance > 0) ? baseBalance * 0.1 : 0; const finalGrandTotal = baseGrandTotal + cardFee; const finalBalance = baseBalance + cardFee;
 
                     totalSales += finalGrandTotal; 
@@ -2106,8 +2109,11 @@ const dashboardStats = useMemo(() => {
                 Object.entries(groups).forEach(([nick, items]) => {
                     const activeItems = items.filter(i => !i.isCancelled && !i.isWaitlist);
                     if (activeItems.length === 0) { status[nick] = true; return; }
-                    const isCard = cardPayments[nick]; const productTotal = activeItems.reduce((sum, i) => sum + Number(i.price), 0);
-                    const shipping = getCalculatedShipping(nick, productTotal); const baseGrandTotal = productTotal + shipping;
+                    const isCard = cardPayments[nick]; 
+                    const productTotal = activeItems.reduce((sum, i) => sum + Number(i.price), 0);
+                    const productTotalForShipping = activeItems.reduce((sum, i) => sum + (Number(i.price) > 0 ? Number(i.price) : 0), 0);
+                    const shipping = getCalculatedShipping(nick, productTotalForShipping); 
+                    const baseGrandTotal = productTotal + shipping;
                     const depositTotal = items.reduce((sum, i) => sum + (i.deposit || 0), 0); const baseBalance = baseGrandTotal - depositTotal;
                     status[nick] = isCard || (baseBalance <= 0);
                 });
@@ -2134,8 +2140,11 @@ const dashboardStats = useMemo(() => {
                     }
                     if (filterStatus === 'card') return cardPayments[nick];
                     
-                    const activeItems = items.filter(i => !i.isCancelled && !i.isWaitlist); const activeProd = activeItems.reduce((s,i) => s + Number(i.price), 0);
-                    const currentDep = items.reduce((s,i) => s + (i.deposit || 0), 0); const currentShip = getCalculatedShipping(nick, activeProd);
+                    const activeItems = items.filter(i => !i.isCancelled && !i.isWaitlist); 
+                    const activeProd = activeItems.reduce((s,i) => s + Number(i.price), 0);
+                    const activeProdForShipping = activeItems.reduce((s,i) => s + (Number(i.price) > 0 ? Number(i.price) : 0), 0);
+                    const currentDep = items.reduce((s,i) => s + (i.deposit || 0), 0); 
+                    const currentShip = getCalculatedShipping(nick, activeProdForShipping);
                     const baseBal = activeProd + (activeItems.length > 0 ? currentShip : 0) - currentDep; const isCard = cardPayments[nick];
                     const finalBal = baseBal + (isCard && baseBal > 0 ? baseBal * 0.1 : 0);
                     
@@ -2246,15 +2255,18 @@ const dashboardStats = useMemo(() => {
                     
                     updatedOrders.forEach(o => {
                         if (o.isCancelled) return;
-                        if (!customerBalances[o.customer]) { customerBalances[o.customer] = { productTotal: 0, depositTotal: 0, activeItemsCount: 0, isCloud: false }; }
-                        customerBalances[o.customer].productTotal += Number(o.price); customerBalances[o.customer].depositTotal += (o.deposit || 0); customerBalances[o.customer].activeItemsCount += 1;
+                        if (!customerBalances[o.customer]) { customerBalances[o.customer] = { productTotal: 0, productTotalForShipping: 0, depositTotal: 0, activeItemsCount: 0, isCloud: false }; }
+                        customerBalances[o.customer].productTotal += Number(o.price); 
+                        if (!o.isWaitlist && Number(o.price) > 0) customerBalances[o.customer].productTotalForShipping += Number(o.price);
+                        customerBalances[o.customer].depositTotal += (o.deposit || 0); 
+                        if (!o.isWaitlist) customerBalances[o.customer].activeItemsCount += 1;
                         if (o.loadedFromCloud) customerBalances[o.customer].isCloud = true;
                     });
 
                     const matchLookup = {};
                     Object.keys(customerBalances).forEach(nick => {
                         const cb = customerBalances[nick];
-                        const currentShipping = getCalculatedShipping(nick, cb.productTotal);
+                        const currentShipping = getCalculatedShipping(nick, cb.productTotalForShipping);
                         cb.grandTotal = cb.productTotal + (cb.activeItemsCount > 0 ? currentShipping : 0); cb.balance = cb.grandTotal - cb.depositTotal;
                         const savedRealName = depositorNames[nick] ? cleanForMatch(depositorNames[nick]) : '';
                         const addrRes = addressLookup.get(nick); const addressRealName = addrRes && addrRes.data ? cleanForMatch(addrRes.data.realname) : '';
@@ -2304,13 +2316,16 @@ const dashboardStats = useMemo(() => {
             const autoSaveToGoogleSheet = useCallback(async () => { 
                 if (!googleScriptUrl || !masterSheetId || Object.keys(orders).length === 0) return; 
                 
-                const customerTotals = {}; orders.filter(o => !o.isCancelled).forEach(o => { customerTotals[o.customer] = (customerTotals[o.customer] || 0) + Number(o.price); });
+                const customerTotalsForShipping = {}; 
+                orders.filter(o => !o.isCancelled && !o.isWaitlist).forEach(o => { 
+                    customerTotalsForShipping[o.customer] = (customerTotalsForShipping[o.customer] || 0) + (Number(o.price) > 0 ? Number(o.price) : 0); 
+                });
                 
                 const uniqueNicknames = Array.from(new Set(orders.filter(o => !o.isCancelled).map(o => o.customer)));
                 
                 const saveList = orders.filter(o=>!o.isCancelled).map(o => { 
                     let addrRes = addressLookup.get(o.customer); let addr = addrRes.data || {}; 
-                    const currentShipping = getCalculatedShipping(o.customer, customerTotals[o.customer] || 0); 
+                    const currentShipping = getCalculatedShipping(o.customer, customerTotalsForShipping[o.customer] || 0); 
                     const isCard = cardPayments[o.customer] ? true : false; 
                     const customerVal = o.customer || '';
                     
@@ -2450,16 +2465,25 @@ const dashboardStats = useMemo(() => {
                 setOrders(prev => prev.map(o => { 
                     if (o.id === id) { 
                         const newOrder = { ...o, [field]: value, isUnmodified: false }; 
+                        const isDiscount = (name) => {
+                            const n = String(name || '');
+                            return n.includes('적립금') || n.includes('기납금') || n.includes('선결제') || n.includes('선입금') || n.includes('과납') || n.includes('예치금') || n.includes('쿠폰') || n.includes('할인') || n.includes('포인트');
+                        };
+
                         if(field === 'product') { 
                             const cleanVal = String(value).trim(); const inv = inventoryRef.current; const hist = productHistoryRef.current;
                             const invItem = Array.isArray(inv) ? inv.find(i => String(i.name).trim() === cleanVal) : null;
-                            const uPrice = invItem ? Number(invItem.price) : (hist[cleanVal] || 0);
+                            let uPrice = invItem ? Number(invItem.price) : (hist[cleanVal] || 0);
+                            if (isDiscount(cleanVal) && uPrice > 0) uPrice = -Math.abs(uPrice);
                             newOrder.price = (Number(newOrder.quantity) || 0) * uPrice; 
                         } 
                         if (field === 'price' && o.product && String(o.product).trim() !== '') { 
-                            const cleanProd = String(o.product).trim(); const valNum = String(value).replace(/,/g, '');
+                            const cleanProd = String(o.product).trim(); let valNum = Number(String(value).replace(/,/g, ''));
+                            if (isDiscount(cleanProd) && valNum > 0) valNum = -Math.abs(valNum);
+                            newOrder.price = valNum;
+                            
                             const effQty = (o.quantity && o.quantity > 0) ? o.quantity : 1;
-                            const uPrice = Number(valNum) / effQty; 
+                            const uPrice = valNum / effQty; 
                             if (uPrice >= 1) {
                                 setInventory(prevInv => {
                                     if (!Array.isArray(prevInv)) return prevInv;
@@ -2485,7 +2509,9 @@ const dashboardStats = useMemo(() => {
                     if (o.id === itemId) { 
                         const cleanProd = String(o.product || '').trim(); const inv = inventoryRef.current; const hist = productHistoryRef.current;
                         const invItem = Array.isArray(inv) ? inv.find(i => String(i.name).trim() === cleanProd) : null;
-                        const unitPrice = invItem ? Number(invItem.price) : (hist[cleanProd] || (o.quantity > 0 ? o.price/o.quantity : 0));
+                        const isDiscount = cleanProd.includes('적립금') || cleanProd.includes('기납금') || cleanProd.includes('선결제') || cleanProd.includes('선입금') || cleanProd.includes('과납') || cleanProd.includes('예치금') || cleanProd.includes('쿠폰') || cleanProd.includes('할인') || cleanProd.includes('포인트');
+                        let unitPrice = invItem ? Number(invItem.price) : (hist[cleanProd] || (o.quantity > 0 ? o.price/o.quantity : 0));
+                        if (isDiscount && unitPrice > 0) unitPrice = -Math.abs(unitPrice);
                         const validQty = (newQtyVal === '' || isNaN(parseInt(newQtyVal))) ? '' : parseInt(newQtyVal);
                         return { ...o, quantity: validQty, price: unitPrice * (Number(validQty) || 0), isUnmodified: false }; 
                     } 
@@ -2501,7 +2527,9 @@ const dashboardStats = useMemo(() => {
                 const activeItems = items.filter(i => !i.isCancelled && !i.isWaitlist); 
                 const waitlistItems = items.filter(i => !i.isCancelled && i.isWaitlist);
                 const addr = addrData || addressLookup.get(nick)?.data || {};
-                const productTotal = activeItems.reduce((sum, i) => sum + Number(i.price), 0); const currentShipping = getCalculatedShipping(nick, productTotal);
+                const productTotal = activeItems.reduce((sum, i) => sum + Number(i.price), 0); 
+                const productTotalForShipping = activeItems.reduce((sum, i) => sum + (Number(i.price) > 0 ? Number(i.price) : 0), 0);
+                const currentShipping = getCalculatedShipping(nick, productTotalForShipping);
                 const itemListText = activeItems.map(i => `${i.product}${i.quantity > 1 ? ` ★${i.quantity}개` : ''} ${Number(i.price).toLocaleString()}원`).join('\n');
                 const { emoji, paidMsg, unpaidPrefix, overpaidMsg = '과납 금액이 있습니다.\n환불 또는 적립 여부를 알려주세요!', addrNotice, surveyNotice, alwaysRequestAddress } = templateConfig;
                 
@@ -2580,9 +2608,12 @@ const dashboardStats = useMemo(() => {
                 let price = 0; const isCustomPriceValid = customPrice !== null && customPrice !== '';
                 if (isCustomPriceValid) price = Number(String(customPrice).replace(/,/g, '')); else price = invItem ? Number(invItem.price) : (hist[cContent] || 0);
 
-                if (cContent !== '' && (isCustomPriceValid || price > 0)) {
+                const isDiscount = cContent.includes('적립금') || cContent.includes('기납금') || cContent.includes('선결제') || cContent.includes('선입금') || cContent.includes('과납') || cContent.includes('예치금') || cContent.includes('쿠폰') || cContent.includes('할인') || cContent.includes('포인트');
+                if (isDiscount && price > 0) price = -Math.abs(price);
+
+                if (cContent !== '' && (isCustomPriceValid || price !== 0)) {
                     const priceToSave = price || 0;
-                    if (priceToSave >= 1) {
+                    if (priceToSave >= 1) { // 정상 제품 가격만 재고 등록 (마이너스는 무시)
                         setInventory(prevInv => {
                             const invArr = Array.isArray(prevInv) ? prevInv : []; const exists = invArr.find(i => String(i.name).trim() === cContent);
                             if (!exists) {
@@ -3009,8 +3040,11 @@ const dashboardStats = useMemo(() => {
                                 </div>
                             )}
                             {displayedOrders.map(([nick, items]) => {
-                                const activeItems = items.filter(i => !i.isCancelled && !i.isWaitlist); const prodSum = activeItems.reduce((s, i) => s + Number(i.price), 0);
-                                const ship = getCalculatedShipping(nick, prodSum); const depSum = items.reduce((s, i) => s + (i.deposit || 0), 0);
+                                const activeItems = items.filter(i => !i.isCancelled && !i.isWaitlist); 
+                                const prodSum = activeItems.reduce((s, i) => s + Number(i.price), 0);
+                                const prodSumForShipping = activeItems.reduce((s, i) => s + (Number(i.price) > 0 ? Number(i.price) : 0), 0);
+                                const ship = getCalculatedShipping(nick, prodSumForShipping); 
+                                const depSum = items.reduce((s, i) => s + (i.deposit || 0), 0);
                                 const baseGrand = prodSum + (activeItems.length > 0 ? ship : 0); const baseBal = baseGrand - depSum;
                                 const isCard = cardPayments[nick]; const cardFee = (isCard && baseBal > 0) ? baseBal * 0.1 : 0;
                                 const grand = baseGrand + cardFee; const bal = baseBal + cardFee;
@@ -3172,8 +3206,11 @@ const dashboardStats = useMemo(() => {
                 const savedCardPayments = cardPayments || {};
                 Object.entries(customerGroups).forEach(([nick, items]) => {
                     const activeItems = items.filter(i => !i.isCancelled && !i.isWaitlist); if(activeItems.length === 0) { customerPaidStatus[nick] = false; return; }
-                    const isCard = savedCardPayments[nick]; const productTotal = activeItems.reduce((sum, i) => sum + Number(i.price), 0);
-                    const shipping = getCalculatedShipping(nick, productTotal); const depositTotal = items.reduce((sum, i) => sum + (i.deposit || 0), 0);
+                    const isCard = savedCardPayments[nick]; 
+                    const productTotal = activeItems.reduce((sum, i) => sum + Number(i.price), 0);
+                    const productTotalForShipping = activeItems.reduce((sum, i) => sum + (Number(i.price) > 0 ? Number(i.price) : 0), 0);
+                    const shipping = getCalculatedShipping(nick, productTotalForShipping); 
+                    const depositTotal = items.reduce((sum, i) => sum + (i.deposit || 0), 0);
                     const grandTotal = productTotal + (activeItems.length > 0 ? shipping : 0); customerPaidStatus[nick] = (depositTotal >= grandTotal) || isCard;
                 });
                 orders.forEach(o => { 
@@ -3202,7 +3239,8 @@ const dashboardStats = useMemo(() => {
                     const isCard = cardPayments[nick]; 
                     const hasCashReceipt = cashReceipts[nick];
                     const productTotal = activeItems.reduce((sum, i) => sum + Number(i.price), 0);
-                    const currentShipping = getCalculatedShipping(nick, productTotal);
+                    const productTotalForShipping = activeItems.reduce((sum, i) => sum + (Number(i.price) > 0 ? Number(i.price) : 0), 0);
+                    const currentShipping = getCalculatedShipping(nick, productTotalForShipping);
                     const depositTotal = items.reduce((sum, i) => sum + (i.deposit || 0), 0); 
                     const grandTotal = productTotal + (activeItems.length > 0 ? currentShipping : 0); 
                     const isPaid = (depositTotal >= grandTotal) || isCard;
@@ -3281,8 +3319,11 @@ const dashboardStats = useMemo(() => {
                     const waitlistItems = items.filter(i => !i.isCancelled && i.isWaitlist);
                     if (activeItems.length === 0 && waitlistItems.length === 0) return;
 
-                    const isCard = cardPayments && cardPayments[nick]; const productTotal = activeItems.reduce((sum, i) => sum + Number(i.price), 0);
-                    const currentShipping = getCalculatedShipping(nick, productTotal); const baseGrandTotal = productTotal + currentShipping;
+                    const isCard = cardPayments && cardPayments[nick]; 
+                    const productTotal = activeItems.reduce((sum, i) => sum + Number(i.price), 0);
+                    const productTotalForShipping = activeItems.reduce((sum, i) => sum + (Number(i.price) > 0 ? Number(i.price) : 0), 0);
+                    const currentShipping = getCalculatedShipping(nick, productTotalForShipping); 
+                    const baseGrandTotal = productTotal + currentShipping;
                     const depositTotal = items.reduce((sum, i) => sum + (i.deposit || 0), 0); const baseBalance = baseGrandTotal - depositTotal;
                     const cardFee = (isCard && baseBalance > 0) ? baseBalance * 0.1 : 0; const grandTotal = baseGrandTotal + cardFee; const balance = baseBalance + cardFee;
                     const itemListTextForMsg = activeItems.map(i => `${i.product}${i.quantity > 1 ? ` ★${i.quantity}개` : ''} ${Number(i.price).toLocaleString()}원`).join('\n');
