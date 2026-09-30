@@ -10,10 +10,10 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <title>주문서 관리 시스템</title>
+    <title>강은지 주문서</title>
     
     <!-- PWA 강제 설치를 위한 매니페스트 (URL 인코딩 방식) -->
-    <link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22%EC%A3%BC%EB%AC%B8%EC%84%9C%20%EA%B4%80%EB%A6%AC%20%EC%8B%9C%EC%8A%A4%ED%85%9C%22%2C%22short_name%22%3A%22%EC%A3%BC%EB%AC%B8%EC%84%9C%22%2C%22display%22%3A%22standalone%22%2C%22start_url%22%3A%22.%2F%22%2C%22background_color%22%3A%22%23202124%22%2C%22theme_color%22%3A%22%23202124%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22https%3A%2F%2Fcdn-icons-png.flaticon.com%2F512%2F3593%2F3593455.png%22%2C%22sizes%22%3A%22512x512%22%2C%22type%22%3A%22image%2Fpng%22%7D%5D%7D">
+    <link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22%EA%B0%95%EC%9D%80%EC%A7%80%20%EC%A3%BC%EB%AC%B8%EC%84%9C%22%2C%22short_name%22%3A%22%EA%B0%95%EC%9D%80%EC%A7%80%22%2C%22display%22%3A%22standalone%22%2C%22start_url%22%3A%22.%2F%22%2C%22background_color%22%3A%22%23202124%22%2C%22theme_color%22%3A%22%23202124%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22https%3A%2F%2Fcdn-icons-png.flaticon.com%2F512%2F3593%2F3593455.png%22%2C%22sizes%22%3A%22512x512%22%2C%22type%22%3A%22image%2Fpng%22%7D%5D%7D">
     
     <!-- 브라우저를 속여 진짜 '앱'으로 설치하게 만드는 가짜 서비스워커 즉석 생성 로직 -->
     <script>
@@ -90,6 +90,64 @@
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
         .resizable-panel { resize: horizontal; overflow: hidden; min-height: 100%; position: relative; }
         .resizable-panel::after { content: ''; position: absolute; bottom: 0; right: 0; width: 10px; height: 10px; cursor: se-resize; }
+        
+        /* ----------------------------------------------------
+           ✨ Professional SaaS Theme (고밀도 전문 UI 테마) ✨
+           ---------------------------------------------------- */
+        
+        /* 1. 곡률 통일: 너무 둥글둥글한 모서리와 원형 버튼을 세련된 라운드 스퀘어로 톤다운 */
+        .rounded-2xl, .rounded-xl, .rounded-lg { border-radius: 6px !important; }
+        .rounded-md, .rounded { border-radius: 4px !important; }
+        .rounded-full { border-radius: 4px !important; } /* 동그란 버튼들을 각진 버튼으로 변경 */
+        
+        /* 2. 과도한 팝(Pop) 효과 및 붕 떠있는 그림자를 차분하고 엣지있게 조절 */
+        .shadow-2xl, .shadow-xl, .shadow-lg { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05) !important; }
+        .shadow-md, .shadow-sm { box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03) !important; }
+        .animate-pop { animation: none !important; } /* 통통 튀는 팝업 애니메이션 제거로 진중함 추가 */
+        
+        /* 3. 정보 밀도 증가 (가독성 향상): 글로벌 여백 일괄 압축 */
+        .gap-2 { gap: 6px !important; } 
+        .gap-3 { gap: 8px !important; } 
+        .p-2 { padding: 6px !important; }
+        .mb-1\.5 { margin-bottom: 4px !important; }
+        .p-1\.5 { padding: 4px !important; }
+        
+        /* 4. 모달 창 등 불필요하게 넓은 패딩 다이어트 */
+        .p-6 { padding: 1.25rem !important; }
+        .p-5 { padding: 1rem !important; }
+        .p-4 { padding: 0.75rem !important; }
+        
+        /* 5. 헤더, 입력창 등 상하 높이를 줄여서 더 많은 행이 보이게 조절 */
+        .py-2 { padding-top: 5px !important; padding-bottom: 5px !important; }
+        .py-1\.5 { padding-top: 3px !important; padding-bottom: 3px !important; }
+        
+        /* 6. 메인 레이아웃 및 패널들의 배경을 살짝 더 차분한 톤으로 변경하여 데이터 집중도 향상 */
+        body, .bg-slate-50 { background-color: #f8fafc !important; }
+        
+        /* 7. ✨ 눈이 편안한 다크모드 (Soft Dark Theme) - 쨍한 대비를 줄이고 눈 피로가 적은 모노톤 & 파스텔톤 적용 */
+        .dark body, .dark .bg-slate-50, .dark .bg-slate-900 { background-color: #18181b !important; } /* 차분한 진회색 바탕 (Zinc-900) */
+        .dark .bg-white, .dark .bg-slate-800 { background-color: #27272a !important; } /* 패널 배경 (Zinc-800) */
+        .dark .border-slate-700, .dark .border-slate-600, .dark .border-slate-800 { border-color: #3f3f46 !important; } /* 부드러운 테두리 */
+        .dark ::-webkit-scrollbar-thumb { background: #52525b !important; } /* 스크롤바 색상 차분하게 */
+        
+        /* 눈부심 방지 텍스트 톤다운 */
+        .dark, .dark .text-slate-100, .dark .text-white, .dark .text-slate-200 { color: #e4e4e7 !important; } 
+        .dark .text-slate-300 { color: #d4d4d8 !important; }
+        .dark .text-slate-400 { color: #a1a1aa !important; }
+        .dark .text-slate-500 { color: #71717a !important; }
+        
+        /* 포인트 색상(블루, 레드, 오렌지, 그린) 채도 낮추기 (눈부심 방지) */
+        .dark .text-blue-300, .dark .text-blue-400, .dark .text-blue-500, .dark .text-blue-600, .dark .text-blue-700 { color: #60a5fa !important; }
+        .dark .bg-blue-900\/20, .dark .bg-blue-900\/30, .dark .bg-blue-900\/40, .dark .bg-blue-900\/50, .dark .bg-blue-900\/60, .dark .bg-blue-800 { background-color: rgba(59, 130, 246, 0.15) !important; border-color: rgba(59, 130, 246, 0.3) !important; }
+        
+        .dark .text-red-400, .dark .text-red-500, .dark .text-red-600 { color: #f87171 !important; }
+        .dark .bg-red-900\/10, .dark .bg-red-900\/20, .dark .bg-red-900\/30, .dark .bg-red-900\/40 { background-color: rgba(248, 113, 113, 0.1) !important; border-color: rgba(248, 113, 113, 0.2) !important; }
+        
+        .dark .text-orange-400, .dark .text-orange-500, .dark .text-orange-600 { color: #fb923c !important; }
+        .dark .bg-orange-900\/20 { background-color: rgba(251, 146, 60, 0.1) !important; border-color: rgba(251, 146, 60, 0.2) !important; }
+        
+        .dark .text-green-400, .dark .text-green-500, .dark .text-green-600 { color: #4ade80 !important; }
+        .dark .bg-green-900\/20, .dark .bg-green-900\/30 { background-color: rgba(74, 222, 128, 0.1) !important; border-color: rgba(74, 222, 128, 0.2) !important; }
     </style>
 </head>
 <body class="transition-colors duration-300">
@@ -706,12 +764,11 @@ useEffect(() => {
                             </div>
                         </div>
                     </div>
-                    <button onClick={()=>setIsSettingsOpen(false)} className="w-full bg-slate-800 text-white rounded py-2 text-sm font-bold hover:bg-slate-900 dark:bg-slate-700 shadow-sm mt-4">닫기</button>
                 </div>
             );
         };
 
-     const InventoryItemRow = memo(({ item, itemStats, getInventory, setOrders, setInventory, setProductHistory, openModal, expandedInventoryItem, setExpandedInventoryItem, setManualProduct, setCurrentSearchTerm, setManualPrice, setIsFixedProductMode, customerPaidStatus, saveInventoryToServer, cardPayments }) => {
+        const InventoryItemRow = memo(({ item, itemStats, getInventory, setOrders, setInventory, setProductHistory, openModal, expandedInventoryItem, setExpandedInventoryItem, setManualProduct, setCurrentSearchTerm, setManualPrice, setIsFixedProductMode, customerPaidStatus, saveInventoryToServer, cardPayments }) => {
             const [isEditing, setIsEditing] = useState(false);
             const [localName, setLocalName] = useState(item.name);
             const [localPrice, setLocalPrice] = useState(item.price === 0 || item.price === '' ? '' : Number(item.price).toLocaleString());
@@ -723,7 +780,6 @@ useEffect(() => {
 
             const orderedCount = itemStats ? itemStats.count : 0;
             const aggregatedOrders = itemStats ? itemStats.aggregated : [];
-            // ✨ 핵심: 대기 수량과 대기 명단 데이터 가져오기
             const waitlistCount = itemStats ? (itemStats.waitlistCount || 0) : 0;
             const waitlistAggregated = itemStats ? (itemStats.waitlistAggregated || []) : [];
 
@@ -742,7 +798,6 @@ useEffect(() => {
                 let copyText = "";
 
                 if (myGroup && myGroup.options.length > 0) {
-                    // 옵션 사이에 쉼표(,) 추가 및 맨 앞 이모지(🔹) 추가
                     copyText = `🔹 ${myGroup.baseName} ${myGroup.options.join(', ')} / ${priceStr}`.trim();
                 } else {
                     copyText = `🔹 ${item.name} / ${priceStr}`.trim();
@@ -767,26 +822,22 @@ useEffect(() => {
                     clearTimeout(clickTimeoutRef.current);
                 }
 
-                // 연속 클릭을 감지하기 위한 0.25초(250ms) 대기 시간
                 clickTimeoutRef.current = setTimeout(() => {
                     const count = clickCountRef.current;
-                    clickCountRef.current = 0; // 카운트 초기화
+                    clickCountRef.current = 0;
 
                     if (count === 1) {
-                        // 1. 단일 클릭: 제품명만 복사
                         const copyText = item.name.trim();
                         const textArea = document.createElement("textarea"); textArea.value = copyText; document.body.appendChild(textArea); textArea.select();
                         try { document.execCommand('copy'); } catch (err) {} document.body.removeChild(textArea);
                         target.classList.add('text-green-600', 'dark:text-green-400');
                         setTimeout(() => target.classList.remove('text-green-600', 'dark:text-green-400'), 500);
                     } else if (count === 2) {
-                        // 2. 더블 클릭: 상단 고정 (수동 입력창)
                         setManualProduct(item.name); 
                         setManualPrice(item.price ? Number(item.price).toLocaleString() : '');
                         setIsFixedProductMode(true); 
                         document.getElementById('manual-prod-input')?.focus();
                     } else if (count >= 3) {
-                        // 3. 세 번 클릭: 옵션 병합 스마트 복사
                         executeSmartCopy(target);
                     }
                 }, 250); 
@@ -815,11 +866,8 @@ useEffect(() => {
                     return;
                 }
                 
-                // ✨ 추가: 상품명이 변경된 경우, 기존에 해당 상품을 주문한 모든 내역의 상품명도 일괄 업데이트
                 if (newName !== item.name) {
                     setOrders(prevOrders => prevOrders.map(o => o.product === item.name ? { ...o, product: newName } : o));
-                    
-                    // 주문 입력시 불러오는 가격 히스토리 데이터도 새 이름으로 복사해 둡니다.
                     setProductHistory(prevHist => {
                         const next = { ...prevHist };
                         if (next[item.name] !== undefined) {
@@ -833,6 +881,10 @@ useEffect(() => {
             };
 
             const handleDelete = () => {
+                if (item.isLocked) {
+                    openModal('잠금(자물쇠)이 설정된 상품은 삭제할 수 없습니다. 먼저 자물쇠를 해제해주세요.', 'alert');
+                    return;
+                }
                 openModal(`'${item.name}' 상품을 삭제하시겠습니까?`, 'confirm', () => {
                     setInventory(prev => {
                         const newInv = prev.filter(i => i.name !== item.name);
@@ -845,6 +897,15 @@ useEffect(() => {
             const handleToggleSoldOut = () => {
                 setInventory(prev => {
                     const newInv = prev.map(i => i.name === item.name ? { ...i, isSoldOut: !i.isSoldOut } : i);
+                    saveInventoryToServer(newInv);
+                    return newInv;
+                });
+            };
+
+            // ✨ 자물쇠(잠금) 토글 함수
+            const handleToggleLock = () => {
+                setInventory(prev => {
+                    const newInv = prev.map(i => i.name === item.name ? { ...i, isLocked: !i.isLocked } : i);
                     saveInventoryToServer(newInv);
                     return newInv;
                 });
@@ -882,7 +943,6 @@ useEffect(() => {
                             <div className="flex flex-col gap-1.5">
                                 <div className="flex justify-between items-start gap-2">
                                     <div className="flex-1 flex items-start gap-1.5 min-w-0">
-                                        {/* ✨ 핀 버튼 추가: 클릭 시 수동 입력창에 고정 */}
                                         <button onClick={(e) => {
                                             e.stopPropagation();
                                             setManualProduct(item.name); 
@@ -896,13 +956,19 @@ useEffect(() => {
                                             onClick={handleMultiClick}
                                             onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); executeSmartCopy(e.currentTarget); }}
                                         >
-                                            {item.name}
+                                            {item.name} {item.isLocked && <span className="text-amber-500 text-[10px] ml-1">🔒</span>}
                                         </div>
                                     </div>
+                                    {/* ✨ 자물쇠 버튼 위치: 판매/품절 버튼과 수정/삭제 버튼 사이 */}
                                     <div className="flex items-center justify-end shrink-0 gap-1 mt-0.5">
                                         <button onClick={(e) => { e.stopPropagation(); handleToggleSoldOut(); }} className={`px-1.5 py-0.5 rounded text-[9px] font-bold shadow-sm transition-colors ${item.isSoldOut ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-slate-200 text-slate-600 hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600'}`}>{item.isSoldOut ? '판매' : '품절'}</button>
+                                        
+                                        <button onClick={(e) => { e.stopPropagation(); handleToggleLock(); }} className={`px-1.5 py-0.5 rounded text-[9px] font-bold shadow-sm transition-colors ${item.isLocked ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-400 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-400'}`} title={item.isLocked ? "잠금 해제 (초기화 시 삭제 가능)" : "상품 잠금 (초기화 및 삭제 방지)"}>
+                                            <Icon name={item.isLocked ? "lock" : "lock-open"} weight="bold" size={12}/>
+                                        </button>
+
                                         <button onClick={(e) => { e.stopPropagation(); setIsEditing(true); }} className="text-slate-400 hover:text-blue-500 w-5 flex justify-center" title="수정"><Icon name="pencil-simple" weight="bold" size={14}/></button>
-                                        <button onClick={(e) => { e.stopPropagation(); handleDelete(); }} className="text-slate-400 hover:text-red-500 w-5 flex justify-center" title="삭제"><Icon name="trash" weight="bold" size={14}/></button>
+                                        <button onClick={(e) => { e.stopPropagation(); handleDelete(); }} className={`w-5 flex justify-center ${item.isLocked ? 'text-slate-200 dark:text-slate-700 cursor-not-allowed' : 'text-slate-400 hover:text-red-500'}`} title={item.isLocked ? "잠긴 상품은 삭제할 수 없습니다" : "삭제"}><Icon name="trash" weight="bold" size={14}/></button>
                                     </div>
                                 </div>
                                 
@@ -913,7 +979,6 @@ useEffect(() => {
                                         <span className="flex items-center gap-1 shrink-0"><span className="text-slate-400">잔여</span> <span className={`font-bold ${item.stock !== undefined && item.stock !== '' && (item.stock - orderedCount <= 0) ? 'text-red-500' : 'text-blue-600 dark:text-blue-400'}`} title={`초기설정재고: ${item.stock !== undefined && item.stock !== '' ? item.stock : '무한'}`}>{item.stock !== undefined && item.stock !== '' ? item.stock - orderedCount : '∞'}</span></span>
                                         <span className="w-px h-3 bg-slate-300 dark:bg-slate-600 shrink-0"></span>
                                         <span className="flex items-center gap-1 shrink-0"><span className="text-slate-400">주문</span> <span className={`font-bold ${item.isSoldOut ? 'text-red-400' : 'text-slate-700 dark:text-slate-300'}`}>{orderedCount}</span></span>
-                                        {/* ✨ 대기 수량 표시 추가 */}
                                         {waitlistCount > 0 && (
                                             <>
                                                 <span className="w-px h-3 bg-slate-300 dark:bg-slate-600 shrink-0"></span>
@@ -928,7 +993,6 @@ useEffect(() => {
                     </div>
                     {isExpanded && !isEditing && (
                         <div className="bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-700 p-1.5 flex flex-col gap-1">
-                            {/* 확정 명단 */}
                             <div className="flex justify-between items-center mb-1">
                                 <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 flex items-center gap-1"><Icon name="users" weight="fill" /> 확정 명단 (총 {orderedCount}개)</span>
                                 <button onClick={handleCopyNames} className="text-[9px] bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-600 hover:bg-slate-300 px-1.5 py-0.5 rounded font-bold shadow-sm transition-colors">명단 복사</button>
@@ -966,7 +1030,6 @@ useEffect(() => {
                                 </div>
                             )}
 
-                            {/* ✨ 대기 명단 (주황색) 추가 */}
                             {waitlistAggregated.length > 0 && (
                                 <>
                                     <div className="flex justify-between items-center mt-2 mb-1 border-t dark:border-slate-700 pt-2">
@@ -999,7 +1062,7 @@ useEffect(() => {
                 </div>
             );
         }, (prev, next) => {
-            if (prev.item.name !== next.item.name || prev.item.price !== next.item.price || prev.item.isSoldOut !== next.item.isSoldOut || prev.item.stock !== next.item.stock) return false;
+            if (prev.item.name !== next.item.name || prev.item.price !== next.item.price || prev.item.isSoldOut !== next.item.isSoldOut || prev.item.stock !== next.item.stock || prev.item.isLocked !== next.item.isLocked) return false;
             
             const isExpandedPrev = prev.expandedInventoryItem === prev.item.name;
             const isExpandedNext = next.expandedInventoryItem === next.item.name;
@@ -2205,16 +2268,16 @@ const dashboardStats = useMemo(() => {
 
             // ✨ 키보드 네비게이션을 위한 상태 및 로직 추가 시작
             const reversedChats = useMemo(() => [...filteredChats].reverse(), [filteredChats]);
-            const [focusedChatIndex, setFocusedChatIndex] = useState(-1);
+            const [focusedChatId, setFocusedChatId] = useState(null); // ✨ 인덱스가 아닌 고유 ID로 추적하도록 변경
 
-            const stateRef = useRef({ reversedChats, isFixedProductMode, focusedChatIndex, manualProduct, manualPrice });
+            const stateRef = useRef({ reversedChats, isFixedProductMode, focusedChatId, manualProduct, manualPrice });
             useEffect(() => { 
-                stateRef.current = { reversedChats, isFixedProductMode, focusedChatIndex, manualProduct, manualPrice }; 
-            }, [reversedChats, isFixedProductMode, focusedChatIndex, manualProduct, manualPrice]);
+                stateRef.current = { reversedChats, isFixedProductMode, focusedChatId, manualProduct, manualPrice }; 
+            }, [reversedChats, isFixedProductMode, focusedChatId, manualProduct, manualPrice]);
 
             useEffect(() => {
                 const handleKeyDown = (e) => {
-                    const { reversedChats, isFixedProductMode, focusedChatIndex, manualProduct, manualPrice } = stateRef.current;
+                    const { reversedChats, isFixedProductMode, focusedChatId, manualProduct, manualPrice } = stateRef.current;
                     
                     // 고정 모드가 아닐 때는 화살표 기능 작동 안 함
                     if (!isFixedProductMode) return;
@@ -2228,22 +2291,27 @@ const dashboardStats = useMemo(() => {
                         }
                         e.preventDefault(); // 스크롤 이동 방지
                         
-                        let nextIndex = focusedChatIndex;
+                        const currentIndex = reversedChats.findIndex(c => c.id === focusedChatId);
+                        let nextIndex = currentIndex;
+                        
                         if (e.key === 'ArrowDown') {
-                            nextIndex = focusedChatIndex < 0 ? 0 : Math.min(focusedChatIndex + 1, reversedChats.length - 1);
+                            nextIndex = currentIndex < 0 ? 0 : Math.min(currentIndex + 1, reversedChats.length - 1);
                         } else if (e.key === 'ArrowUp') {
-                            nextIndex = focusedChatIndex < 0 ? reversedChats.length - 1 : Math.max(focusedChatIndex - 1, 0);
+                            nextIndex = currentIndex <= 0 ? reversedChats.length - 1 : Math.max(currentIndex - 1, 0);
                         }
                             
-                        setFocusedChatIndex(nextIndex);
-                        document.getElementById(`chat-item-${nextIndex}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                        const nextChat = reversedChats[nextIndex];
+                        if (nextChat) {
+                            setFocusedChatId(nextChat.id);
+                            document.getElementById(`chat-item-${nextChat.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                        }
                     } 
-                    else if ((e.key === 'Enter' || e.key === ' ' || e.code === 'Space') && focusedChatIndex >= 0) {
+                    else if ((e.key === 'Enter' || e.key === ' ' || e.code === 'Space') && focusedChatId) {
                         // 타이핑 중일 때(검색창, 상품명 창 등)는 단축키 작동 방지 (글씨 써지도록)
                         if (isInputActive) return;
 
                         e.preventDefault();
-                        const chat = reversedChats[focusedChatIndex];
+                        const chat = reversedChats.find(c => c.id === focusedChatId);
                         if (chat) {
                             // 마우스 클릭과 완벽하게 동일한 로직 실행
                             bringToTopAndScroll(chat.nickname);
@@ -2262,14 +2330,40 @@ const dashboardStats = useMemo(() => {
 
             // 고정 모드가 풀리면 포커스 초기화
             useEffect(() => { 
-                if (!isFixedProductMode) setFocusedChatIndex(-1); 
+                if (!isFixedProductMode) setFocusedChatId(null); 
             }, [isFixedProductMode]);
             // ✨ 키보드 네비게이션 로직 종료
 
             const renderChatContent = useCallback((content, keywordsArr) => {
-                const safeContent = String(content || ''); if (!keywordsArr || keywordsArr.length === 0) return safeContent; const kwArray = keywordsArr.filter(k => k.trim()); if (!kwArray.length) return safeContent;
-                const pattern = new RegExp(`(${kwArray.map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'gi');
-                return safeContent.split(pattern).map((part, i) => kwArray.includes(part) ? <span key={i} className="text-blue-600 dark:text-blue-400 font-black bg-blue-50 dark:bg-blue-900/30 px-1 py-0.5 rounded shadow-sm">{part}</span> : part);
+                const safeContent = String(content || ''); 
+                const kwArray = (keywordsArr || []).filter(k => k.trim()); 
+                
+                // 💡 자주 쓰이는 색상/사이즈 자동 형광펜 처리용 단어 목록
+                const autoWords = ['블랙', '화이트', '아이보리', '베이지', '그레이', '차콜', '네이비', '레드', '핑크', '블루', '소라', '옐로우', '그린', '카키', '브라운', '퍼플', '프리', 'FREE', '스몰', '미듐', '라지'];
+                
+                if (!kwArray.length && !autoWords.some(w => safeContent.includes(w)) && !safeContent.match(/(55|66|77|88|225|230|235|240|245|250)/)) {
+                    return safeContent;
+                }
+
+                // 수동 키워드 + 자동 단어 정규식 병합
+                let patterns = [...kwArray, ...autoWords].map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+                patterns.push('55', '66', '77', '88', '225', '230', '235', '240', '245', '250');
+                
+                const regex = new RegExp(`(${patterns.join('|')})`, 'gi');
+
+                return safeContent.split(regex).map((part, i) => {
+                    if (!part) return part;
+                    
+                    // 1. 수동 등록 키워드 (진한 노란색 형광펜)
+                    if (kwArray.includes(part)) {
+                        return <span key={i} className="text-yellow-900 dark:text-yellow-100 font-black bg-yellow-300 dark:bg-yellow-600/60 px-1 py-0.5 rounded shadow-sm">{part}</span>;
+                    } 
+                    // 2. 자동 인식 단어 (은은한 민트색 형광펜)
+                    else if (autoWords.includes(part) || /^(55|66|77|88|225|230|235|240|245|250)$/.test(part)) {
+                        return <span key={i} className="text-emerald-900 dark:text-emerald-100 font-bold bg-emerald-200 dark:bg-emerald-700/50 px-1 rounded">{part}</span>;
+                    }
+                    return part;
+                });
             }, []);
 
             const handleChatClick = (chat) => { bringToTopAndScroll(chat.nickname); setClickedChats(prev => new Set(prev).add(chat.id)); const finalProduct = (isFixedProductMode && manualProduct.trim() !== '') ? manualProduct.trim() : String(chat.content || ''); const finalPrice = isFixedProductMode ? manualPrice : null; addOrderLogic(chat.nickname, finalProduct, 1, true, null, finalPrice, isFixedProductMode, true); };
@@ -2529,8 +2623,8 @@ const dashboardStats = useMemo(() => {
                     if (o.id === id) { 
                         const newOrder = { ...o, [field]: value, isUnmodified: false }; 
                         const isDiscount = (name) => {
-                            const n = String(name || '');
-                            return n.includes('적립금') || n.includes('기납금') || n.includes('선결제') || n.includes('선입금') || n.includes('과납') || n.includes('예치금') || n.includes('쿠폰') || n.includes('할인') || n.includes('포인트');
+                            const n = String(name || '').trim();
+                            return n === '적립금';
                         };
 
                         if(field === 'product') { 
@@ -2572,7 +2666,7 @@ const dashboardStats = useMemo(() => {
                     if (o.id === itemId) { 
                         const cleanProd = String(o.product || '').trim(); const inv = inventoryRef.current; const hist = productHistoryRef.current;
                         const invItem = Array.isArray(inv) ? inv.find(i => String(i.name).trim() === cleanProd) : null;
-                        const isDiscount = cleanProd.includes('적립금') || cleanProd.includes('기납금') || cleanProd.includes('선결제') || cleanProd.includes('선입금') || cleanProd.includes('과납') || cleanProd.includes('예치금') || cleanProd.includes('쿠폰') || cleanProd.includes('할인') || cleanProd.includes('포인트');
+                        const isDiscount = cleanProd === '적립금';
                         let unitPrice = invItem ? Number(invItem.price) : (hist[cleanProd] || (o.quantity > 0 ? o.price/o.quantity : 0));
                         if (isDiscount && unitPrice > 0) unitPrice = -Math.abs(unitPrice);
                         const validQty = (newQtyVal === '' || isNaN(parseInt(newQtyVal))) ? '' : parseInt(newQtyVal);
@@ -2599,8 +2693,8 @@ const dashboardStats = useMemo(() => {
                 let msg = `${emoji} ${nick} 님 ${emoji}\n\n[${broadcastName} 주문목록]\n${itemListText}\n배송비 ${currentShipping.toLocaleString()}원\n\n총 주문금액 ${grandTotal.toLocaleString()}원\n------------------\n`;
                 if (isCard) { 
                     const cardBase = Math.max(0, grandTotal - depositTotal);
-                    if (depositTotal > 0) { msg += `[카드결제]\n총 주문금액 ${grandTotal.toLocaleString()}원\n선입금 ${depositTotal.toLocaleString()}원\n남은 결제금액 ${cardBase.toLocaleString()}원\n수수료(10%) ${(cardBase * 0.1).toLocaleString()}원\n👉최종 결제요청액 ${(cardBase * 1.1).toLocaleString()}원 예정\n\n핸드폰번호 남겨주세요🌸\n------------------\n\n`; } 
-                    else { msg += `[카드결제]\n금액 ${cardBase.toLocaleString()}원\n수수료(10%) ${(cardBase * 0.1).toLocaleString()}원\n👉결제요청액 ${(cardBase * 1.1).toLocaleString()}원 예정\n\n핸드폰번호 남겨주세요🌸\n------------------\n\n`; }
+                    if (depositTotal > 0) { msg += `[카드결제]\n총 주문금액 ${grandTotal.toLocaleString()}원\n선입금 ${depositTotal.toLocaleString()}원\n남은 결제금액 ${cardBase.toLocaleString()}원\n수수료(10%) ${(cardBase * 0.1).toLocaleString()}원\n👉최종 결제요청액 ${(cardBase * 1.1).toLocaleString()}원 예정\n\n방송종료 시간이 늦을경우 오전에 카드결제 링크 발송합니다.\n주문내역 확인 후 주무시면 됩니다!\n------------------\n\n`; } 
+                    else { msg += `[카드결제]\n금액 ${cardBase.toLocaleString()}원\n수수료(10%) ${(cardBase * 0.1).toLocaleString()}원\n👉결제요청액 ${(cardBase * 1.1).toLocaleString()}원 예정\n\n방송종료 시간이 늦을경우 오전에 카드결제 링크 발송합니다.\n주문내역 확인 후 주무시면 됩니다!\n------------------\n\n`; }
                 } 
                 else { 
                     const isPaid = (balance <= 0) && (grandTotal >= 0) && (activeItems.length > 0); 
@@ -2613,9 +2707,9 @@ const dashboardStats = useMemo(() => {
                 
                 if (addr && addr.address && !alwaysRequestAddress) {
                     const dispPhone = fixPhoneNumber(addr.phone);
-                    msg += `\n[배송지 확인]\n\n${addr.realname || nick}\n${dispPhone}\n${addr.address} ${addr.zipcode ? `(${addr.zipcode})` : ''}\n${addr.memo ? addr.memo + '\n' : ''}\n------------------\n${addrNotice}`;
+                    msg += `\n[배송지 확인]\n\n${addr.realname || nick}\n${dispPhone}\n${addr.address} ${addr.zipcode ? `(${addr.zipcode})` : ''}\n${addr.memo ? addr.memo + '\n' : ''}\n------------------\n${addrNotice ? addrNotice + '\n' : ''}`;
                 } else if (!sentAddressRequests.has(nick) || alwaysRequestAddress) { 
-                    msg += `\n${surveyNotice}`; setSentAddressRequests(prev => new Set(prev).add(nick)); 
+                    if (surveyNotice) msg += `\n${surveyNotice}\n`; setSentAddressRequests(prev => new Set(prev).add(nick)); 
                 }
 
                 // ✨ 대기 상품이 있다면 메시지 맨 끝에 별도 안내문 추가
@@ -2671,7 +2765,7 @@ const dashboardStats = useMemo(() => {
                 let price = 0; const isCustomPriceValid = customPrice !== null && customPrice !== '';
                 if (isCustomPriceValid) price = Number(String(customPrice).replace(/,/g, '')); else price = invItem ? Number(invItem.price) : (hist[cContent] || 0);
 
-                const isDiscount = cContent.includes('적립금') || cContent.includes('기납금') || cContent.includes('선결제') || cContent.includes('선입금') || cContent.includes('과납') || cContent.includes('예치금') || cContent.includes('쿠폰') || cContent.includes('할인') || cContent.includes('포인트');
+                const isDiscount = cContent === '적립금';
                 if (isDiscount && price > 0) price = -Math.abs(price);
 
                 if (cContent !== '' && (isCustomPriceValid || price !== 0)) {
@@ -2797,9 +2891,14 @@ const dashboardStats = useMemo(() => {
             const handleAddManualDeposit = (e) => { e.preventDefault(); if (!newDepositName.trim() || !newDepositAmount) return openModal("입금자명/금액 필수", 'alert'); const newDep = { id: `manual_${Date.now()}`, name: newDepositName, amount: newDepositAmount, source: 'manual' }; setManualDeposits(prev => [newDep, ...prev]); setNewDepositName(''); setNewDepositAmount(''); };
 
             const visibleDeposits = useMemo(() => {
-                if (deferredDepositSearch) return filteredDeposits; const unmatched = []; const matched = [];
-                filteredDeposits.forEach(d => { if (matchedDeposits?.has(d.id)) matched.push(d); else unmatched.push(d); });
-                return [...unmatched, ...matched];
+                if (deferredDepositSearch) return filteredDeposits; 
+                const unmatched = []; const matched = []; const sijae = [];
+                filteredDeposits.forEach(d => { 
+                    if (String(d.name).trim() === '시재') sijae.push(d);
+                    else if (matchedDeposits?.has(d.id)) matched.push(d); 
+                    else unmatched.push(d); 
+                });
+                return [...unmatched, ...matched, ...sijae];
             }, [filteredDeposits, deferredDepositSearch, matchedDeposits]);
 
             const usedAddressNicks = useMemo(() => {
@@ -3002,10 +3101,21 @@ const dashboardStats = useMemo(() => {
                         <div ref={chatScrollRef} className="flex-1 overflow-y-auto p-1.5 space-y-0.5 bg-slate-50 dark:bg-slate-900">
                             {reversedChats.map((c, idx) => {
                                 const safeContent = String(c.content || ''); const isMatched = (keywords || []).some(k => safeContent.includes(k)); const isProcessed = clickedChats?.has(c.id);
-                                const isFocused = isFixedProductMode && focusedChatIndex === idx;
+                                const isFocused = isFixedProductMode && focusedChatId === c.id;
                                 
-                                // ✨ 파란색 포커스 테두리 디자인 적용
-                                const chatClasses = isFocused ? 'ring-2 ring-blue-500 bg-blue-100 dark:bg-blue-900/60 border-blue-400 z-10 scale-[1.02] shadow-md' : (isProcessed ? 'opacity-80 bg-slate-100 dark:bg-slate-800/80 border-transparent' : (isMatched ? 'bg-slate-100 dark:bg-slate-800 border-slate-400 dark:border-slate-600 ring-1 ring-slate-400 dark:ring-slate-600 shadow-sm' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'));
+                                // ✨ 파란색 포커스 테두리 디자인 및 처리 여부 구분 적용
+                                let chatClasses = '';
+                                if (isFocused) {
+                                    if (isProcessed) {
+                                        // 포커스 됨 + 이미 등록됨 -> 회색조의 톤다운된 포커스 (이미 처리된 느낌)
+                                        chatClasses = 'ring-2 ring-slate-400 bg-slate-200 dark:bg-slate-700 border-slate-400 z-10 scale-[1.02] shadow-md opacity-70';
+                                    } else {
+                                        // 포커스 됨 + 새로운 채팅 -> 기존처럼 쨍한 파란색 포커스
+                                        chatClasses = 'ring-2 ring-blue-500 bg-blue-100 dark:bg-blue-900/60 border-blue-400 z-10 scale-[1.02] shadow-md';
+                                    }
+                                } else {
+                                    chatClasses = isProcessed ? 'opacity-80 bg-slate-100 dark:bg-slate-800/80 border-transparent' : (isMatched ? 'bg-slate-100 dark:bg-slate-800 border-slate-400 dark:border-slate-600 ring-1 ring-slate-400 dark:ring-slate-600 shadow-sm' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700');
+                                }
                                 
                                 const custStatus = specialCustomers[normalizeString(c.nickname)]?.type;
                                 let statusBadge = null;
@@ -3014,7 +3124,7 @@ const dashboardStats = useMemo(() => {
                                 else if (custStatus === 'manager') statusBadge = <span className="text-[9px] bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 px-1 py-0.5 rounded flex items-center gap-0.5 shrink-0"><Icon name="shield-check" weight="fill"/> 관리자</span>;
 
                                 return (
-                                    <div key={c.id} id={`chat-item-${idx}`} onClick={() => { setFocusedChatIndex(idx); handleChatClick(c); }} className={`py-1.5 px-2 border rounded cursor-pointer transition-all flex flex-col gap-1 ${chatClasses}`}>
+                                    <div key={c.id} id={`chat-item-${c.id}`} onClick={() => { setFocusedChatId(c.id); handleChatClick(c); }} className={`py-1.5 px-2 border rounded cursor-pointer transition-all flex flex-col gap-1 ${chatClasses}`}>
                                         <div className="flex justify-between items-start"><span className={`flex items-center gap-1 break-all text-[12px] font-bold ${isProcessed && !isFocused ? 'text-slate-400 dark:text-slate-500' : 'text-slate-800 dark:text-slate-200'}`}>{c.nickname} {statusBadge}</span><span className="text-[10px] text-slate-400 dark:text-slate-500 shrink-0 mt-0.5">{formatTimeOnly(c.time)}</span></div>
                                         <div className={`text-[12px] font-medium leading-snug break-all pl-1 ${isProcessed && !isFocused ? 'text-slate-400 dark:text-slate-500' : 'text-slate-700 dark:text-slate-300'}`}>{renderChatContent(safeContent, keywords || [])}</div>
                                     </div>
@@ -3375,7 +3485,7 @@ const dashboardStats = useMemo(() => {
             const handleExportAllMessages = () => {
                 const groups = {}; orders.forEach(o => { if (!groups[o.customer]) groups[o.customer] = []; groups[o.customer].push(o); });
                 const templateConfigStr = localStorage.getItem(getLsKey('templateConfig'));
-                const templateConfigLocal = templateConfigStr ? JSON.parse(templateConfigStr) : { emoji: '💙', paidMsg: '😍 완납 확인! 감사합니다 😍', unpaidPrefix: '[미입금]\n총 입금하실 금액\n👉', overpaidMsg: '과납 금액이 있습니다.\n환불 또는 적립 여부를 알려주세요!', addrNotice: '※ 배송지 변경 시 채팅으로 변경할 주소를 남겨주세요!', surveyNotice: '방송마다 1회 하단의 주문서(배송지입력) 필수!!', alwaysRequestAddress: false };
+                const templateConfigLocal = templateConfigStr ? JSON.parse(templateConfigStr) : { emoji: '💙', paidMsg: '😍 완납 확인! 감사합니다 😍', unpaidPrefix: '[미입금]\n총 입금하실 금액\n👉', overpaidMsg: '과납 금액이 있습니다.\n환불 또는 적립 여부를 알려주세요!', addrNotice: '', surveyNotice: '', alwaysRequestAddress: false };
                 const overpaidMsg = templateConfigLocal.overpaidMsg || '과납 금액이 있습니다.\n환불 또는 적립 여부를 알려주세요!';
                 const bankStr = localStorage.getItem(getLsKey('bankAccount')) || "카카오뱅크 김선정\n7942 18 01611";
                 const sentAddressRequestsStr = localStorage.getItem(getLsKey('sentAddressRequests')); const sentAddressRequestsLocal = sentAddressRequestsStr ? new Set(JSON.parse(sentAddressRequestsStr)) : new Set();
@@ -3399,8 +3509,8 @@ const dashboardStats = useMemo(() => {
                     let statusStr = '';
                     if (isCard) { 
                         statusStr = '카드결제'; const cardBase = Math.max(0, baseGrandTotal - depositTotal);
-                        if (depositTotal > 0) { msg += `[카드결제]\n총 주문금액 ${baseGrandTotal.toLocaleString()}원\n선입금 ${depositTotal.toLocaleString()}원\n남은 결제금액 ${cardBase.toLocaleString()}원\n수수료(10%) ${(cardBase * 0.1).toLocaleString()}원\n👉최종 결제요청액 ${(cardBase * 1.1).toLocaleString()}원 예정\n\n핸드폰번호 남겨주세요🌸\n------------------\n\n`; } 
-                        else { msg += `[카드결제]\n금액 ${cardBase.toLocaleString()}원\n수수료(10%) ${(cardBase * 0.1).toLocaleString()}원\n👉결제요청액 ${(cardBase * 1.1).toLocaleString()}원 예정\n\n핸드폰번호 남겨주세요🌸\n------------------\n\n`; }
+                        if (depositTotal > 0) { msg += `[카드결제]\n총 주문금액 ${baseGrandTotal.toLocaleString()}원\n선입금 ${depositTotal.toLocaleString()}원\n남은 결제금액 ${cardBase.toLocaleString()}원\n수수료(10%) ${(cardBase * 0.1).toLocaleString()}원\n👉최종 결제요청액 ${(cardBase * 1.1).toLocaleString()}원 예정\n\n방송종료 시간이 늦을경우 오전에 카드결제 링크 발송합니다.\n주문내역 확인 후 주무시면 됩니다!\n------------------\n\n`; } 
+                        else { msg += `[카드결제]\n금액 ${cardBase.toLocaleString()}원\n수수료(10%) ${(cardBase * 0.1).toLocaleString()}원\n👉결제요청액 ${(cardBase * 1.1).toLocaleString()}원 예정\n\n방송종료 시간이 늦을경우 오전에 카드결제 링크 발송합니다.\n주문내역 확인 후 주무시면 됩니다!\n------------------\n\n`; }
                     } else { 
                         const isPaid = (balance <= 0) && (grandTotal >= 0); 
                         if (depositTotal > 0 && balance <= 0) { msg += `[입금확인]\n${depositTotal.toLocaleString()}원\n------------------\n\n`; } 
@@ -3414,8 +3524,10 @@ const dashboardStats = useMemo(() => {
                     }
                     if (addrInfo && addrInfo.address && !templateConfigLocal.alwaysRequestAddress) {
                         let cleanPhone = fixPhoneNumber(addrInfo.phone);
-                        msg += `\n[배송지 확인]\n\n${addrInfo.realname || nick}\n${cleanPhone}\n${addrInfo.address} ${addrInfo.zipcode ? `(${addrInfo.zipcode})` : ''}\n${addrInfo.memo ? addrInfo.memo + '\n' : ''}\n------------------\n${templateConfigLocal.addrNotice}`; 
-                    } else if (!sentAddressRequestsLocal.has(nick) || templateConfigLocal.alwaysRequestAddress) { msg += `\n${templateConfigLocal.surveyNotice}`; }
+                        msg += `\n[배송지 확인]\n\n${addrInfo.realname || nick}\n${cleanPhone}\n${addrInfo.address} ${addrInfo.zipcode ? `(${addrInfo.zipcode})` : ''}\n${addrInfo.memo ? addrInfo.memo + '\n' : ''}\n------------------\n${templateConfigLocal.addrNotice ? templateConfigLocal.addrNotice + '\n' : ''}`; 
+                    } else if (!sentAddressRequestsLocal.has(nick) || templateConfigLocal.alwaysRequestAddress) { 
+                        if (templateConfigLocal.surveyNotice) msg += `\n${templateConfigLocal.surveyNotice}\n`; 
+                    }
                     
                     if (waitlistItems.length > 0) {
                         const waitlistText = waitlistItems.map(i => `${i.product}${i.quantity > 1 ? ` ★${i.quantity}개` : ''}`).join('\n');
@@ -3589,7 +3701,7 @@ const dashboardStats = useMemo(() => {
             const [quickShipping, setQuickShipping] = useLocalStorage('quickShipping', 4000); 
             const [jejuShipping, setJejuShipping] = useLocalStorage('jejuShipping', 8000);
             const [freeShippingThreshold, setFreeShippingThreshold] = useLocalStorage('freeShippingThreshold', 70000);
-            const [templateConfig, setTemplateConfig] = useLocalStorage('templateConfig', { emoji: '💙', paidMsg: '😍 완납 확인! 감사합니다 😍', unpaidPrefix: '[미입금]\n총 입금하실 금액\n👉', overpaidMsg: '과납 금액이 있습니다.\n환불 또는 적립 여부를 알려주세요!', addrNotice: '※ 배송지 변경 시 채팅으로 변경할 주소를 남겨주세요!', surveyNotice: '방송마다 1회 하단의 주문서(배송지입력) 필수!!', alwaysRequestAddress: false });
+            const [templateConfig, setTemplateConfig] = useLocalStorage('templateConfig', { emoji: '💙', paidMsg: '😍 완납 확인! 감사합니다 😍', unpaidPrefix: '[미입금]\n총 입금하실 금액\n👉', overpaidMsg: '과납 금액이 있습니다.\n환불 또는 적립 여부를 알려주세요!', addrNotice: '', surveyNotice: '', alwaysRequestAddress: false });
             const [isDarkMode, setIsDarkMode] = useLocalStorage('darkMode', false);
             
             const [productHistory, setProductHistory] = useLocalStorage('productHistory', {});
@@ -3630,6 +3742,16 @@ const dashboardStats = useMemo(() => {
             const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
 
             useEffect(() => {
+                setTemplateConfig(prev => {
+                    let updated = { ...prev };
+                    let changed = false;
+                    if (updated.surveyNotice === '방송마다 1회 하단의 주문서(배송지입력) 필수!!') { updated.surveyNotice = ''; changed = true; }
+                    if (updated.addrNotice === '※ 배송지 변경 시 채팅으로 변경할 주소를 남겨주세요!') { updated.addrNotice = ''; changed = true; }
+                    return changed ? updated : prev;
+                });
+            }, [setTemplateConfig]);
+
+            useEffect(() => {
                 const handleGlobalKeyDown = (e) => {
                     if (e.altKey && (e.key === 'r' || e.key === 'R' || e.key === 'ㄱ')) {
                         e.preventDefault();
@@ -3655,11 +3777,15 @@ const dashboardStats = useMemo(() => {
             const openModal = useCallback((msg, type = 'alert', onConfirm = null, onCancel = null, initVal = '') => { setModalConfig({ isOpen: true, type, message: msg, onConfirm: (val) => { setModalConfig(p => ({...p, isOpen: false})); if(onConfirm) onConfirm(val); }, onCancel: () => { setModalConfig(p => ({...p, isOpen: false})); if(onCancel) onCancel(); }, initialValue: initVal }); }, []);
 
             const handleResetAllData = () => {
-                openModal('정말 모든 데이터를 초기화하시겠습니까?\n(주문서, 입금 연결, 채팅 기록, 실시간 재고, 기타 설정이 모두 삭제됩니다)', 'confirm', () => {
+                openModal('정말 모든 데이터를 초기화하시겠습니까?\n(주문서, 입금 연결, 채팅 기록, 실시간 재고(잠긴 상품 제외), 기타 설정이 삭제됩니다)', 'confirm', () => {
                     setOrders([]); setProductHistory({}); setShippingOverrides({}); setCardPayments({}); setMatchedDeposits(new Set()); setDepositLinks({}); setDepositorNames({}); setClickedChats(new Set());
-                    setKeywords([]); setSentAddressRequests(new Set()); setDeletedDepositIds(new Set()); setCheckedOrders(new Set()); setAddressMapping({}); setCashReceipts({}); setInventory([]); setManualDeposits([]); localStorage.removeItem(getLsKey('ignoredAutoMatch'));
+                    setKeywords([]); setSentAddressRequests(new Set()); setDeletedDepositIds(new Set()); setCheckedOrders(new Set()); setAddressMapping({}); setCashReceipts({}); 
+                    
+                    // ✨ 초기화 시 자물쇠(isLocked)가 걸린 상품들만 안전하게 남겨두기
+                    setInventory(prev => (Array.isArray(prev) ? prev.filter(i => i.isLocked) : [])); 
+                    
+                    setManualDeposits([]); localStorage.removeItem(getLsKey('ignoredAutoMatch'));
                     setNoShowCustomers({}); setWaitlistCustomers({});
-                    // 채팅 기록 날리기
                     window.localStorage.removeItem(getLsKey('savedChats'));
                     
                     if (googleScriptUrl && masterSheetId) {
@@ -3749,7 +3875,7 @@ const dashboardStats = useMemo(() => {
                     
                     <div className="bg-white dark:bg-slate-800 border-b dark:border-slate-700 shadow-sm px-4 py-2 flex justify-between items-center z-10 shrink-0">
                         <div className="flex items-center gap-3">
-                            <h1 className="text-xl font-black tracking-tight text-slate-800 dark:text-white flex items-center gap-2"><Icon name="shopping-bag" weight="fill" className="text-blue-500" /> 주문서 관리 시스템</h1>
+                            <h1 className="text-xl font-black tracking-tight text-slate-800 dark:text-white flex items-center gap-2"><Icon name="shopping-bag" weight="fill" className="text-blue-500" /> 강은지 주문서</h1>
                             <div className="flex bg-slate-100 dark:bg-slate-900 rounded-lg p-1 ml-4 shadow-inner border dark:border-slate-700 items-center">
                                 <button onClick={() => setActiveTab('live')} className={`px-4 py-1.5 rounded-md text-sm font-bold transition-all ${activeTab === 'live' ? 'bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-400 border border-slate-200 dark:border-slate-600' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}><Icon name="broadcast" weight={activeTab === 'live' ? 'fill' : 'regular'} className="inline-block mr-1"/> 라이브</button>
                                 <button onClick={() => setActiveTab('management')} className={`px-4 py-1.5 rounded-md text-sm font-bold transition-all ${activeTab === 'management' ? 'bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-400 border border-slate-200 dark:border-slate-600' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}><Icon name="kanban" weight={activeTab === 'management' ? 'fill' : 'regular'} className="inline-block mr-1"/> 정산 / 내보내기</button>
