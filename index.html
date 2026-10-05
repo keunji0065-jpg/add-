@@ -1935,7 +1935,8 @@ useEffect(() => {
                                             id: existing && existing.id ? existing.id : `inv_${Date.now()}_${Math.random()}`, 
                                             name: i.name, price: Number(i.price), 
                                             stock: existing && existing.stock !== undefined ? existing.stock : '', 
-                                            isSoldOut: i.status === '품절' || (existing && existing.isSoldOut)
+                                            isSoldOut: i.status === '품절' || (existing && existing.isSoldOut),
+                                            isLocked: existing ? existing.isLocked : false
                                         };
                                     });
                                     return [...localOnly, ...merged];
@@ -2411,13 +2412,16 @@ const dashboardStats = useMemo(() => {
                     let newDepositLinks = { ...depositLinks };
                     
                     updatedOrders.forEach(o => {
-                        if (o.isCancelled) return;
                         if (!customerBalances[o.customer]) { customerBalances[o.customer] = { productTotal: 0, productTotalForShipping: 0, depositTotal: 0, activeItemsCount: 0, isCloud: false }; }
-                        customerBalances[o.customer].productTotal += Number(o.price); 
-                        if (!o.isWaitlist && Number(o.price) > 0) customerBalances[o.customer].productTotalForShipping += Number(o.price);
+                        
                         customerBalances[o.customer].depositTotal += (o.deposit || 0); 
-                        if (!o.isWaitlist) customerBalances[o.customer].activeItemsCount += 1;
-                        if (o.loadedFromCloud) customerBalances[o.customer].isCloud = true;
+                        
+                        if (!o.isCancelled) {
+                            customerBalances[o.customer].productTotal += Number(o.price); 
+                            if (!o.isWaitlist && Number(o.price) > 0) customerBalances[o.customer].productTotalForShipping += Number(o.price);
+                            if (!o.isWaitlist) customerBalances[o.customer].activeItemsCount += 1;
+                            if (o.loadedFromCloud) customerBalances[o.customer].isCloud = true;
+                        }
                     });
 
                     const matchLookup = {};
@@ -2446,21 +2450,16 @@ const dashboardStats = useMemo(() => {
                         
                         if (matchedCustomer) {
                             const cb = customerBalances[matchedCustomer];
-                            if (cb.balance <= 0) { 
-                                newMatchedIds.add(deposit.id);
-                                newDepositLinks[deposit.id] = matchedCustomer;
-                                hasChanges = true; 
-                            } else {
-                                let applied = false;
-                                updatedOrders = updatedOrders.map(o => { 
-                                    if (o.customer === matchedCustomer && !applied) { applied = true; return { ...o, deposit: (o.deposit || 0) + depositAmount, loadedFromCloud: false }; } 
-                                    return o; 
-                                });
-                                cb.depositTotal += depositAmount; cb.balance -= depositAmount; cb.isCloud = false; 
-                                newMatchedIds.add(deposit.id);
-                                newDepositLinks[deposit.id] = matchedCustomer;
-                                hasChanges = true;
-                            }
+                            // 금액이 초과(과납)되더라도 무조건 주문서에 입금액을 누적시켜 과납을 기록하도록 수정
+                            let applied = false;
+                            updatedOrders = updatedOrders.map(o => { 
+                                if (o.customer === matchedCustomer && !applied) { applied = true; return { ...o, deposit: (o.deposit || 0) + depositAmount, loadedFromCloud: false }; } 
+                                return o; 
+                            });
+                            cb.depositTotal += depositAmount; cb.balance -= depositAmount; cb.isCloud = false; 
+                            newMatchedIds.add(deposit.id);
+                            newDepositLinks[deposit.id] = matchedCustomer;
+                            hasChanges = true;
                         }
                     });
                     if (hasChanges) { setOrders(updatedOrders); setMatchedDeposits(newMatchedIds); setDepositLinks(newDepositLinks); }
@@ -2474,17 +2473,32 @@ const dashboardStats = useMemo(() => {
                 if (!googleScriptUrl || !masterSheetId || Object.keys(orders).length === 0) return; 
                 
                 const customerTotalsForShipping = {}; 
+                const customerTotalDeposits = {}; 
+
+                orders.forEach(o => {
+                    if (!customerTotalDeposits[o.customer]) customerTotalDeposits[o.customer] = 0;
+                    customerTotalDeposits[o.customer] += (o.deposit || 0);
+                });
+
                 orders.filter(o => !o.isCancelled && !o.isWaitlist).forEach(o => { 
                     customerTotalsForShipping[o.customer] = (customerTotalsForShipping[o.customer] || 0) + (Number(o.price) > 0 ? Number(o.price) : 0); 
                 });
                 
                 const uniqueNicknames = Array.from(new Set(orders.filter(o => !o.isCancelled).map(o => o.customer)));
+                const printedDeposits = {};
                 
                 const saveList = orders.filter(o=>!o.isCancelled).map(o => { 
                     let addrRes = addressLookup.get(o.customer); let addr = addrRes.data || {}; 
                     const currentShipping = getCalculatedShipping(o.customer, customerTotalsForShipping[o.customer] || 0); 
                     const isCard = cardPayments[o.customer] ? true : false; 
                     const customerVal = o.customer || '';
+                    
+                    // 주문 품목 중 하나가 취소되어도 해당 고객의 입금 총액이 마스터 시트에 정상 보존되도록 개선
+                    let depositToSave = 0;
+                    if (!printedDeposits[customerVal]) {
+                        depositToSave = customerTotalDeposits[customerVal] || 0;
+                        printedDeposits[customerVal] = true;
+                    }
                     
                     const isVip = specialCustomers && specialCustomers[normalizeString(customerVal)]?.type === 'vip';
                     const isNoShow = noShowCustomers && noShowCustomers[customerVal];
@@ -2496,7 +2510,7 @@ const dashboardStats = useMemo(() => {
                         '수량': o.quantity,
                         '단가(제품금액)': o.price,
                         '배송비': currentShipping,
-                        '입금액': o.deposit,
+                        '입금액': depositToSave,
                         '카드결제': isCard ? 'O' : '',
                         '수령인명': addr.realname || '',
                         '연락처': addr.phone ? "'" + addr.phone : '',
@@ -2677,7 +2691,26 @@ const dashboardStats = useMemo(() => {
             }, [setOrders]);
 
             const handleOrderCancel = useCallback((id) => setOrders(prev => prev.map(o => o.id === id ? { ...o, isCancelled: !o.isCancelled } : o)), [setOrders]);
-            const handleOrderDelete = useCallback((id) => openModal("주문 삭제하시겠습니까?", 'confirm', () => setOrders(prev => prev.filter(o => o.id !== id))), [openModal, setOrders]);
+            const handleOrderDelete = useCallback((id) => {
+                openModal("주문 삭제하시겠습니까?", 'confirm', () => {
+                    setOrders(prev => {
+                        const orderToDelete = prev.find(o => o.id === id);
+                        if (!orderToDelete) return prev;
+                        const depositToShift = orderToDelete.deposit || 0;
+                        
+                        let shifted = false;
+                        const next = prev.filter(o => o.id !== id).map(o => {
+                            // 삭제하는 줄에 묶여있던 입금액이 있다면, 동일 고객의 다른 줄로 안전하게 이관
+                            if (!shifted && o.customer === orderToDelete.customer) {
+                                shifted = true;
+                                return { ...o, deposit: (o.deposit || 0) + depositToShift };
+                            }
+                            return o;
+                        });
+                        return next;
+                    });
+                });
+            }, [openModal, setOrders]);
 
    const copyOrderSheet = useCallback((nick, items, grandTotal, depositTotal, balance, isCard, addrData, e) => {
                 // ✨ 확정 상품과 대기 상품 분리
@@ -2690,6 +2723,12 @@ const dashboardStats = useMemo(() => {
                 const itemListText = activeItems.map(i => `${i.product}${i.quantity > 1 ? ` ★${i.quantity}개` : ''} ${Number(i.price).toLocaleString()}원`).join('\n');
                 const { emoji, paidMsg, unpaidPrefix, overpaidMsg = '과납 금액이 있습니다.\n환불 또는 적립 여부를 알려주세요!', addrNotice, surveyNotice, alwaysRequestAddress } = templateConfig;
                 
+                const hasCashReceipt = cashReceipts[nick];
+                let finalPaidMsg = paidMsg;
+                if (hasCashReceipt && depositTotal > 0) {
+                    finalPaidMsg += `\n[현금영수증 요청] ${depositTotal.toLocaleString()}원`;
+                }
+
                 let msg = `${emoji} ${nick} 님 ${emoji}\n\n[${broadcastName} 주문목록]\n${itemListText}\n배송비 ${currentShipping.toLocaleString()}원\n\n총 주문금액 ${grandTotal.toLocaleString()}원\n------------------\n`;
                 if (isCard) { 
                     const cardBase = Math.max(0, grandTotal - depositTotal);
@@ -2701,8 +2740,8 @@ const dashboardStats = useMemo(() => {
                     if (depositTotal > 0 && balance <= 0) { msg += `[입금확인]\n${depositTotal.toLocaleString()}원\n------------------\n\n`; } 
                     else if (depositTotal > 0 && balance > 0) { msg += `[입금확인]\n${depositTotal.toLocaleString()}원 (일부 입금)\n------------------\n\n`; }
                     if (balance > 0) { if (depositTotal > 0) { msg += `[부분 미수 안내]\n남은 미수금 👉 ${balance.toLocaleString()}원\n\n${bankAccount}\n추가 입금 부탁드립니다 🙏\n------------------\n\n`; } else { msg += `${unpaidPrefix}\n${balance.toLocaleString()}원 \n\n${bankAccount}\n입금 부탁드립니다 🙏\n------------------\n\n`; } } 
-                    else if (balance < 0) { msg += `${paidMsg}\n\n[과납 안내]\n과납액: ${Math.abs(balance).toLocaleString()}원\n${overpaidMsg}\n------------------\n`; } 
-                    else { if (isPaid) msg += `${paidMsg}\n------------------\n`; }
+                    else if (balance < 0) { msg += `${finalPaidMsg}\n\n[과납 안내]\n과납액: ${Math.abs(balance).toLocaleString()}원\n${overpaidMsg}\n------------------\n`; } 
+                    else { if (isPaid) msg += `${finalPaidMsg}\n------------------\n`; }
                 }
                 
                 if (addr && addr.address && !alwaysRequestAddress) {
@@ -2734,7 +2773,7 @@ const dashboardStats = useMemo(() => {
                     el.className = 'ml-1 flex items-center gap-1 px-2 py-0.5 rounded border shrink-0 bg-green-500 border-green-600 text-white font-bold transition-colors';
                     setTimeout(() => { el.className = originalClass; }, 1000);
                 } catch (err) { } document.body.removeChild(textArea);
-            }, [addressLookup, getCalculatedShipping, templateConfig, bankAccount, sentAddressRequests, setSentAddressRequests, setCheckedOrders, broadcastName]);
+            }, [addressLookup, getCalculatedShipping, templateConfig, bankAccount, sentAddressRequests, setSentAddressRequests, setCheckedOrders, broadcastName, cashReceipts]);
 
             const handleFullDepositToggle = useCallback((nick, grandTotal, currentDeposit) => { 
                 if (currentDeposit >= grandTotal) { 
@@ -3454,6 +3493,9 @@ const dashboardStats = useMemo(() => {
                         statusColumn = "🚨 노쇼 (취소됨)";
                     } else if (isWaitlistToggle || (waitlistItems.length > 0 && activeItems.length === 0)) {
                         statusColumn = "대기";
+                    } else if (balance < 0 && !isCard) {
+                        statusColumn = `과납 (${Math.abs(balance).toLocaleString()}원)`;
+                        if (hasCashReceipt) statusColumn += " / 현금영수증";
                     } else if (hasCashReceipt) {
                         statusColumn = "현금영수증";
                     } else if (isCard) {
@@ -3462,6 +3504,7 @@ const dashboardStats = useMemo(() => {
                         statusColumn = "완납";
                     } else {
                         statusColumn = depositTotal > 0 ? `부분입금(미수 ${balance.toLocaleString()})` : `미입금(미수 ${balance.toLocaleString()})`;
+                        if (hasCashReceipt) statusColumn += " / 현금영수증";
                     }
                     
                     const createRow = (productValue) => ({ 
@@ -3505,6 +3548,13 @@ const dashboardStats = useMemo(() => {
                     const itemListTextForMsg = activeItems.map(i => `${i.product}${i.quantity > 1 ? ` ★${i.quantity}개` : ''} ${Number(i.price).toLocaleString()}원`).join('\n');
                     const itemListTextForExcel = activeItems.map(i => `${i.product}(${i.quantity}개)`).join(', '); 
                     const addrInfo = findAddress(nick) || {};
+
+                    const hasCashReceipt = cashReceipts && cashReceipts[nick];
+                    let finalPaidMsg = templateConfigLocal.paidMsg;
+                    if (hasCashReceipt && depositTotal > 0) {
+                        finalPaidMsg += `\n[현금영수증 요청] ${depositTotal.toLocaleString()}원`;
+                    }
+
                     let msg = `${templateConfigLocal.emoji} ${nick} 님 ${templateConfigLocal.emoji}\n\n[${broadcastName} 주문목록]\n${itemListTextForMsg}\n배송비 ${currentShipping.toLocaleString()}원\n\n총 주문금액 ${baseGrandTotal.toLocaleString()}원\n------------------\n`;
                     let statusStr = '';
                     if (isCard) { 
@@ -3515,12 +3565,19 @@ const dashboardStats = useMemo(() => {
                         const isPaid = (balance <= 0) && (grandTotal >= 0); 
                         if (depositTotal > 0 && balance <= 0) { msg += `[입금확인]\n${depositTotal.toLocaleString()}원\n------------------\n\n`; } 
                         else if (depositTotal > 0 && balance > 0) { msg += `[입금확인]\n${depositTotal.toLocaleString()}원 (일부 입금)\n------------------\n\n`; }
+                        
                         if (balance > 0) {
                             statusStr = depositTotal > 0 ? `부분입금(미수 ${balance.toLocaleString()})` : `미입금(미수 ${balance.toLocaleString()})`;
                             if (depositTotal > 0) { msg += `[부분 미수 안내]\n남은 미수금 👉 ${balance.toLocaleString()}원\n\n${bankStr}\n추가 입금 부탁드립니다 🙏\n------------------\n\n`; } 
                             else { msg += `${templateConfigLocal.unpaidPrefix}\n${balance.toLocaleString()}원 \n\n${bankStr}\n입금 부탁드립니다 🙏\n------------------\n\n`; }
-                        } else if (balance < 0) { statusStr = '과납'; msg += `${templateConfigLocal.paidMsg}\n\n[과납 안내]\n과납액: ${Math.abs(balance).toLocaleString()}원\n${overpaidMsg}\n------------------\n`; } 
-                        else { statusStr = '입금'; if (isPaid) msg += `${templateConfigLocal.paidMsg}\n------------------\n`; }
+                        } else if (balance < 0) { 
+                            statusStr = '과납'; 
+                            msg += `${finalPaidMsg}\n\n[과납 안내]\n과납액: ${Math.abs(balance).toLocaleString()}원\n${overpaidMsg}\n------------------\n`; 
+                        } 
+                        else { 
+                            statusStr = '입금'; 
+                            if (isPaid) msg += `${finalPaidMsg}\n------------------\n`; 
+                        }
                     }
                     if (addrInfo && addrInfo.address && !templateConfigLocal.alwaysRequestAddress) {
                         let cleanPhone = fixPhoneNumber(addrInfo.phone);
@@ -3781,15 +3838,18 @@ const dashboardStats = useMemo(() => {
                     setOrders([]); setProductHistory({}); setShippingOverrides({}); setCardPayments({}); setMatchedDeposits(new Set()); setDepositLinks({}); setDepositorNames({}); setClickedChats(new Set());
                     setKeywords([]); setSentAddressRequests(new Set()); setDeletedDepositIds(new Set()); setCheckedOrders(new Set()); setAddressMapping({}); setCashReceipts({}); 
                     
-                    // ✨ 초기화 시 자물쇠(isLocked)가 걸린 상품들만 안전하게 남겨두기
-                    setInventory(prev => (Array.isArray(prev) ? prev.filter(i => i.isLocked) : [])); 
+                    // ✨ 초기화 시 자물쇠(isLocked)가 걸린 상품들만 추출하기
+                    const lockedItems = Array.isArray(inventory) ? inventory.filter(i => i.isLocked) : [];
+                    setInventory(lockedItems); 
                     
                     setManualDeposits([]); localStorage.removeItem(getLsKey('ignoredAutoMatch'));
                     setNoShowCustomers({}); setWaitlistCustomers({});
                     window.localStorage.removeItem(getLsKey('savedChats'));
                     
                     if (googleScriptUrl && masterSheetId) {
-                        fetchGas(googleScriptUrl, { action: 'save_inventory', masterId: getCleanSheetId(masterSheetId), data: [] }).catch(()=>{});
+                        // ✨ 구글 시트에도 빈 배열([])이 아닌 잠긴 상품만 남겨서 덮어쓰기!
+                        const payload = lockedItems.map(i => ({ name: i.name, price: i.price, status: i.isSoldOut ? '품절' : '' }));
+                        fetchGas(googleScriptUrl, { action: 'save_inventory', masterId: getCleanSheetId(masterSheetId), data: payload }).catch(()=>{});
                     }
                 });
             };
