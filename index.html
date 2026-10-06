@@ -1082,8 +1082,7 @@ useEffect(() => {
             }
             return true;
         });
-
- const OrderItem = memo(({ item, nick, nextItemId, isLast, handleProductChange, handleQuantityUpdate, handleOrderCancel, handleOrderDelete, addOrderLogic, setSelectedNick, inventory, productHistory }) => {
+        const OrderItem = memo(({ item, nick, nextItemId, isLast, handleProductChange, handleQuantityUpdate, handleOrderCancel, handleOrderDelete, addOrderLogic, setSelectedNick, inventory, productHistory }) => {
             const [localProduct, setLocalProduct] = useState(item.product); 
             const [localQty, setLocalQty] = useState(item.quantity === '' ? '' : item.quantity); 
             const [localPrice, setLocalPrice] = useState(item.price === '' || item.price === 0 ? '' : Number(item.price).toLocaleString());
@@ -1102,6 +1101,7 @@ useEffect(() => {
                         {/* ✨ 대기 상태 뱃지 추가 */}
                         {!item.isCancelled && item.isWaitlist && <span className="text-[9px] text-orange-500 font-bold shrink-0">[대기]</span>}
                         
+                        {/* ✨ 핵심 수정: autoComplete="off" 추가로 기존 검색기록 덮어씌움 방지 및 datalist 활성화 */}
                         <input id={`prod-input-${item.id}`} type="text" list="product-list" autoComplete="off" value={localProduct} 
                             onChange={(e) => {
                                 const val = e.target.value; setLocalProduct(val);
