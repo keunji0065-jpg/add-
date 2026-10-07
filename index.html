@@ -227,8 +227,28 @@
         const parseSafeDate = (val) => {
             if (!val) return new Date(0);
             const s = String(val).trim();
+            
+            // YYYYMMDD 형식
+            if (/^\d{8}$/.test(s)) return new Date(parseInt(s.substring(0, 4)), parseInt(s.substring(4, 6)) - 1, parseInt(s.substring(6, 8)));
+            // YYMMDD 형식
+            if (/^\d{6}$/.test(s)) return new Date(2000 + parseInt(s.substring(0, 2)), parseInt(s.substring(2, 4)) - 1, parseInt(s.substring(4, 6)));
+
+            // ✨ 구글 시트/엑셀 숫자형 일련번호(예: 45206.5) 처리 로직
+            const numVal = Number(s);
+            // 엑셀에서 30000은 대략 1982년, 60000은 2064년. 이 범위 내일 때만 일련번호로 취급하여 버그 방지
+            if (!isNaN(numVal) && numVal > 30000 && numVal < 60000) {
+                const d = new Date(1899, 11, 30);
+                d.setDate(d.getDate() + Math.floor(numVal));
+                if (!isNaN(d) && d.getTime() > 0) return d;
+            }
+
             const match = s.match(/(\d{4})[./-]\s*(\d{1,2})[./-]\s*(\d{1,2})/);
             if (match) return new Date(parseInt(match[1]), parseInt(match[2])-1, parseInt(match[3]));
+            
+            // "10. 7" 또는 "10/7" 같은 올해 연도 생략 날짜 (구글폼에서 자주 발생)
+            const shortMatch = s.match(/^(\d{1,2})[./-]\s*(\d{1,2})[./]?\s*$/);
+            if (shortMatch) return new Date(new Date().getFullYear(), parseInt(shortMatch[1])-1, parseInt(shortMatch[2]));
+
             let d = new Date(s.replace(/-/g, '/')); // iOS Safari 크로스 브라우징 완벽 호환을 위한 슬래시 치환
             if (!isNaN(d) && d.getTime() > 0) return d;
             return new Date(0);
@@ -357,7 +377,7 @@ useEffect(() => {
             
             if (!isOpen) return null;
             return (
-                <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-[9999] animate-pop" onClick={type === 'alert' ? () => onConfirm() : undefined}>
+                <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-[9999] animate-pop">
                     <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 w-80 max-w-sm" onClick={e => e.stopPropagation()}>
                         <div className="mb-4">
                             <h3 className="text-lg font-bold text-center text-slate-800 dark:text-slate-100 mb-2">{type === 'confirm' ? '확인' : type === 'prompt' ? '입력' : '알림'}</h3>
@@ -419,7 +439,7 @@ useEffect(() => {
             };
 
             return (
-                <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-[9999] animate-pop" onClick={onClose}>
+                <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-[9999] animate-pop">
                     <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-4 w-full max-w-md mx-4 flex flex-col max-h-[80vh]" onClick={e => e.stopPropagation()}>
                         <div className="mb-3 border-b dark:border-slate-700 pb-2 flex justify-between items-center shrink-0">
                             <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
@@ -530,7 +550,7 @@ useEffect(() => {
 
             if (!isOpen) return null;
             return (
-                <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-[9999] animate-pop" onClick={onClose}>
+                <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-[9999] animate-pop">
                     <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 w-full max-w-md mx-4" onClick={e => e.stopPropagation()}>
                         <div className="mb-4 border-b dark:border-slate-700 pb-3 flex justify-between items-center">
                             <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2"><Icon name="pencil-line" weight="fill" /> '{initialData ? initialData.nickname : nick}' 배송지 {initialData ? '수정' : '빠른 입력'}</h3>
@@ -618,7 +638,7 @@ useEffect(() => {
             };
             
             return (
-                <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-[9999] animate-pop" onClick={onClose}>
+                <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-[9999] animate-pop">
                     <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 w-full max-w-md mx-4" onClick={e => e.stopPropagation()}>
                         <div className="mb-4 border-b dark:border-slate-700 pb-3 flex justify-between items-center">
                             <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2"><Icon name="users-three" weight="fill" className="text-blue-500" /> 통합 고객상태 관리대장</h3>
@@ -1082,7 +1102,8 @@ useEffect(() => {
             }
             return true;
         });
-        const OrderItem = memo(({ item, nick, nextItemId, isLast, handleProductChange, handleQuantityUpdate, handleOrderCancel, handleOrderDelete, addOrderLogic, setSelectedNick, inventory, productHistory }) => {
+
+ const OrderItem = memo(({ item, nick, nextItemId, isLast, handleProductChange, handleQuantityUpdate, handleOrderCancel, handleOrderDelete, addOrderLogic, setSelectedNick, inventory, productHistory }) => {
             const [localProduct, setLocalProduct] = useState(item.product); 
             const [localQty, setLocalQty] = useState(item.quantity === '' ? '' : item.quantity); 
             const [localPrice, setLocalPrice] = useState(item.price === '' || item.price === 0 ? '' : Number(item.price).toLocaleString());
@@ -1101,7 +1122,6 @@ useEffect(() => {
                         {/* ✨ 대기 상태 뱃지 추가 */}
                         {!item.isCancelled && item.isWaitlist && <span className="text-[9px] text-orange-500 font-bold shrink-0">[대기]</span>}
                         
-                        {/* ✨ 핵심 수정: autoComplete="off" 추가로 기존 검색기록 덮어씌움 방지 및 datalist 활성화 */}
                         <input id={`prod-input-${item.id}`} type="text" list="product-list" autoComplete="off" value={localProduct} 
                             onChange={(e) => {
                                 const val = e.target.value; setLocalProduct(val);
@@ -1194,7 +1214,7 @@ useEffect(() => {
                                 
                                 <div onClick={(e) => { e.stopPropagation(); openModal(`'${nick}'님의 입금자명(실명)을 입력하세요.`, 'prompt', (newName) => { if(newName !== null) setDepositorNames(prev => ({...prev, [nick]: newName})); }, null, depositorNames[nick] || ''); }} className={`cursor-pointer flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border hover:bg-slate-100 transition-colors ml-1 shrink-0 ${depositorNames[nick] ? 'bg-slate-200 text-slate-700 border-slate-400' : (isAutoDepositor ? 'bg-green-50 text-green-700 border-green-200' : 'bg-white text-slate-500 border-slate-300')}`} title={isAutoDepositor ? "주소록 실명 연동됨" : "실명 입금자 등록"}><Icon name="user" weight={depositorNames[nick] || isAutoDepositor ? "fill" : "regular"}/> <span>{displayDepositorName}</span></div>
                                 <div onClick={(e) => { e.stopPropagation(); handleFullDepositToggle(nick, baseGrandTotal, depositTotal); }} className={`cursor-pointer ml-1 flex items-center gap-1 px-1.5 py-0.5 rounded border transition-colors shrink-0 ${isPaidState ? 'bg-green-600 border-green-700 text-white shadow-inner' : 'bg-white border-slate-300 text-slate-500 hover:bg-slate-100'}`} title={isPaidState ? "입금 완료됨 (클릭시 취소)" : "클릭시 전액 입금 처리"}><Icon name={isPaidState ? "toggle-right" : "toggle-left"} weight="fill" size={16} /><span className="text-[10px] font-bold">{isPaidState ? "완납" : "미납"}</span></div>
-                                <button onClick={(e) => { e.stopPropagation(); copyOrderSheet(nick, items, baseGrandTotal, depositTotal, balance, isCard, addr, e); }} className="ml-1 flex items-center gap-1 px-2 py-0.5 rounded border transition-colors shrink-0 bg-[#FEE500] border-[#E5CE00] text-gray-900 hover:bg-[#FADA0A] active:scale-95" title="주문서 카톡 복사"><Icon name="chat-circle-dots" weight="fill" size={16}/><span className="text-[10px] font-bold">카톡</span></button>
+                                <button onClick={(e) => { e.stopPropagation(); copyOrderSheet(nick, items, baseGrandTotal, depositTotal, balance, isCard, cashReceiptStatus, addr, e); }} className="ml-1 flex items-center gap-1 px-2 py-0.5 rounded border transition-colors shrink-0 bg-[#FEE500] border-[#E5CE00] text-gray-900 hover:bg-[#FADA0A] active:scale-95" title="주문서 카톡 복사"><Icon name="chat-circle-dots" weight="fill" size={16}/><span className="text-[10px] font-bold">카톡</span></button>
                                 <div onClick={(e) => { e.stopPropagation(); handleOrderCheckToggle(nick); }} className="ml-1 cursor-pointer flex items-center shrink-0" title="주문 확인 체크"><input type="checkbox" checked={isOrderConfirmed} readOnly className="custom-checkbox" /></div>
                             </div>
                             <div className="flex flex-col items-start gap-1 text-xs mt-1 w-full overflow-hidden">
@@ -1348,7 +1368,7 @@ useEffect(() => {
     };
 
     return (
-        <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-[9999] animate-pop" onClick={onClose}>
+        <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-[9999] animate-pop">
             <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-5 w-full max-w-md mx-4 flex flex-col max-h-[85vh]" onClick={e => e.stopPropagation()}>
                 <div className="mb-4 border-b dark:border-slate-700 pb-3 flex justify-between items-center shrink-0">
                     <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2"><Icon name="clipboard-text" weight="fill" className="text-blue-500"/> 스마트 메뉴판</h3>
@@ -1889,6 +1909,7 @@ useEffect(() => {
                             const mappedRaw = addrRows.map(row => {
                                 let obj = {}; headers.forEach((h, i) => { obj[h] = row[i]; });
                                 const getVal = (...keys) => { for (let k of keys) { if (obj[k]) return String(obj[k]).trim(); } return ''; };
+                                const tsRaw = getVal('입력시간', '타임스탬프', '날짜', '시간', '제출시간');
                                 return {
                                     nickname: getVal('닉네임', '아이디', '주문자', '유튜브닉네임'),
                                     realname: getVal('이름', '수령인', '입금자명', '입금자'),
@@ -1896,7 +1917,8 @@ useEffect(() => {
                                     address: getVal('주소', '전체주소', '배송지', '주소(동,호수 필수)'),
                                     zipcode: getVal('우편번호', '우편', '우편 번호'),
                                     memo: getVal('배송메모', '메모', '요청사항'),
-                                    timestamp: getVal('타임스탬프', '날짜', '시간', '제출시간'),
+                                    timestamp: tsRaw,
+                                    _parsedTime: parseSafeDate(tsRaw).getTime(),
                                     _source: 'raw'
                                 };
                             }).filter(a => a.nickname || a.realname);
@@ -1906,7 +1928,7 @@ useEffect(() => {
                     } else { gasMsg += `주소(연결실패) `; }
                     
                     if (res.masterAddresses && Array.isArray(res.masterAddresses)) {
-                        const masterAddrs = res.masterAddresses.map(a => ({...a, phone: fixPhoneNumber(String(a.phone || '').trim()), _source: 'master'}));
+                        const masterAddrs = res.masterAddresses.map(a => ({...a, phone: fixPhoneNumber(String(a.phone || '').trim()), _parsedTime: parseSafeDate(a.timestamp).getTime(), _source: 'master'}));
                         mergedAddr = [...mergedAddr, ...masterAddrs];
                     }
                     
@@ -2712,7 +2734,7 @@ const dashboardStats = useMemo(() => {
                 });
             }, [openModal, setOrders]);
 
-   const copyOrderSheet = useCallback((nick, items, grandTotal, depositTotal, balance, isCard, addrData, e) => {
+   const copyOrderSheet = useCallback((nick, items, grandTotal, depositTotal, balance, isCard, hasCashReceipt, addrData, e) => {
                 // ✨ 확정 상품과 대기 상품 분리
                 const activeItems = items.filter(i => !i.isCancelled && !i.isWaitlist); 
                 const waitlistItems = items.filter(i => !i.isCancelled && i.isWaitlist);
@@ -2723,12 +2745,6 @@ const dashboardStats = useMemo(() => {
                 const itemListText = activeItems.map(i => `${i.product}${i.quantity > 1 ? ` ★${i.quantity}개` : ''} ${Number(i.price).toLocaleString()}원`).join('\n');
                 const { emoji, paidMsg, unpaidPrefix, overpaidMsg = '과납 금액이 있습니다.\n환불 또는 적립 여부를 알려주세요!', addrNotice, surveyNotice, alwaysRequestAddress } = templateConfig;
                 
-                const hasCashReceipt = cashReceipts[nick];
-                let finalPaidMsg = paidMsg;
-                if (hasCashReceipt && depositTotal > 0) {
-                    finalPaidMsg += `\n[현금영수증 요청] ${depositTotal.toLocaleString()}원`;
-                }
-
                 let msg = `${emoji} ${nick} 님 ${emoji}\n\n[${broadcastName} 주문목록]\n${itemListText}\n배송비 ${currentShipping.toLocaleString()}원\n\n총 주문금액 ${grandTotal.toLocaleString()}원\n------------------\n`;
                 if (isCard) { 
                     const cardBase = Math.max(0, grandTotal - depositTotal);
@@ -2739,9 +2755,12 @@ const dashboardStats = useMemo(() => {
                     const isPaid = (balance <= 0) && (grandTotal >= 0) && (activeItems.length > 0); 
                     if (depositTotal > 0 && balance <= 0) { msg += `[입금확인]\n${depositTotal.toLocaleString()}원\n------------------\n\n`; } 
                     else if (depositTotal > 0 && balance > 0) { msg += `[입금확인]\n${depositTotal.toLocaleString()}원 (일부 입금)\n------------------\n\n`; }
+                    
+                    const cashReceiptText = (hasCashReceipt && depositTotal > 0) ? `현금영수증 : ${depositTotal.toLocaleString()}원 예정\n` : '';
+
                     if (balance > 0) { if (depositTotal > 0) { msg += `[부분 미수 안내]\n남은 미수금 👉 ${balance.toLocaleString()}원\n\n${bankAccount}\n추가 입금 부탁드립니다 🙏\n------------------\n\n`; } else { msg += `${unpaidPrefix}\n${balance.toLocaleString()}원 \n\n${bankAccount}\n입금 부탁드립니다 🙏\n------------------\n\n`; } } 
-                    else if (balance < 0) { msg += `${finalPaidMsg}\n\n[과납 안내]\n과납액: ${Math.abs(balance).toLocaleString()}원\n${overpaidMsg}\n------------------\n`; } 
-                    else { if (isPaid) msg += `${finalPaidMsg}\n------------------\n`; }
+                    else if (balance < 0) { msg += `${paidMsg}\n${cashReceiptText}\n[과납 안내]\n과납액: ${Math.abs(balance).toLocaleString()}원\n${overpaidMsg}\n------------------\n`; } 
+                    else { if (isPaid) msg += `${paidMsg}\n${cashReceiptText}------------------\n`; }
                 }
                 
                 if (addr && addr.address && !alwaysRequestAddress) {
@@ -2773,7 +2792,7 @@ const dashboardStats = useMemo(() => {
                     el.className = 'ml-1 flex items-center gap-1 px-2 py-0.5 rounded border shrink-0 bg-green-500 border-green-600 text-white font-bold transition-colors';
                     setTimeout(() => { el.className = originalClass; }, 1000);
                 } catch (err) { } document.body.removeChild(textArea);
-            }, [addressLookup, getCalculatedShipping, templateConfig, bankAccount, sentAddressRequests, setSentAddressRequests, setCheckedOrders, broadcastName, cashReceipts]);
+            }, [addressLookup, getCalculatedShipping, templateConfig, bankAccount, sentAddressRequests, setSentAddressRequests, setCheckedOrders, broadcastName]);
 
             const handleFullDepositToggle = useCallback((nick, grandTotal, currentDeposit) => { 
                 if (currentDeposit >= grandTotal) { 
@@ -2956,8 +2975,8 @@ const dashboardStats = useMemo(() => {
                 const latestMap = {};
                 addresses.forEach(a => {
                     const cleanNick = normalizeString(a.nickname);
-                    const ts = parseSafeDate(a.timestamp).getTime();
-                    if (!latestMap[cleanNick] || ts > parseSafeDate(latestMap[cleanNick].timestamp).getTime()) latestMap[cleanNick] = a;
+                    const ts = a._parsedTime || parseSafeDate(a.timestamp).getTime();
+                    if (!latestMap[cleanNick] || ts > (latestMap[cleanNick]._parsedTime || parseSafeDate(latestMap[cleanNick].timestamp).getTime())) latestMap[cleanNick] = a;
                 });
                 let res = Object.values(latestMap);
                 if (deferredAddressSearch) { const term = String(deferredAddressSearch).toLowerCase(); res = res.filter(a => String(a.nickname).toLowerCase().includes(term) || String(a.realname).toLowerCase().includes(term) || String(a.phone).includes(term)); }
@@ -3006,13 +3025,13 @@ const dashboardStats = useMemo(() => {
                         
                         if (aIsSimilar && bIsSimilar) {
                             if (a._tempScore !== b._tempScore) return a._tempScore - b._tempScore;
-                            return parseSafeDate(b.timestamp).getTime() - parseSafeDate(a.timestamp).getTime();
+                            return (b._parsedTime || parseSafeDate(b.timestamp).getTime()) - (a._parsedTime || parseSafeDate(a.timestamp).getTime());
                         }
                         
-                        return parseSafeDate(b.timestamp).getTime() - parseSafeDate(a.timestamp).getTime();
+                        return (b._parsedTime || parseSafeDate(b.timestamp).getTime()) - (a._parsedTime || parseSafeDate(a.timestamp).getTime());
                     });
                 } else {
-                    res.sort((a, b) => { const tA = parseSafeDate(a.timestamp).getTime(); const tB = parseSafeDate(b.timestamp).getTime(); return tB - tA; });
+                    res.sort((a, b) => { const tA = a._parsedTime || parseSafeDate(a.timestamp).getTime(); const tB = b._parsedTime || parseSafeDate(b.timestamp).getTime(); return tB - tA; });
                 }
                 return res;
             }, [addresses, deferredAddressSearch, selectedNick, addressMapping, depositorNames]);
@@ -3042,7 +3061,7 @@ const dashboardStats = useMemo(() => {
                     <SmartMenuModal isOpen={isMenuModalOpen} onClose={() => setIsMenuModalOpen(false)} inventory={inventory} />
 
                     {isBatchModalOpen && (
-                        <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-[9999] animate-pop" onClick={() => setIsBatchModalOpen(false)}>
+                        <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-[9999] animate-pop">
                             <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 w-full max-w-sm mx-4" onClick={e => e.stopPropagation()}>
                                 <h3 className="font-bold text-lg mb-4 text-slate-800 dark:text-slate-200 flex items-center gap-2"><Icon name="copy" weight="fill"/> 옵션 일괄 생성</h3>
                                 <div className="space-y-3">
@@ -3335,7 +3354,7 @@ const dashboardStats = useMemo(() => {
                             {visibleAddresses.map((addr, idx) => {
                                 const isUsed = usedAddressNicks.has(normalizeString(addr.nickname));
                                 const tsDate = parseSafeDate(addr.timestamp);
-                                const tsStr = tsDate.getTime() > 0 ? `${tsDate.getMonth()+1}/${tsDate.getDate()}` : '';
+                                const tsStr = tsDate.getTime() > 0 ? `${String(tsDate.getMonth()+1).padStart(2, '0')}/${String(tsDate.getDate()).padStart(2, '0')}` : '';
                                 return (
                                     <div key={`${addr.phone}-${idx}`} onClick={() => handleAddressClick(addr)} className={`relative flex flex-col p-1.5 border rounded cursor-pointer transition-all ${isUsed ? 'opacity-60 bg-slate-100 dark:bg-slate-800/80 border-transparent' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm'}`}>
                                         <div className="flex justify-between items-center gap-1">
@@ -3493,9 +3512,6 @@ const dashboardStats = useMemo(() => {
                         statusColumn = "🚨 노쇼 (취소됨)";
                     } else if (isWaitlistToggle || (waitlistItems.length > 0 && activeItems.length === 0)) {
                         statusColumn = "대기";
-                    } else if (balance < 0 && !isCard) {
-                        statusColumn = `과납 (${Math.abs(balance).toLocaleString()}원)`;
-                        if (hasCashReceipt) statusColumn += " / 현금영수증";
                     } else if (hasCashReceipt) {
                         statusColumn = "현금영수증";
                     } else if (isCard) {
@@ -3504,9 +3520,11 @@ const dashboardStats = useMemo(() => {
                         statusColumn = "완납";
                     } else {
                         statusColumn = depositTotal > 0 ? `부분입금(미수 ${balance.toLocaleString()})` : `미입금(미수 ${balance.toLocaleString()})`;
-                        if (hasCashReceipt) statusColumn += " / 현금영수증";
                     }
                     
+                    const cashReceiptAmount = (hasCashReceipt && depositTotal > 0) ? depositTotal : '';
+                    const overpaidAmount = (balance < 0 && !isCard) ? Math.abs(balance) : '';
+
                     const createRow = (productValue) => ({ 
                         '날짜시간': new Date().toLocaleString(), 
                         '입금상태': statusColumn, 
@@ -3515,7 +3533,9 @@ const dashboardStats = useMemo(() => {
                         '이름': addrInfo.realname || '', 
                         '핸드폰번호': cleanPhone, 
                         '주소': fullAddress, 
-                        '배송메모': addrInfo.memo || ''
+                        '배송메모': addrInfo.memo || '',
+                        '현금영수증금액': cashReceiptAmount,
+                        '과납금액': overpaidAmount
                     }); 
                     
                     excelRows.push(createRow(`[ ${nick} ]`)); 
@@ -3539,6 +3559,7 @@ const dashboardStats = useMemo(() => {
                     if (activeItems.length === 0 && waitlistItems.length === 0) return;
 
                     const isCard = cardPayments && cardPayments[nick]; 
+                    const hasCashReceipt = cashReceipts && cashReceipts[nick];
                     const productTotal = activeItems.reduce((sum, i) => sum + Number(i.price), 0);
                     const productTotalForShipping = activeItems.reduce((sum, i) => sum + (Number(i.price) > 0 ? Number(i.price) : 0), 0);
                     const currentShipping = getCalculatedShipping(nick, productTotalForShipping); 
@@ -3548,13 +3569,6 @@ const dashboardStats = useMemo(() => {
                     const itemListTextForMsg = activeItems.map(i => `${i.product}${i.quantity > 1 ? ` ★${i.quantity}개` : ''} ${Number(i.price).toLocaleString()}원`).join('\n');
                     const itemListTextForExcel = activeItems.map(i => `${i.product}(${i.quantity}개)`).join(', '); 
                     const addrInfo = findAddress(nick) || {};
-
-                    const hasCashReceipt = cashReceipts && cashReceipts[nick];
-                    let finalPaidMsg = templateConfigLocal.paidMsg;
-                    if (hasCashReceipt && depositTotal > 0) {
-                        finalPaidMsg += `\n[현금영수증 요청] ${depositTotal.toLocaleString()}원`;
-                    }
-
                     let msg = `${templateConfigLocal.emoji} ${nick} 님 ${templateConfigLocal.emoji}\n\n[${broadcastName} 주문목록]\n${itemListTextForMsg}\n배송비 ${currentShipping.toLocaleString()}원\n\n총 주문금액 ${baseGrandTotal.toLocaleString()}원\n------------------\n`;
                     let statusStr = '';
                     if (isCard) { 
@@ -3566,18 +3580,14 @@ const dashboardStats = useMemo(() => {
                         if (depositTotal > 0 && balance <= 0) { msg += `[입금확인]\n${depositTotal.toLocaleString()}원\n------------------\n\n`; } 
                         else if (depositTotal > 0 && balance > 0) { msg += `[입금확인]\n${depositTotal.toLocaleString()}원 (일부 입금)\n------------------\n\n`; }
                         
+                        const cashReceiptText = (hasCashReceipt && depositTotal > 0) ? `현금영수증 : ${depositTotal.toLocaleString()}원 예정\n` : '';
+
                         if (balance > 0) {
                             statusStr = depositTotal > 0 ? `부분입금(미수 ${balance.toLocaleString()})` : `미입금(미수 ${balance.toLocaleString()})`;
                             if (depositTotal > 0) { msg += `[부분 미수 안내]\n남은 미수금 👉 ${balance.toLocaleString()}원\n\n${bankStr}\n추가 입금 부탁드립니다 🙏\n------------------\n\n`; } 
                             else { msg += `${templateConfigLocal.unpaidPrefix}\n${balance.toLocaleString()}원 \n\n${bankStr}\n입금 부탁드립니다 🙏\n------------------\n\n`; }
-                        } else if (balance < 0) { 
-                            statusStr = '과납'; 
-                            msg += `${finalPaidMsg}\n\n[과납 안내]\n과납액: ${Math.abs(balance).toLocaleString()}원\n${overpaidMsg}\n------------------\n`; 
-                        } 
-                        else { 
-                            statusStr = '입금'; 
-                            if (isPaid) msg += `${finalPaidMsg}\n------------------\n`; 
-                        }
+                        } else if (balance < 0) { statusStr = '과납'; msg += `${templateConfigLocal.paidMsg}\n${cashReceiptText}\n[과납 안내]\n과납액: ${Math.abs(balance).toLocaleString()}원\n${overpaidMsg}\n------------------\n`; } 
+                        else { statusStr = '입금'; if (isPaid) msg += `${templateConfigLocal.paidMsg}\n${cashReceiptText}------------------\n`; }
                     }
                     if (addrInfo && addrInfo.address && !templateConfigLocal.alwaysRequestAddress) {
                         let cleanPhone = fixPhoneNumber(addrInfo.phone);
