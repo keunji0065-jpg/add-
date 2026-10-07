@@ -3512,18 +3512,32 @@ const dashboardStats = useMemo(() => {
                         statusColumn = "🚨 노쇼 (취소됨)";
                     } else if (isWaitlistToggle || (waitlistItems.length > 0 && activeItems.length === 0)) {
                         statusColumn = "대기";
-                    } else if (hasCashReceipt) {
-                        statusColumn = "현금영수증";
                     } else if (isCard) {
                         statusColumn = "카드결제";
-                    } else if (isPaid) {
-                        statusColumn = "완납";
                     } else {
-                        statusColumn = depositTotal > 0 ? `부분입금(미수 ${balance.toLocaleString()})` : `미입금(미수 ${balance.toLocaleString()})`;
+                        let base = "";
+                        let details = [];
+                        
+                        if (balance < 0) {
+                            base = "과납";
+                            details.push(`${Math.abs(balance).toLocaleString()}`);
+                        } else if (balance > 0) {
+                            base = depositTotal > 0 ? "부분입금" : "미입금";
+                            details.push(`미수 ${balance.toLocaleString()}`);
+                        } else {
+                            base = "완납";
+                        }
+                        
+                        if (hasCashReceipt && depositTotal > 0) {
+                            details.push(`현영 ${depositTotal.toLocaleString()}`);
+                        }
+                        
+                        if (details.length > 0) {
+                            statusColumn = `${base}(${details.join(' / ')})`;
+                        } else {
+                            statusColumn = base;
+                        }
                     }
-                    
-                    const cashReceiptAmount = (hasCashReceipt && depositTotal > 0) ? depositTotal : '';
-                    const overpaidAmount = (balance < 0 && !isCard) ? Math.abs(balance) : '';
 
                     const createRow = (productValue) => ({ 
                         '날짜시간': new Date().toLocaleString(), 
@@ -3533,9 +3547,7 @@ const dashboardStats = useMemo(() => {
                         '이름': addrInfo.realname || '', 
                         '핸드폰번호': cleanPhone, 
                         '주소': fullAddress, 
-                        '배송메모': addrInfo.memo || '',
-                        '현금영수증금액': cashReceiptAmount,
-                        '과납금액': overpaidAmount
+                        '배송메모': addrInfo.memo || ''
                     }); 
                     
                     excelRows.push(createRow(`[ ${nick} ]`)); 
