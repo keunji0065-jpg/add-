@@ -3461,7 +3461,7 @@ const dashboardStats = useMemo(() => {
                 downloadExcel(data, '상품별_발주리스트'); 
             };
 
-         const handleExportCustomers = () => { 
+            const handleExportCustomers = () => { 
                 const groups = {}; orders.forEach(o => { if (!groups[o.customer]) groups[o.customer] = []; groups[o.customer].push(o); }); 
                 let entries = Object.entries(groups).map(([nick, items]) => {
                     const isNoShow = noShowCustomers && noShowCustomers[nick];
