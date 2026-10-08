@@ -1505,16 +1505,79 @@ useEffect(() => {
             const [newInvName, setNewInvName] = useState('');
             const [newInvPrice, setNewInvPrice] = useState('');
             const [newInvStock, setNewInvStock] = useState('');
-            const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
-            const [isMenuModalOpen, setIsMenuModalOpen] = useState(false); // ✨ 스마트 메뉴판 모달 상태 추가
             
-            const inventorySyncLock = useRef(0);
+            const [batchBaseName, setBatchBaseName] = useState('');
+            const [batchOpt1, setBatchOpt1] = useState('');
+            const [batchOpt2, setBatchOpt2] = useState('');
+            const [batchBasePrice, setBatchBasePrice] = useState('');
+            const [previewItems, setPreviewItems] = useState([]);
             
-            const prevDepsStr = useRef('');
-            const prevAddrsStr = useRef('');
-            const prevInvStr = useRef('');
+            const toggleSize = (size) => {
+                setBatchOpt2(prev => {
+                    const currentOpts = prev.split(',').map(s => s.trim()).filter(Boolean);
+                    if (currentOpts.includes(size)) {
+                        return currentOpts.filter(s => s !== size).join(', ');
+                    } else {
+                        return [...currentOpts, size].join(', ');
+                    }
+                });
+            };
 
-            // YouTube Live Chat State
+            const renderSizeBtn = (size) => {
+                const isActive = batchOpt2.split(',').map(s=>s.trim()).includes(size);
+                return (
+                    <button type="button" key={size} onClick={() => toggleSize(size)} className={`px-1.5 py-0.5 rounded text-[10px] font-bold shadow-sm transition-colors shrink-0 ${isActive ? 'bg-blue-600 text-white' : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 border dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-600'}`}>{size}</button>
+                );
+            };
+            
+            // ✨ 여기에 스마트 옵션 생성 함수들 추가
+            const handleGeneratePreview = () => {
+                if (!batchBaseName.trim()) return openModal("기본 상품명을 입력해주세요.", "alert");
+                
+                const opts1 = batchOpt1.split(',').map(s => s.trim()).filter(Boolean);
+                const opts2 = batchOpt2.split(',').map(s => s.trim()).filter(Boolean);
+                const price = Number(String(batchBasePrice).replace(/,/g, '')) || 0;
+                
+                let newPreviews = [];
+                if (opts1.length === 0 && opts2.length === 0) {
+                    newPreviews.push({ id: Date.now() + Math.random(), name: batchBaseName.trim(), price, stock: '' });
+                } else if (opts1.length > 0 && opts2.length === 0) {
+                    opts1.forEach(o1 => newPreviews.push({ id: Date.now() + Math.random(), name: `${batchBaseName.trim()} ${o1}`, price, stock: '' }));
+                } else if (opts1.length === 0 && opts2.length > 0) {
+                    opts2.forEach(o2 => newPreviews.push({ id: Date.now() + Math.random(), name: `${batchBaseName.trim()} ${o2}`, price, stock: '' }));
+                } else {
+                    opts1.forEach(o1 => opts2.forEach(o2 => newPreviews.push({ id: Date.now() + Math.random(), name: `${batchBaseName.trim()} ${o1} ${o2}`, price, stock: '' })));
+                }
+                setPreviewItems(newPreviews);
+            };
+
+            const handleRegisterBatch = () => {
+                if (previewItems.length === 0) return;
+                setInventory(prev => {
+                    const newInv = [...(Array.isArray(prev) ? prev : [])];
+                    let addedCount = 0;
+                    previewItems.forEach(item => {
+                        const cleanName = item.name.trim();
+                        if (cleanName && !newInv.some(i => i.name === cleanName)) {
+                            newInv.unshift({ id: `inv_${Date.now()}_${Math.random()}`, name: cleanName, price: item.price, stock: item.stock === '' ? '' : Number(item.stock), isSoldOut: false, isLocked: false });
+                            addedCount++;
+                            if (item.price > 0) setProductHistory(h => ({...h, [cleanName]: item.price}));
+                        }
+                    });
+                    
+                    if (addedCount > 0) {
+                        saveInventoryToServer(newInv);
+                        openModal(`${addedCount}개 상품이 등록되었습니다.`, "alert");
+                        // 등록 후 폼 초기화
+                        setPreviewItems([]); setBatchBaseName(''); setBatchOpt1(''); setBatchOpt2(''); setBatchBasePrice('');
+                    } else {
+                        openModal("등록할 상품이 없거나 모두 이미 존재하는 이름입니다.", "alert");
+                    }
+                    return newInv;
+                });
+            };
+            
+            const [isMenuModalOpen, setIsMenuModalOpen] = useState(false);
             const [liveChatId, setLiveChatId] = useState(null);
             const chatNextPageTokenRef = useRef('');
             const unsavedChatsRef = useRef([]);
@@ -2173,7 +2236,7 @@ const dashboardStats = useMemo(() => {
                     const productTotalForShipping = activeItems.reduce((sum, i) => sum + (Number(i.price) > 0 ? Number(i.price) : 0), 0);
                     const shipping = getCalculatedShipping(nick, productTotalForShipping); 
                     const baseGrandTotal = productTotal + shipping; const baseBalance = baseGrandTotal - depositTotal;
-                    const cardFee = (isCard && baseBalance > 0) ? baseBalance * 0.1 : 0; const finalGrandTotal = baseGrandTotal + cardFee; const finalBalance = baseBalance + cardFee;
+                    const cardFee = (isCard && baseBalance > 0) ? Math.round(baseBalance * 0.1) : 0; const finalGrandTotal = baseGrandTotal + cardFee; const finalBalance = baseBalance + cardFee;
 
                     totalSales += finalGrandTotal; 
                     if (finalBalance > 0) { if (isCard) totalCardExpected += finalBalance; else totalUnpaid += finalBalance; } else if (finalBalance < 0 && !isCard) { totalOverpaid += Math.abs(finalBalance); }
@@ -2232,7 +2295,7 @@ const dashboardStats = useMemo(() => {
                     const currentDep = items.reduce((s,i) => s + (i.deposit || 0), 0); 
                     const currentShip = getCalculatedShipping(nick, activeProdForShipping);
                     const baseBal = activeProd + (activeItems.length > 0 ? currentShip : 0) - currentDep; const isCard = cardPayments[nick];
-                    const finalBal = baseBal + (isCard && baseBal > 0 ? baseBal * 0.1 : 0);
+                    const finalBal = baseBal + (isCard && baseBal > 0 ? Math.round(baseBal * 0.1) : 0);
                     
                     if (filterStatus === 'unpaid') return !isCard && finalBal > 0 && activeProd > 0;
                     if (filterStatus === 'overpaid') return !isCard && finalBal < 0;
@@ -2748,8 +2811,10 @@ const dashboardStats = useMemo(() => {
                 let msg = `${emoji} ${nick} 님 ${emoji}\n\n[${broadcastName} 주문목록]\n${itemListText}\n배송비 ${currentShipping.toLocaleString()}원\n\n총 주문금액 ${grandTotal.toLocaleString()}원\n------------------\n`;
                 if (isCard) { 
                     const cardBase = Math.max(0, grandTotal - depositTotal);
-                    if (depositTotal > 0) { msg += `[카드결제]\n총 주문금액 ${grandTotal.toLocaleString()}원\n선입금 ${depositTotal.toLocaleString()}원\n남은 결제금액 ${cardBase.toLocaleString()}원\n수수료(10%) ${(cardBase * 0.1).toLocaleString()}원\n👉최종 결제요청액 ${(cardBase * 1.1).toLocaleString()}원 예정\n\n방송종료 시간이 늦을경우 오전에 카드결제 링크 발송합니다.\n주문내역 확인 후 주무시면 됩니다!\n------------------\n\n`; } 
-                    else { msg += `[카드결제]\n금액 ${cardBase.toLocaleString()}원\n수수료(10%) ${(cardBase * 0.1).toLocaleString()}원\n👉결제요청액 ${(cardBase * 1.1).toLocaleString()}원 예정\n\n방송종료 시간이 늦을경우 오전에 카드결제 링크 발송합니다.\n주문내역 확인 후 주무시면 됩니다!\n------------------\n\n`; }
+                    const cardFee = Math.round(cardBase * 0.1);
+                    const finalCardAmount = cardBase + cardFee;
+                    if (depositTotal > 0) { msg += `[카드결제]\n총 주문금액 ${grandTotal.toLocaleString()}원\n선입금 ${depositTotal.toLocaleString()}원\n남은 결제금액 ${cardBase.toLocaleString()}원\n수수료(10%) ${cardFee.toLocaleString()}원\n👉최종 결제요청액 ${finalCardAmount.toLocaleString()}원 예정\n\n방송종료 시간이 늦을경우 오전에 카드결제 링크 발송합니다.\n주문내역 확인 후 주무시면 됩니다!\n------------------\n\n`; } 
+                    else { msg += `[카드결제]\n금액 ${cardBase.toLocaleString()}원\n수수료(10%) ${cardFee.toLocaleString()}원\n👉결제요청액 ${finalCardAmount.toLocaleString()}원 예정\n\n방송종료 시간이 늦을경우 오전에 카드결제 링크 발송합니다.\n주문내역 확인 후 주무시면 됩니다!\n------------------\n\n`; }
                 } 
                 else { 
                     const isPaid = (balance <= 0) && (grandTotal >= 0) && (activeItems.length > 0); 
@@ -3060,73 +3125,7 @@ const dashboardStats = useMemo(() => {
                     <MultiAddModal isOpen={!!multiAddNick} nick={multiAddNick} inventory={inventory} onClose={() => setMultiAddNick(null)} addOrderLogic={addOrderLogic} />
                     <SmartMenuModal isOpen={isMenuModalOpen} onClose={() => setIsMenuModalOpen(false)} inventory={inventory} />
 
-                    {isBatchModalOpen && (
-                        <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-[9999] animate-pop">
-                            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 w-full max-w-sm mx-4" onClick={e => e.stopPropagation()}>
-                                <h3 className="font-bold text-lg mb-4 text-slate-800 dark:text-slate-200 flex items-center gap-2"><Icon name="copy" weight="fill"/> 옵션 일괄 생성</h3>
-                                <div className="space-y-3">
-                                    <div><label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1">기본 상품명</label><input type="text" id="batch-base-name" placeholder="예: 나그랑 티셔츠" autoFocus className="w-full border dark:border-slate-600 rounded px-2 py-2 text-xs bg-slate-50 dark:bg-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-slate-500" /></div>
-                                    <div><label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1">옵션 1: 색상 등 (쉼표로 구분)</label><input type="text" id="batch-options-1" placeholder="예: 블랙, 화이트, 레드" className="w-full border dark:border-slate-600 rounded px-2 py-2 text-xs bg-slate-50 dark:bg-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-slate-500" /></div>
-                                    <div>
-                                        <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1">옵션 2: 사이즈 등 (쉼표로 구분)</label>
-                                        <input type="text" id="batch-options-2" placeholder="예: S, M, L, XL" className="w-full border dark:border-slate-600 rounded px-2 py-2 text-xs bg-slate-50 dark:bg-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-slate-500 mb-1" />
-                                        <div className="flex flex-col gap-1.5 mt-1">
-                                            <div className="flex gap-1 flex-wrap">
-                                                {['55', '66', '77', '88', 'F', 'XS', 'S', 'M', 'L', 'XL', 'XXL'].map(size => (
-                                                    <button key={size} type="button" onClick={() => {
-                                                        const el = document.getElementById('batch-options-2');
-                                                        const current = el.value.split(',').map(s => s.trim()).filter(Boolean);
-                                                        if (!current.includes(size)) {
-                                                            current.push(size);
-                                                            el.value = current.join(', ');
-                                                        }
-                                                    }} className="bg-slate-200 text-slate-700 hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600 px-1.5 py-0.5 rounded text-[10px] font-bold transition-colors shadow-sm">{size}</button>
-                                                ))}
-                                            </div>
-                                            <div className="flex gap-1 flex-wrap items-center">
-                                                {['225', '230', '235', '240', '245', '250', '255'].map(size => (
-                                                    <button key={size} type="button" onClick={() => {
-                                                        const el = document.getElementById('batch-options-2');
-                                                        const current = el.value.split(',').map(s => s.trim()).filter(Boolean);
-                                                        if (!current.includes(size)) {
-                                                            current.push(size);
-                                                            el.value = current.join(', ');
-                                                        }
-                                                    }} className="bg-slate-200 text-slate-700 hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600 px-1.5 py-0.5 rounded text-[10px] font-bold transition-colors shadow-sm">{size}</button>
-                                                ))}
-                                                <button type="button" onClick={() => { document.getElementById('batch-options-2').value = ''; }} className="bg-red-50 text-red-500 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50 px-1.5 py-0.5 rounded text-[10px] font-bold transition-colors shadow-sm ml-auto">비우기</button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div><label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1">일괄 단가 (선택)</label><input type="text" id="batch-price" placeholder="예: 15000" className="w-full border dark:border-slate-600 rounded px-2 py-2 text-xs bg-slate-50 dark:bg-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-slate-500 text-right font-bold" /></div>
-                                    <div><label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1">일괄 재고 (선택, 비우면 무한)</label><input type="number" id="batch-stock" placeholder="예: 50" className="w-full border dark:border-slate-600 rounded px-2 py-2 text-xs bg-slate-50 dark:bg-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-slate-500 text-right font-bold" /></div>
-                                </div>
-                                <div className="flex gap-2 mt-5">
-                                    <button onClick={() => setIsBatchModalOpen(false)} className="flex-1 py-2 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-bold text-xs hover:bg-slate-200">취소</button>
-                                    <button onClick={async () => {
-                                        const baseName = document.getElementById('batch-base-name').value.trim(); const optionsStr1 = document.getElementById('batch-options-1').value.trim(); const optionsStr2 = document.getElementById('batch-options-2').value.trim(); const priceNum = Number(document.getElementById('batch-price').value.replace(/,/g, '').trim()) || 0;
-                                        const stockStr = document.getElementById('batch-stock').value.trim(); const stockNum = stockStr === '' ? '' : parseInt(stockStr);
-                                        if(!baseName) return openModal("기본 상품명을 입력해주세요.", "alert");
-                                        const list1 = optionsStr1.split(',').map(s => s.trim()).filter(Boolean); const list2 = optionsStr2.split(',').map(s => s.trim()).filter(Boolean);
-                                        let combinations = [];
-                                        if (list1.length > 0 && list2.length > 0) { list1.forEach(c => { list2.forEach(s => { combinations.push(`${baseName} ${c} ${s}`); }); }); } else if (list1.length > 0) { list1.forEach(c => combinations.push(`${baseName} ${c}`)); } else if (list2.length > 0) { list2.forEach(s => combinations.push(`${baseName} ${s}`)); } else { combinations.push(baseName); }
-                                        let addedCount = 0; let newInvList = [...inventory];
-                                        combinations.reverse().forEach(opt => {
-                                            if(!newInvList.some(i => i.name === opt)) {
-                                                newInvList.unshift({ id: `inv_${Date.now()}_${Math.random()}`, name: opt, price: priceNum, stock: stockNum, isSoldOut: false });
-                                                if (priceNum > 0) setProductHistory(h => ({...h, [opt]: priceNum}));
-                                                addedCount++;
-                                            }
-                                        });
-                                        setInventory(newInvList); saveInventoryToServer(newInvList); setIsBatchModalOpen(false); 
-                                        openModal(`${addedCount}개의 상품이 일괄 등록되었습니다.`, "alert");
-                                    }} className="flex-1 py-2 rounded bg-slate-800 text-white font-bold text-xs shadow-sm hover:bg-slate-900">일괄 생성</button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    <div className="flex flex-col bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-lg shadow-sm resizable-panel" style={{ width: '18%', minWidth: '150px' }}>
+                    <div className="flex flex-col bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-lg shadow-sm resizable-panel" style={{ width: '14%', minWidth: '130px' }}>
                         <div className="p-1.5 bg-slate-100 dark:bg-slate-900 border-b dark:border-slate-700 grid grid-cols-3 gap-1 shrink-0">
                             {quickMessages.map((msg, idx) => (
                                 <button key={idx} onClick={(e) => handleCopyQuickMessage(e, msg, idx)} className={`text-[10px] border rounded py-1 truncate transition-colors shadow-sm bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300`}>{msg || "빈칸"}</button>
@@ -3191,7 +3190,7 @@ const dashboardStats = useMemo(() => {
                         </div>
                     </div>
 
-                    <div className="flex flex-col bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-lg flex flex-col shadow-sm resizable-panel" style={{ width: '34%', minWidth: '300px' }}>
+                    <div className="flex flex-col bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-lg flex flex-col shadow-sm resizable-panel" style={{ width: '30%', minWidth: '280px' }}>
                         <div className="grid grid-cols-5 gap-1 p-2 bg-slate-100 dark:bg-slate-800 border-b dark:border-slate-700 text-center text-[10px] shrink-0">
                             {[{id:'all', label:'총매출', val:dashboardStats.totalSales, isCurrency:true, colSpan:2}, 
                               {id:'no-address', label:'주소없음', val:dashboardStats.missingAddressCount, isCurrency:false, onClick:handleNoAddressClick},
@@ -3280,7 +3279,7 @@ const dashboardStats = useMemo(() => {
                                 const ship = getCalculatedShipping(nick, prodSumForShipping); 
                                 const depSum = items.reduce((s, i) => s + (i.deposit || 0), 0);
                                 const baseGrand = prodSum + (activeItems.length > 0 ? ship : 0); const baseBal = baseGrand - depSum;
-                                const isCard = cardPayments[nick]; const cardFee = (isCard && baseBal > 0) ? baseBal * 0.1 : 0;
+                                const isCard = cardPayments[nick]; const cardFee = (isCard && baseBal > 0) ? Math.round(baseBal * 0.1) : 0;
                                 const grand = baseGrand + cardFee; const bal = baseBal + cardFee;
                                 const { data: addrData, conflict: addrConflict, type: addrType } = addressLookup.get(nick);
                                 const customerDeps = allDeposits.filter(d => depositLinks[d.id] === nick && matchedDeposits.has(d.id));
@@ -3290,7 +3289,7 @@ const dashboardStats = useMemo(() => {
                         </div>
                     </div>
 
-                    <div className="flex flex-col bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-lg shadow-sm resizable-panel" style={{ width: '11%', minWidth: '110px' }}>
+                    <div className="flex flex-col bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-lg shadow-sm resizable-panel" style={{ width: '11%', minWidth: '100px' }}>
                         <div className="p-2 bg-slate-100 dark:bg-slate-800 border-b dark:border-slate-700 flex flex-col gap-2 shrink-0">
                             <div className="font-bold text-slate-800 dark:text-slate-200 flex items-center justify-between">
                                 <span className="flex items-center gap-1"><Icon name="money" weight="fill"/> 입금 내역</span>
@@ -3342,7 +3341,7 @@ const dashboardStats = useMemo(() => {
                         <div className="p-1 bg-white dark:bg-slate-800 text-center font-bold text-[10px] border-t dark:border-slate-700 shrink-0">총: <span className="text-slate-800 dark:text-slate-200 text-xs">{totalDepositAmount.toLocaleString()}</span>원</div>
                     </div>
                     
-                    <div className="flex flex-col bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-lg shadow-sm resizable-panel" style={{ width: '16%', minWidth: '150px' }}>
+                    <div className="flex flex-col bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-lg shadow-sm resizable-panel" style={{ width: '14%', minWidth: '130px' }}>
                         <div className="p-2 bg-slate-100 dark:bg-slate-800 border-b dark:border-slate-700 flex flex-col gap-2 shrink-0">
                             <div className="font-bold text-slate-800 dark:text-slate-200 flex items-center justify-between">
                                 <span className="flex items-center gap-1"><Icon name="address-book" weight="fill"/> 실시간 주소록</span>
@@ -3368,7 +3367,7 @@ const dashboardStats = useMemo(() => {
                         </div>
                     </div>
 
-                    <div className="flex flex-col bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-lg shadow-sm resizable-panel" style={{ width: '20%', minWidth: '200px' }}>
+                    <div className="flex flex-col bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-lg shadow-sm resizable-panel" style={{ width: '15%', minWidth: '150px' }}>
                         <div className="p-2 bg-slate-100 dark:bg-slate-800 border-b dark:border-slate-700 flex flex-col gap-2 shrink-0">
                             <div className="font-bold text-slate-800 dark:text-slate-200 flex items-center justify-between">
                                 <span className="flex items-center gap-1"><Icon name="package" weight="fill"/> 실시간 재고</span>
@@ -3378,7 +3377,6 @@ const dashboardStats = useMemo(() => {
                                         e.stopPropagation();
                                         setIsMenuModalOpen(true);
                                     }} className="bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800 text-[9px] px-1.5 py-0.5 rounded shadow-sm transition-colors flex items-center gap-0.5" title="스마트 메뉴판을 엽니다"><Icon name="clipboard-text" weight="bold"/> 메뉴판</button>
-                                    <button onClick={(e) => { e.stopPropagation(); setIsBatchModalOpen(true); }} className="bg-slate-600 hover:bg-slate-700 text-white text-[9px] px-1.5 py-0.5 rounded shadow-sm transition-colors flex items-center gap-0.5"><Icon name="list-plus" weight="bold"/> 일괄옵션</button>
                                 </div>
                             </div>
                             <div className="flex items-center gap-1 mt-1">
@@ -3400,6 +3398,77 @@ const dashboardStats = useMemo(() => {
                             ))}
                         </div>
                     </div>
+
+                    <div className="flex flex-col bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-lg shadow-sm resizable-panel shrink-0" style={{ width: '16%', minWidth: '180px' }}>
+                        <div className="p-2 bg-slate-100 dark:bg-slate-800 border-b dark:border-slate-700 flex justify-between items-center shrink-0">
+                            <span className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1 text-[13px]">
+                                <Icon name="copy" weight="fill" className="text-slate-500" /> 스마트 옵션 생성기
+                            </span>
+                        </div>
+                        <div className="p-3 flex flex-col gap-3 overflow-y-auto bg-white dark:bg-slate-800">
+                            
+                            <div>
+                                <label className="block text-[10px] font-bold text-slate-500 mb-1">기본 상품명</label>
+                                <input id="batch-basename-input" type="text" value={batchBaseName} onChange={e => setBatchBaseName(e.target.value)} onKeyDown={(e) => { if(e.key === 'Enter') { e.preventDefault(); document.getElementById('batch-opt1-input')?.focus(); } }} placeholder="예: 나그랑 티셔츠" className="w-full border dark:border-slate-600 rounded px-2 py-1.5 text-xs bg-slate-50 dark:bg-slate-900 outline-none dark:text-white" />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-bold text-slate-500 mb-1">옵션 1 (색상 등, 쉼표 구분)</label>
+                                <input id="batch-opt1-input" type="text" value={batchOpt1} onChange={e => setBatchOpt1(e.target.value)} onKeyDown={(e) => { if(e.key === 'Enter') { e.preventDefault(); document.getElementById('batch-opt2-input')?.focus(); } }} placeholder="예: 블랙, 화이트" className="w-full border dark:border-slate-600 rounded px-2 py-1.5 text-xs bg-slate-50 dark:bg-slate-900 outline-none dark:text-white" />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-bold text-slate-500 mb-1">옵션 2 (사이즈 등, 쉼표 구분)</label>
+                                <input id="batch-opt2-input" type="text" value={batchOpt2} onChange={e => setBatchOpt2(e.target.value)} onKeyDown={(e) => { if(e.key === 'Enter') { e.preventDefault(); document.getElementById('batch-price-input')?.focus(); } }} placeholder="직접 입력 또는 아래 버튼 클릭" className="w-full border dark:border-slate-600 rounded px-2 py-1.5 text-xs bg-slate-50 dark:bg-slate-900 outline-none dark:text-white mb-1.5" />
+                                <div className="flex flex-col gap-1">
+                                    <div className="flex flex-wrap gap-1">{['F', 'XS', 'S', 'M', 'L', 'XL', 'XXL'].map(renderSizeBtn)}</div>
+                                    <div className="flex flex-wrap gap-1">{['44', '55', '66', '77', '88'].map(renderSizeBtn)}</div>
+                                    <div className="flex flex-wrap gap-1">{['225', '230', '235', '240', '245', '250'].map(renderSizeBtn)}</div>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-bold text-slate-500 mb-1">일괄 단가 (선택)</label>
+                                <input id="batch-price-input" type="text" value={batchBasePrice} onChange={e => { const val = e.target.value.replace(/,/g, ''); if(!isNaN(val)) setBatchBasePrice(val ? Number(val).toLocaleString() : ''); }} onKeyDown={(e) => { if(e.key === 'Enter') { e.preventDefault(); handleGeneratePreview(); } }} placeholder="예: 15,000" className="w-full border dark:border-slate-600 rounded px-2 py-1.5 text-xs bg-slate-50 dark:bg-slate-900 outline-none dark:text-white" />
+                            </div>
+                            
+                            <button onClick={handleGeneratePreview} className="bg-slate-700 hover:bg-slate-800 text-white font-bold py-2 rounded text-xs transition-colors mt-1 shadow-sm">
+                                미리보기 생성
+                            </button>
+
+                            <div className="border-t dark:border-slate-700 mt-2 pt-3">
+                                    <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-2 flex justify-between items-center">
+                                        <span>2. 개별 수정 및 확정</span>
+                                        {previewItems.length > 0 && <span className="text-[10px] text-blue-500">{previewItems.length}개</span>}
+                                    </div>
+                                    
+                                    {previewItems.length === 0 ? (
+                                        <div className="text-center text-slate-400 text-[10px] py-4 bg-slate-50 dark:bg-slate-800/50 rounded border border-dashed dark:border-slate-700">생성된 조합이 없습니다.</div>
+                                    ) : (
+                                        <div className="flex flex-col gap-2">
+                                            {previewItems.map((item, idx) => (
+                                                <div key={item.id} className="bg-slate-50 dark:bg-slate-900 border dark:border-slate-700 p-2 rounded relative group shadow-sm">
+                                                    <button onClick={() => setPreviewItems(prev => prev.filter(p => p.id !== item.id))} className="absolute -top-1.5 -right-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"><Icon name="x" size={10} weight="bold"/></button>
+                                                    <div className="font-bold text-[11px] mb-1.5 text-slate-800 dark:text-slate-200 truncate pr-3" title={item.name}>{item.name}</div>
+                                                    <div className="flex gap-1">
+                                                        <div className="flex items-center flex-1 border dark:border-slate-600 bg-white dark:bg-slate-800 rounded overflow-hidden">
+                                                            <span className="px-1 text-[9px] text-slate-400 bg-slate-100 dark:bg-slate-700 h-full flex items-center shrink-0">단가</span>
+                                                            <input type="text" value={item.price ? Number(item.price).toLocaleString() : ''} onChange={e => { const val = e.target.value.replace(/,/g, ''); if(!isNaN(val)) setPreviewItems(prev => prev.map(p => p.id === item.id ? {...p, price: Number(val)} : p)); }} className="w-full bg-transparent px-1 py-1 text-[10px] text-right outline-none dark:text-white" />
+                                                        </div>
+                                                        <div className="flex items-center flex-1 border dark:border-slate-600 bg-white dark:bg-slate-800 rounded overflow-hidden">
+                                                            <span className="px-1 text-[9px] text-slate-400 bg-slate-100 dark:bg-slate-700 h-full flex items-center shrink-0">재고</span>
+                                                            {/* 첫번째 생성된 항목의 재고칸에 자동 포커스 및 전체선택 적용 */}
+                                                            <input type="number" value={item.stock} onChange={e => setPreviewItems(prev => prev.map(p => p.id === item.id ? {...p, stock: e.target.value} : p))} autoFocus={idx === 0} onFocus={e => e.target.select()} className="w-full bg-transparent px-1 py-1 text-[10px] text-right outline-none dark:text-white" placeholder="∞" />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            <button onClick={handleRegisterBatch} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded text-[11px] mt-2 shadow-sm transition-colors">
+                                                실시간 재고로 일괄 등록
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             );
         };
@@ -3513,7 +3582,9 @@ const dashboardStats = useMemo(() => {
                     } else if (isWaitlistToggle || (waitlistItems.length > 0 && activeItems.length === 0)) {
                         statusColumn = "대기";
                     } else if (isCard) {
-                        statusColumn = "카드결제";
+                        const cardBase = Math.max(0, balance);
+                        const finalCardAmount = cardBase + Math.round(cardBase * 0.1);
+                        statusColumn = `카드결제(${finalCardAmount.toLocaleString()})`;
                     } else {
                         let base = "";
                         let details = [];
@@ -3577,7 +3648,7 @@ const dashboardStats = useMemo(() => {
                     const currentShipping = getCalculatedShipping(nick, productTotalForShipping); 
                     const baseGrandTotal = productTotal + currentShipping;
                     const depositTotal = items.reduce((sum, i) => sum + (i.deposit || 0), 0); const baseBalance = baseGrandTotal - depositTotal;
-                    const cardFee = (isCard && baseBalance > 0) ? baseBalance * 0.1 : 0; const grandTotal = baseGrandTotal + cardFee; const balance = baseBalance + cardFee;
+                    const cardFee = (isCard && baseBalance > 0) ? Math.round(baseBalance * 0.1) : 0; const grandTotal = baseGrandTotal + cardFee; const balance = baseBalance + cardFee;
                     const itemListTextForMsg = activeItems.map(i => `${i.product}${i.quantity > 1 ? ` ★${i.quantity}개` : ''} ${Number(i.price).toLocaleString()}원`).join('\n');
                     const itemListTextForExcel = activeItems.map(i => `${i.product}(${i.quantity}개)`).join(', '); 
                     const addrInfo = findAddress(nick) || {};
@@ -3585,8 +3656,10 @@ const dashboardStats = useMemo(() => {
                     let statusStr = '';
                     if (isCard) { 
                         statusStr = '카드결제'; const cardBase = Math.max(0, baseGrandTotal - depositTotal);
-                        if (depositTotal > 0) { msg += `[카드결제]\n총 주문금액 ${baseGrandTotal.toLocaleString()}원\n선입금 ${depositTotal.toLocaleString()}원\n남은 결제금액 ${cardBase.toLocaleString()}원\n수수료(10%) ${(cardBase * 0.1).toLocaleString()}원\n👉최종 결제요청액 ${(cardBase * 1.1).toLocaleString()}원 예정\n\n방송종료 시간이 늦을경우 오전에 카드결제 링크 발송합니다.\n주문내역 확인 후 주무시면 됩니다!\n------------------\n\n`; } 
-                        else { msg += `[카드결제]\n금액 ${cardBase.toLocaleString()}원\n수수료(10%) ${(cardBase * 0.1).toLocaleString()}원\n👉결제요청액 ${(cardBase * 1.1).toLocaleString()}원 예정\n\n방송종료 시간이 늦을경우 오전에 카드결제 링크 발송합니다.\n주문내역 확인 후 주무시면 됩니다!\n------------------\n\n`; }
+                        const cFee = Math.round(cardBase * 0.1);
+                        const finalCardAmount = cardBase + cFee;
+                        if (depositTotal > 0) { msg += `[카드결제]\n총 주문금액 ${baseGrandTotal.toLocaleString()}원\n선입금 ${depositTotal.toLocaleString()}원\n남은 결제금액 ${cardBase.toLocaleString()}원\n수수료(10%) ${cFee.toLocaleString()}원\n👉최종 결제요청액 ${finalCardAmount.toLocaleString()}원 예정\n\n방송종료 시간이 늦을경우 오전에 카드결제 링크 발송합니다.\n주문내역 확인 후 주무시면 됩니다!\n------------------\n\n`; } 
+                        else { msg += `[카드결제]\n금액 ${cardBase.toLocaleString()}원\n수수료(10%) ${cFee.toLocaleString()}원\n👉결제요청액 ${finalCardAmount.toLocaleString()}원 예정\n\n방송종료 시간이 늦을경우 오전에 카드결제 링크 발송합니다.\n주문내역 확인 후 주무시면 됩니다!\n------------------\n\n`; }
                     } else { 
                         const isPaid = (balance <= 0) && (grandTotal >= 0); 
                         if (depositTotal > 0 && balance <= 0) { msg += `[입금확인]\n${depositTotal.toLocaleString()}원\n------------------\n\n`; } 
