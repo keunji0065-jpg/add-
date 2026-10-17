@@ -345,6 +345,35 @@
             return [storedValue, setValue];
         };
 
+        const useResizablePanel = (id, defaultWidth) => {
+            const lsKey = getLsKey(`panel_width_${id}`);
+            const [width, setWidth] = useState(() => window.localStorage.getItem(lsKey) || defaultWidth);
+            const ref = useRef(null);
+            const timerRef = useRef(null);
+
+            useEffect(() => {
+                const target = ref.current;
+                if (!target) return;
+                const observer = new ResizeObserver(() => {
+                    if (target.style.width && target.style.width !== width) {
+                        clearTimeout(timerRef.current);
+                        timerRef.current = setTimeout(() => {
+                            const newWidth = target.style.width;
+                            setWidth(newWidth);
+                            window.localStorage.setItem(lsKey, newWidth);
+                        }, 200);
+                    }
+                });
+                observer.observe(target);
+                return () => {
+                    observer.disconnect();
+                    clearTimeout(timerRef.current);
+                };
+            }, [lsKey, width]);
+
+            return { ref, width };
+        };
+
         const downloadExcel = (data, fileName) => {
             const ws = XLSX.utils.json_to_sheet(data);
             const wb = XLSX.utils.book_new();
@@ -352,138 +381,51 @@
             XLSX.writeFile(wb, `${fileName}_${new Date().toLocaleDateString()}.xlsx`);
         };
 
-        const BatchRenameModal = ({ isOpen, onClose, inventory, setInventory, setOrders, setProductHistory, saveInventoryToServer, openModal }) => {
-            const [findText, setFindText] = useState('');
-            const [replaceText, setReplaceText] = useState('');
-
-            useEffect(() => {
-                if (isOpen) {
-                    setFindText('');
-                    setReplaceText('');
-                }
-            }, [isOpen]);
-
-            if (!isOpen) return null;
-
-            const affectedItems = findText ? inventory.filter(i => i.name.includes(findText)) : [];
-
-            const handleApply = () => {
-                if (!findText) return openModal('기존 단어를 입력하세요.', 'alert');
-                if (affectedItems.length === 0) return openModal('일치하는 상품이 없습니다.', 'alert');
-
-                let duplicateCount = 0;
-                let successCount = 0;
-                const changes = []; 
-
-                setInventory(prevInv => {
-                    let newInv = [...prevInv];
-                    affectedItems.forEach(item => {
-                        const newName = item.name.replace(findText, replaceText).trim();
-                        if (newName === item.name) return;
-                        if (newInv.some(i => i.name === newName && i.name !== item.name)) {
-                            duplicateCount++;
-                            return;
-                        }
-                        const idx = newInv.findIndex(i => i.name === item.name);
-                        if (idx !== -1) {
-                            newInv[idx] = { ...newInv[idx], name: newName };
-                            successCount++;
-                            changes.push({ oldName: item.name, newName });
-                        }
-                    });
-                    if (successCount > 0) saveInventoryToServer(newInv);
-                    return newInv;
-                });
-
-                if (successCount > 0) {
-                    setOrders(prevOrders => prevOrders.map(o => {
-                        const change = changes.find(c => c.oldName === o.product);
-                        return change ? { ...o, product: change.newName, isUnmodified: false } : o;
-                    }));
-                    
-                    setProductHistory(prevHist => {
-                        const next = { ...prevHist };
-                        changes.forEach(c => {
-                            if (next[c.oldName] !== undefined) {
-                                next[c.newName] = next[c.oldName];
-                            }
-                        });
-                        return next;
-                    });
-                    openModal(`총 ${successCount}건의 상품명이 일괄 변경되었습니다.` + (duplicateCount > 0 ? `\n(중복 제외: ${duplicateCount}건)` : ''), 'alert');
-                    onClose();
-                } else if (duplicateCount > 0) {
-                    openModal('변경하려는 이름이 이미 존재하여 변경되지 않았습니다.', 'alert');
-                }
-            };
-
-            return (
-                <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-[9999] animate-pop">
-                    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-5 w-full max-w-md mx-4 flex flex-col max-h-[85vh]" onClick={e => e.stopPropagation()}>
-                        <div className="mb-4 border-b dark:border-slate-700 pb-3 flex justify-between items-center shrink-0">
-                            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2"><Icon name="text-aa" weight="fill" className="text-blue-500"/> 상품명 일괄 변경 (치환)</h3>
-                            <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><Icon name="x" weight="bold" size={20}/></button>
-                        </div>
-                        
-                        <div className="flex flex-col gap-3 shrink-0 mb-4">
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 mb-1">찾을 단어 (예: 01)</label>
-                                <input type="text" value={findText} onChange={e => setFindText(e.target.value)} autoFocus placeholder="변경할 기존 단어" className="w-full border dark:border-slate-600 rounded px-3 py-2 text-sm outline-none bg-slate-50 dark:bg-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500" />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 mb-1">바꿀 단어 (예: 14)</label>
-                                <input type="text" value={replaceText} onChange={e => setReplaceText(e.target.value)} placeholder="새로 들어갈 단어" className="w-full border dark:border-slate-600 rounded px-3 py-2 text-sm outline-none bg-slate-50 dark:bg-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500" />
-                            </div>
-                        </div>
-
-                        <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 pb-2 border-t dark:border-slate-700 pt-3">
-                            <div className="text-xs font-bold text-slate-600 dark:text-slate-400 mb-2">변경 미리보기 <span className="text-blue-500">({affectedItems.length}건)</span></div>
-                            {affectedItems.length === 0 ? (
-                                <div className="text-center py-6 text-slate-400 text-xs bg-slate-50 dark:bg-slate-800/50 rounded border border-dashed dark:border-slate-700">일치하는 상품이 없습니다.</div>
-                            ) : (
-                                affectedItems.map((item, idx) => (
-                                    <div key={idx} className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-2 rounded flex flex-col gap-0.5">
-                                        <div className="text-[10px] text-slate-400 line-through truncate">{item.name}</div>
-                                        <div className="text-[12px] font-bold text-blue-600 dark:text-blue-400 truncate flex items-center gap-1">
-                                            <Icon name="arrow-bend-down-right" weight="bold" className="text-slate-400"/>
-                                            {item.name.replace(findText, replaceText)}
-                                        </div>
-                                    </div>
-                                ))
-                            )}
-                        </div>
-                        
-                        <div className="mt-2 pt-3 border-t dark:border-slate-700 shrink-0 flex gap-2">
-                            <button onClick={onClose} className="flex-1 py-2.5 rounded-lg font-bold text-sm bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">취소</button>
-                            <button onClick={handleApply} disabled={affectedItems.length === 0} className={`flex-1 py-2.5 rounded-lg font-bold text-sm transition-colors shadow-sm flex items-center justify-center gap-1.5 ${affectedItems.length > 0 ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-400 cursor-not-allowed'}`}>일괄 변경 적용</button>
-                        </div>
-                    </div>
-                </div>
-            );
-        };
-
         const Modal = ({ isOpen, type, message, onConfirm, onCancel, initialValue }) => {
             const [inputValue, setInputValue] = useState(initialValue || '');
             const inputRef = useRef(null);
-        const inputValueRef = useRef(inputValue);
-useEffect(() => { inputValueRef.current = inputValue; }, [inputValue]);
-
-useEffect(() => {
-    const handleKeyDown = (e) => {
-        if (!isOpen) return;
-        if (type !== 'confirm' && type !== 'alert') { 
-            if (e.key === 'Enter') onConfirm(inputValueRef.current); 
-        } else { 
-            if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); onConfirm(); } 
-        }
-        if (e.key === 'Escape' && type !== 'alert') onCancel();
-    };
-    window.addEventListener('keydown', handleKeyDown); 
-    return () => window.removeEventListener('keydown', handleKeyDown);
-}, [isOpen, type, onConfirm, onCancel]);    
-          
+            const confirmBtnRef = useRef(null);
+            const inputValueRef = useRef(inputValue);
             
-            useEffect(() => { if (isOpen && type === 'prompt' && inputRef.current) { setInputValue(initialValue || ''); setTimeout(() => inputRef.current.focus(), 100); } }, [isOpen, type, initialValue]);
+            useEffect(() => { inputValueRef.current = inputValue; }, [inputValue]);
+
+            useEffect(() => {
+                const handleKeyDown = (e) => {
+                    if (!isOpen) return;
+                    if (type !== 'confirm' && type !== 'alert') { 
+                        if (e.key === 'Enter') { 
+                            e.preventDefault(); 
+                            e.stopPropagation(); 
+                            onConfirm(inputValueRef.current); 
+                        }
+                    } else { 
+                        if (e.key === ' ' || e.key === 'Enter') { 
+                            e.preventDefault(); 
+                            e.stopPropagation(); 
+                            onConfirm(); 
+                        } 
+                    }
+                    if (e.key === 'Escape' && type !== 'alert') { 
+                        e.preventDefault(); 
+                        e.stopPropagation(); 
+                        onCancel(); 
+                    }
+                };
+                // ✨ 캡처링(true)으로 이벤트를 가장 먼저 가로채서 뒷배경 버튼 클릭을 막습니다.
+                window.addEventListener('keydown', handleKeyDown, true); 
+                return () => window.removeEventListener('keydown', handleKeyDown, true);
+            }, [isOpen, type, onConfirm, onCancel]);    
+          
+            useEffect(() => { 
+                if (isOpen) { 
+                    if (type === 'prompt' && inputRef.current) { 
+                        setInputValue(initialValue || ''); 
+                        setTimeout(() => inputRef.current.focus(), 10); 
+                    } else if (confirmBtnRef.current) {
+                        setTimeout(() => confirmBtnRef.current.focus(), 10); 
+                    }
+                } 
+            }, [isOpen, type, initialValue]);
             
             if (!isOpen) return null;
             return (
@@ -498,7 +440,7 @@ useEffect(() => {
                         )}
                         <div className="flex gap-2">
                             {type !== 'alert' && <button onClick={onCancel} className="flex-1 py-2.5 rounded-lg text-sm font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">취소</button>}
-                            <button onClick={() => type === 'prompt' ? onConfirm(inputValue) : onConfirm()} className="flex-1 py-2.5 rounded-lg text-sm font-bold text-white bg-slate-700 hover:bg-slate-800 transition-colors shadow-sm">확인</button>
+                            <button ref={confirmBtnRef} onClick={() => type === 'prompt' ? onConfirm(inputValue) : onConfirm()} className="flex-1 py-2.5 rounded-lg text-sm font-bold text-white bg-slate-700 hover:bg-slate-800 transition-colors shadow-sm focus:ring-2 focus:ring-offset-2 focus:ring-slate-500 dark:focus:ring-offset-slate-800 outline-none">확인</button>
                         </div>
                     </div>
                 </div>
@@ -578,13 +520,13 @@ useEffect(() => {
                                     const isSelected = selectedItems[item.name] > 0;
                                     const qty = selectedItems[item.name] || 0;
                                     return (
-                                        <div key={item.id || item.name} className={`flex items-center justify-between p-2 rounded-lg border transition-all ${isSelected ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-700 ring-1 ring-blue-200' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-blue-300'} ${item.isSoldOut ? 'opacity-60' : ''}`}>
+                                        <div key={item.id || item.name} className={`flex items-center justify-between p-2 rounded-lg border transition-all ${isSelected ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-700 ring-1 ring-blue-200' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-blue-300'}`}>
                                             <div className="flex-1 min-w-0 pr-2">
-                                                <div className={`font-bold text-sm truncate ${item.isSoldOut ? 'text-red-500 line-through' : (isSelected ? 'text-blue-700 dark:text-blue-300' : 'text-slate-800 dark:text-slate-200')}`}>
-                                                    {item.name} {item.isSoldOut && '(품절)'}
+                                                <div className={`font-bold text-sm truncate ${isSelected ? 'text-blue-700 dark:text-blue-300' : 'text-slate-800 dark:text-slate-200'}`}>
+                                                    {item.name} {item.isSoldOut && <span className="ml-1 text-[10px] bg-red-500 text-white px-1 py-0.5 rounded font-bold shadow-sm">품절</span>}
                                                 </div>
                                                 <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                                                    단가: {Number(item.price).toLocaleString()}원 | 남은재고: {item.stock !== undefined && item.stock !== '' ? item.stock : '∞'}
+                                                    단가: {Number(item.price).toLocaleString()}원 | 총재고: {item.stock !== undefined && item.stock !== '' ? item.stock : '∞'}
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-2 shrink-0">
@@ -898,151 +840,119 @@ useEffect(() => {
             );
         };
 
-        const InventoryItemRow = memo(({ item, itemStats, getInventory, setOrders, setInventory, setProductHistory, openModal, expandedInventoryItem, setExpandedInventoryItem, setManualProduct, setCurrentSearchTerm, setManualPrice, setIsFixedProductMode, customerPaidStatus, saveInventoryToServer, cardPayments }) => {
+        const InventoryItemRow = memo(({ item, itemStats, expandedInventoryItem, isPinned, onItemAction, setInventory, setOrders, setProductHistory, saveInventoryToServer, openModal, customerPaidStatus, cardPayments, setExpandedInventoryItem }) => {
+            const isBuyerListOpen = item && expandedInventoryItem === item.name;
             const [isEditing, setIsEditing] = useState(false);
-            const [localName, setLocalName] = useState(item.name);
-            const [localPrice, setLocalPrice] = useState(item.price === 0 || item.price === '' ? '' : Number(item.price).toLocaleString());
-            const [localStock, setLocalStock] = useState(item.stock === undefined || item.stock === '' ? '' : item.stock);
-
-            useEffect(() => { setLocalName(item.name); }, [item.name]);
-            useEffect(() => { setLocalPrice(item.price === 0 || item.price === '' ? '' : Number(item.price).toLocaleString()); }, [item.price]);
-            useEffect(() => { setLocalStock(item.stock === undefined || item.stock === '' ? '' : item.stock); }, [item.stock]);
-
             const orderedCount = itemStats ? itemStats.count : 0;
-            const aggregatedOrders = itemStats ? itemStats.aggregated : [];
             const waitlistCount = itemStats ? (itemStats.waitlistCount || 0) : 0;
-            const waitlistAggregated = itemStats ? (itemStats.waitlistAggregated || []) : [];
+            const aggregatedOrders = (itemStats && itemStats.aggregated) ? itemStats.aggregated : [];
+            const waitlistAggregated = (itemStats && itemStats.waitlistAggregated) ? itemStats.waitlistAggregated : [];
+            const [feedback, setFeedback] = useState(null);
 
-            const isExpanded = expandedInventoryItem === item.name;
+            const [localName, setLocalName] = useState(item?.name || '');
+            const [localPrice, setLocalPrice] = useState(item?.price === 0 || item?.price === '' ? '' : Number(item?.price).toLocaleString());
+            const [localStock, setLocalStock] = useState(item?.stock === undefined || item?.stock === '' ? '' : item?.stock);
 
-            const clickTimeoutRef = useRef(null);
-            const clickCountRef = useRef(0);
-
-            const executeSmartCopy = (target) => {
-                const currentInventory = getInventory ? getInventory() : [];
-                const groups = generateSmartGroups(currentInventory);
-                const myGroup = groups.find(g => g.rawNames.includes(item.name));
-                
-                const priceNum = Number(String(item.price).replace(/,/g, '')) || 0;
-                const priceStr = priceNum > 0 ? priceNum.toLocaleString() + '원' : '0원';
-                let copyText = "";
-
-                if (myGroup && myGroup.options.length > 0) {
-                    copyText = `🔹 ${myGroup.baseName} ${myGroup.options.join(', ')} / ${priceStr}`.trim();
-                } else {
-                    copyText = `🔹 ${item.name} / ${priceStr}`.trim();
+            useEffect(() => {
+                // ✨ 수정창을 열어두고 타이핑 중일 때는 외부 리렌더링이 입력 중인 글자를 덮어쓰지 않도록 완벽 차단
+                if (item && !isEditing) {
+                    setLocalName(item.name);
+                    setLocalPrice(item.price === 0 || item?.price === '' ? '' : Number(item.price).toLocaleString());
+                    setLocalStock(item.stock === undefined || item.stock === '' ? '' : item?.stock);
                 }
-                
-                const textArea = document.createElement("textarea"); textArea.value = copyText; document.body.appendChild(textArea); textArea.select();
-                try { document.execCommand('copy'); } catch (err) {} document.body.removeChild(textArea);
-                
-                if (target) {
-                    target.classList.add('text-blue-600', 'dark:text-blue-400'); 
-                    setTimeout(() => target.classList.remove('text-blue-600', 'dark:text-blue-400'), 500);
-                }
-            };
+            }, [item, isEditing]);
 
-            const handleMultiClick = (e) => {
+            const hasStockLimit = item && item.stock !== '' && item.stock !== undefined && item.stock !== null;
+            const totalStock = hasStockLimit ? Number(item.stock) : null;
+            const remainingStock = hasStockLimit ? Math.max(0, totalStock - orderedCount) : '∞';
+
+            const handleClick = (e) => {
                 e.stopPropagation();
-                
-                const target = e.currentTarget;
-                clickCountRef.current += 1;
-
-                if (clickTimeoutRef.current) {
-                    clearTimeout(clickTimeoutRef.current);
-                }
-
-                clickTimeoutRef.current = setTimeout(() => {
-                    const count = clickCountRef.current;
-                    clickCountRef.current = 0;
-
-                    if (count === 1) {
-                        const copyText = item.name.trim();
-                        const textArea = document.createElement("textarea"); textArea.value = copyText; document.body.appendChild(textArea); textArea.select();
-                        try { document.execCommand('copy'); } catch (err) {} document.body.removeChild(textArea);
-                        target.classList.add('text-green-600', 'dark:text-green-400');
-                        setTimeout(() => target.classList.remove('text-green-600', 'dark:text-green-400'), 500);
-                    } else if (count === 2) {
-                        setManualProduct(item.name); 
-                        setManualPrice(item.price ? Number(item.price).toLocaleString() : '');
-                        setIsFixedProductMode(true); 
-                        document.getElementById('manual-prod-input')?.focus();
-                    } else if (count >= 3) {
-                        executeSmartCopy(target);
+                if (onItemAction && item) {
+                    const res = onItemAction(item, e.detail);
+                    if (res) {
+                        setFeedback(res);
+                        setTimeout(() => setFeedback(null), 1000);
                     }
-                }, 250); 
+                }
             };
 
-            const handleSave = () => {
+            const handlePinClick = (e) => {
+                e.stopPropagation();
+                if (onItemAction && item) {
+                    const res = onItemAction(item, 'pin');
+                    if (res) {
+                        setFeedback(res);
+                        setTimeout(() => setFeedback(null), 1000);
+                    }
+                }
+            };
+
+            const handleSave = (e) => {
+                if (e) e.stopPropagation();
+                if (!item) return;
                 const newName = localName.trim();
                 const newPrice = Number(String(localPrice).replace(/,/g, ''));
                 const newStock = localStock === '' ? '' : parseInt(localStock);
-                if (!newName) { openModal('상품명을 입력해주세요.', 'alert'); return; }
+                if (!newName) return openModal('상품명을 입력해주세요.', 'alert');
 
                 let isDuplicate = false;
                 setInventory(prevInv => {
-                    if (newName !== item.name && prevInv.some(i => i.name === newName && i.name !== item.name)) { 
+                    if (newName !== item.name && prevInv.some(i => i.name === newName && i.name !== item.name)) {
                         isDuplicate = true;
-                        return prevInv; 
+                        return prevInv;
                     }
                     const newInv = prevInv.map(i => i.name === item.name ? { ...i, name: newName, price: newPrice, stock: newStock } : i);
-                    saveInventoryToServer(newInv); 
+                    saveInventoryToServer(newInv);
                     return newInv;
                 });
 
                 if (isDuplicate) {
-                    openModal('이미 동일한 이름의 상품이 있습니다.', 'alert'); 
+                    openModal('이미 동일한 이름의 상품이 있습니다.', 'alert');
                     setLocalName(item.name);
                     return;
                 }
-                
+
                 if (newName !== item.name) {
                     setOrders(prevOrders => prevOrders.map(o => o.product === item.name ? { ...o, product: newName } : o));
                     setProductHistory(prevHist => {
                         const next = { ...prevHist };
-                        if (next[item.name] !== undefined) {
-                            next[newName] = next[item.name];
-                        }
+                        if (next[item.name] !== undefined) next[newName] = next[item.name];
                         return next;
                     });
+                    if (isBuyerListOpen) setExpandedInventoryItem(newName);
                 }
-
                 setIsEditing(false);
             };
 
-            const handleDelete = () => {
-                if (item.isLocked) {
-                    openModal('잠금(자물쇠)이 설정된 상품은 삭제할 수 없습니다. 먼저 자물쇠를 해제해주세요.', 'alert');
-                    return;
-                }
+            const handleToggleSoldOut = (e) => {
+                e.stopPropagation();
+                setInventory(prev => { const newInv = prev.map(i => i.name === item.name ? { ...i, isSoldOut: !i.isSoldOut } : i); saveInventoryToServer(newInv); return newInv; });
+            };
+
+            const handleToggleLock = (e) => {
+                e.stopPropagation();
+                setInventory(prev => { const newInv = prev.map(i => i.name === item.name ? { ...i, isSoldOut: i.isSoldOut, isLocked: !i.isLocked } : i); saveInventoryToServer(newInv); return newInv; });
+            };
+
+            const handleDelete = (e) => {
+                e.stopPropagation();
+                if (item.isLocked) return openModal('잠금(자물쇠)이 설정된 상품은 삭제할 수 없습니다.', 'alert');
                 openModal(`'${item.name}' 상품을 삭제하시겠습니까?`, 'confirm', () => {
                     setInventory(prev => {
                         const newInv = prev.filter(i => i.name !== item.name);
                         saveInventoryToServer(newInv);
                         return newInv;
                     });
+                    if (isBuyerListOpen) {
+                        setExpandedInventoryItem(null);
+                    }
                 });
             };
 
-            const handleToggleSoldOut = () => {
-                setInventory(prev => {
-                    const newInv = prev.map(i => i.name === item.name ? { ...i, isSoldOut: !i.isSoldOut } : i);
-                    saveInventoryToServer(newInv);
-                    return newInv;
-                });
-            };
-
-            // ✨ 자물쇠(잠금) 토글 함수
-            const handleToggleLock = () => {
-                setInventory(prev => {
-                    const newInv = prev.map(i => i.name === item.name ? { ...i, isLocked: !i.isLocked } : i);
-                    saveInventoryToServer(newInv);
-                    return newInv;
-                });
-            };
-
-            const handleCopyNames = () => {
-                if (aggregatedOrders.length === 0) return;
+            const handleCopyNames = (e) => {
+                e.stopPropagation();
+                if (!item || aggregatedOrders.length === 0) return;
                 const title = `🔹 ${item.name} (총 ${orderedCount}개)\n`;
                 const names = aggregatedOrders.map(a => a.quantity > 1 ? `${a.customer}(${a.quantity})` : a.customer).join(', ');
                 const text = title + names;
@@ -1050,167 +960,132 @@ useEffect(() => {
                 try { document.execCommand('copy'); openModal('명단이 복사되었습니다.', 'alert'); } catch (err) {} document.body.removeChild(textArea);
             };
 
-            return (
-                <div className="flex flex-col bg-white dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
-                    <div className={`p-1.5 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors group ${item.isSoldOut ? 'bg-red-50/50 dark:bg-red-900/10' : ''}`}>
-                        {isEditing ? (
-                            <div className="flex flex-col gap-1.5">
-                                <input autoFocus type="text" value={localName} onChange={e=>setLocalName(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')handleSave();}} className="w-full border dark:border-slate-600 bg-white dark:bg-slate-900 dark:text-white px-2 py-1 rounded text-xs outline-none focus:ring-1 focus:ring-blue-500" placeholder="상품명" />
-                                <div className="flex items-center gap-1.5">
-                                    <div className="flex items-center flex-1 border dark:border-slate-600 bg-white dark:bg-slate-900 rounded overflow-hidden">
-                                        <span className="px-1.5 text-[10px] text-slate-400 bg-slate-50 dark:bg-slate-800/50 h-full flex items-center">단가</span>
-                                        <input type="text" value={localPrice} onChange={e=>{const v = e.target.value.replace(/,/g, ''); if (v === '' || v === '-') setLocalPrice(v); else if(!isNaN(v)) setLocalPrice(Number(v).toLocaleString());}} onKeyDown={e=>{if(e.key==='Enter')handleSave();}} className="w-full bg-transparent dark:text-white px-1 py-1 text-[11px] text-right outline-none" placeholder="단가" />
-                                    </div>
-                                    <div className="flex items-center flex-1 border dark:border-slate-600 bg-white dark:bg-slate-900 rounded overflow-hidden">
-                                        <span className="px-1.5 text-[10px] text-slate-400 bg-slate-50 dark:bg-slate-800/50 h-full flex items-center">재고</span>
-                                        <input type="number" value={localStock} onChange={e=>setLocalStock(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')handleSave();}} className="w-full bg-transparent dark:text-white px-1 py-1 text-[11px] text-right outline-none" placeholder="무한" />
-                                    </div>
-                                    <button onClick={handleSave} className="bg-slate-600 hover:bg-slate-700 text-white px-2 py-1.5 rounded shadow-sm text-[10px] shrink-0 font-bold">저장</button>
-                                    <button onClick={()=>setIsEditing(false)} className="bg-slate-300 hover:bg-slate-400 dark:bg-slate-600 dark:hover:bg-slate-500 text-slate-700 dark:text-slate-200 px-2 py-1.5 rounded shadow-sm text-[10px] shrink-0 font-bold">취소</button>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="flex flex-col gap-1.5">
-                                <div className="flex items-start gap-1.5 w-full min-w-0">
-                                    <button onClick={(e) => {
-                                        e.stopPropagation();
-                                        setManualProduct(item.name); 
-                                        setManualPrice(item.price ? Number(item.price).toLocaleString() : '');
-                                        setIsFixedProductMode(true); 
-                                        document.getElementById('manual-prod-input')?.focus();
-                                    }} className="mt-0.5 text-slate-400 hover:text-blue-500 shrink-0 transition-colors" title="수동 입력창에 상품 고정">
-                                        <Icon name="push-pin" weight="fill" size={14}/>
-                                    </button>
-                                    <div className={`flex-1 font-bold text-[13px] leading-snug break-all cursor-pointer select-none ${item.isSoldOut ? 'text-red-500 dark:text-red-400 line-through opacity-80' : 'text-slate-800 dark:text-slate-200 hover:text-blue-600 dark:hover:text-blue-400'}`} title="1번 클릭: 제품명 복사 / 2번 클릭: 상단 고정 / 3번 클릭(우클릭): 메뉴판 요약 복사"
-                                        onClick={handleMultiClick}
-                                        onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); executeSmartCopy(e.currentTarget); }}
-                                    >
-                                        {item.name} {item.isLocked && <span className="text-amber-500 text-[10px] ml-1">🔒</span>}
-                                    </div>
-                                    <div className="flex items-center justify-end shrink-0 ml-2 mt-0.5">
-                                        <button onClick={(e) => { e.stopPropagation(); handleToggleSoldOut(); }} className={`px-2 py-0.5 rounded text-[10px] font-bold shadow-sm transition-colors ${item.isSoldOut ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-slate-200 text-slate-600 hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600'}`}>{item.isSoldOut ? '판매' : '품절'}</button>
-                                    </div>
-                                </div>
-                                
-                                <div className="flex justify-between items-center bg-slate-100/60 dark:bg-slate-900/40 border border-slate-200/60 dark:border-slate-700/60 rounded px-1.5 py-1">
-                                    <div className="flex items-center gap-2.5 text-[11px] truncate pr-1">
-                                        <span className="flex items-center gap-1 shrink-0"><span className="text-slate-400">단가</span> <span className={`font-bold ${item.isSoldOut ? 'text-red-400' : 'text-slate-700 dark:text-slate-300'}`}>{item.price ? Number(item.price).toLocaleString() : '0'}</span></span>
-                                        <span className="w-px h-3 bg-slate-300 dark:bg-slate-600 shrink-0"></span>
-                                        <span className="flex items-center gap-1 shrink-0"><span className="text-slate-400">잔여</span> <span className={`font-bold ${item.stock !== undefined && item.stock !== '' && (item.stock - orderedCount <= 0) ? 'text-red-500' : 'text-blue-600 dark:text-blue-400'}`} title={`초기설정재고: ${item.stock !== undefined && item.stock !== '' ? item.stock : '무한'}`}>{item.stock !== undefined && item.stock !== '' ? item.stock - orderedCount : '∞'}</span></span>
-                                        <span className="w-px h-3 bg-slate-300 dark:bg-slate-600 shrink-0"></span>
-                                        <span className="flex items-center gap-1 shrink-0"><span className="text-slate-400">주문</span> <span className={`font-bold ${item.isSoldOut ? 'text-red-400' : 'text-slate-700 dark:text-slate-300'}`}>{orderedCount}</span></span>
-                                        {waitlistCount > 0 && (
-                                            <>
-                                                <span className="w-px h-3 bg-slate-300 dark:bg-slate-600 shrink-0"></span>
-                                                <span className="flex items-center gap-1 shrink-0"><span className="text-orange-400">대기</span> <span className="font-bold text-orange-500">{waitlistCount}</span></span>
-                                            </>
-                                        )}
-                                    </div>
-                                    
-                                    <div className="flex items-center gap-0.5 shrink-0">
-                                        <button onClick={(e) => { e.stopPropagation(); handleToggleLock(); }} className={`p-1 rounded text-[10px] transition-colors ${item.isLocked ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400' : 'text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`} title={item.isLocked ? "잠금 해제 (초기화 시 삭제 가능)" : "상품 잠금 (초기화 및 삭제 방지)"}>
-                                            <Icon name={item.isLocked ? "lock" : "lock-open"} weight="bold" size={13}/>
-                                        </button>
-                                        <button onClick={(e) => { e.stopPropagation(); setIsEditing(true); }} className="p-1 rounded text-slate-400 hover:text-blue-500 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors" title="수정"><Icon name="pencil-simple" weight="bold" size={13}/></button>
-                                        <button onClick={(e) => { e.stopPropagation(); handleDelete(); }} className={`p-1 rounded transition-colors ${item.isLocked ? 'text-slate-200 dark:text-slate-700 cursor-not-allowed' : 'text-slate-400 hover:text-red-500 hover:bg-slate-200 dark:hover:bg-slate-700'}`} title={item.isLocked ? "잠긴 상품은 삭제할 수 없습니다" : "삭제"}><Icon name="trash" weight="bold" size={13}/></button>
-                                        
-                                        <div className="w-px h-3 bg-slate-300 dark:bg-slate-600 mx-1"></div>
-                                        
-                                        <button onClick={(e) => { e.stopPropagation(); setExpandedInventoryItem(isExpanded ? null : item.name); }} className={`p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors shrink-0 flex justify-center ${isExpanded ? 'bg-slate-200 dark:bg-slate-600 text-slate-700 dark:text-slate-200' : ''}`}><Icon name="caret-down" weight="bold" size={14} className={`transition-transform ${isExpanded ? 'rotate-180' : ''}`} /></button>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                    {isExpanded && !isEditing && (
-                        <div className="bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-700 p-1.5 flex flex-col gap-1">
-                            <div className="flex justify-between items-center mb-1">
-                                <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 flex items-center gap-1"><Icon name="users" weight="fill" /> 확정 명단 (총 {orderedCount}개)</span>
-                                <button onClick={handleCopyNames} className="text-[9px] bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-600 hover:bg-slate-300 px-1.5 py-0.5 rounded font-bold shadow-sm transition-colors">명단 복사</button>
-                            </div>
-                            {aggregatedOrders.length === 0 ? (
-                                <div className="text-center text-[10px] text-slate-400 py-2">확정된 주문이 없습니다.</div>
-                            ) : (
-                                <div className="grid grid-cols-2 gap-1 max-h-[160px] overflow-y-auto pr-1">
-                                    {aggregatedOrders.map(agg => {
-                                        const isPaid = customerPaidStatus && customerPaidStatus[agg.customer];
-                                        const isCard = cardPayments && cardPayments[agg.customer];
-                                        
-                                        let textColor = "text-slate-700 dark:text-slate-300";
-                                        if (isCard) textColor = "text-purple-600 font-bold dark:text-purple-400";
-                                        else if (!isPaid) textColor = "text-red-500 font-bold dark:text-red-400";
-                                        
-                                        return (
-                                            <div key={agg.customer} className="flex justify-between items-center bg-white dark:bg-slate-800 p-1 rounded border border-slate-200 dark:border-slate-700 shadow-sm text-[10px] group hover:border-slate-300 min-w-0">
-                                                <span className={`cursor-pointer hover:underline truncate flex-1 flex items-center gap-0.5 ${textColor}`} onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    const textArea = document.createElement("textarea"); textArea.value = agg.customer; document.body.appendChild(textArea); textArea.select();
-                                                    try { document.execCommand('copy'); } catch (err) {} document.body.removeChild(textArea);
-                                                    const el = e.currentTarget; el.classList.add('text-green-500'); setTimeout(() => el.classList.remove('text-green-500'), 500);
-                                                }} title="클릭하여 닉네임 복사">
-                                                    <span className="truncate">{agg.customer}</span> {agg.quantity > 1 && <span className="text-slate-500 ml-0.5 shrink-0">({agg.quantity}개)</span>}
-                                                    {isCard && <span className="text-[8px] bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300 border border-purple-200 dark:border-purple-700 px-1 py-0.5 rounded shrink-0 leading-none">카드</span>}
-                                                </span>
-                                                <button onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    openModal(`'${agg.customer}'님의 '${item.name}' 주문을 삭제하시겠습니까?`, 'confirm', () => { setOrders(prev => prev.filter(order => !agg.orderIds.includes(order.id))); });
-                                                }} className="text-red-400 hover:text-red-600 bg-red-50 hover:bg-red-100 px-1.5 py-0.5 rounded font-bold shrink-0 ml-1 opacity-0 group-hover:opacity-100">삭제</button>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            )}
+            if (!item) return null;
 
-                            {waitlistAggregated.length > 0 && (
-                                <>
-                                    <div className="flex justify-between items-center mt-2 mb-1 border-t dark:border-slate-700 pt-2">
-                                        <span className="text-[10px] font-bold text-orange-500 flex items-center gap-1"><Icon name="hourglass" weight="fill" /> 대기 명단 (총 {waitlistCount}개)</span>
+            return (
+                <div className={`border rounded transition-colors select-none overflow-hidden ${isPinned ? 'border-purple-400 dark:border-purple-600 bg-purple-50/30 dark:bg-purple-900/15 ring-1 ring-purple-300 dark:ring-purple-700' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600'}`}>
+                    {/* 상단 메인 영역 (초슬림 2줄 정돈 레이아웃) */}
+                    <div className="px-1.5 py-1 flex flex-col gap-0.5">
+                        {/* 1번째 줄: 압정 아이콘 + 상품명 + 품절 버튼 */}
+                        <div className="flex items-center justify-between gap-1">
+                            <div className="flex items-center gap-1 flex-1 min-w-0">
+                                <button type="button" onClick={handlePinClick} className={`p-0.5 rounded transition-colors shrink-0 ${isPinned ? 'text-purple-600 dark:text-purple-400 bg-purple-100 dark:bg-purple-900/50' : 'text-slate-300 hover:text-purple-600'}`} title={isPinned ? "고정 해제" : "클릭하여 이 상품 즉시 고정"}>
+                                    <Icon name="push-pin" weight={isPinned ? "fill" : "regular"} size={12} />
+                                </button>
+                                <div onClick={handleClick} className="flex-1 min-w-0 cursor-pointer group" title="1클릭: 상품명 복사 / 2클릭: 상품 고정 / 3클릭: 메뉴 텍스트 복사">
+                                    <span className={`font-bold text-[11px] truncate block leading-none py-0.5 ${item.isSoldOut ? 'text-slate-400 line-through dark:text-slate-500' : (isPinned ? 'text-purple-700 dark:text-purple-300' : 'text-slate-800 dark:text-slate-100 group-hover:text-blue-600 dark:group-hover:text-blue-400')}`}>
+                                        {feedback ? <span className={feedback.color}>{feedback.msg}</span> : item.name}
+                                    </span>
+                                </div>
+                            </div>
+                            <button onClick={handleToggleSoldOut} className={`px-1.5 py-0.5 rounded text-[9px] font-bold leading-none shrink-0 transition-colors ${item.isSoldOut ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-slate-100 text-slate-400 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-400 dark:hover:bg-slate-600'}`}>
+                                품절
+                            </button>
+                        </div>
+
+                        {/* 2번째 줄: 내부 박스 없이 깔끔하게 정렬된 수치 + 우측 액션 아이콘 */}
+                        <div className="flex items-center justify-between gap-1 pl-4 pt-0.5 border-t border-slate-100 dark:border-slate-700/50 text-[10px] leading-none">
+                            <div onClick={handleClick} className="flex items-center gap-1.5 text-slate-400 dark:text-slate-500 min-w-0 cursor-pointer">
+                                <span className="text-slate-600 dark:text-slate-300 font-bold tabular-nums">{item.price ? Number(item.price).toLocaleString() : '0'}</span>
+                                <span className="text-slate-200 dark:text-slate-700">|</span>
+                                <span>잔여 <strong className={`font-bold tabular-nums ${!hasStockLimit ? 'text-blue-500 dark:text-blue-400' : (remainingStock > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500')}`}>{remainingStock}</strong></span>
+                                <span className="text-slate-200 dark:text-slate-700">|</span>
+                                <span>주문 <strong className={`font-bold tabular-nums ${orderedCount > 0 ? 'text-blue-600 dark:text-blue-400' : 'text-slate-600 dark:text-slate-400'}`}>{orderedCount}</strong>{waitlistCount > 0 && <strong className="text-orange-500 font-bold ml-0.5">(+{waitlistCount})</strong>}</span>
+                            </div>
+
+                            <div className="flex items-center gap-0.5 shrink-0 text-slate-400">
+                                <button onClick={handleToggleLock} className={`p-0.5 rounded hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors ${item.isLocked ? 'text-amber-500' : 'text-slate-300 hover:text-slate-600 dark:hover:text-slate-200'}`} title={item.isLocked ? "잠금 해제" : "초기화 방지 잠금"}>
+                                    <Icon name={item.isLocked ? "lock-key" : "lock-simple"} weight={item.isLocked ? "fill" : "regular"} size={11} />
+                                </button>
+                                <button onClick={(e) => { e.stopPropagation(); setIsEditing(prev => !prev); }} className={`p-0.5 rounded hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors ${isEditing ? 'text-blue-600 bg-blue-50 dark:bg-blue-900/40' : 'text-slate-300 hover:text-slate-600 dark:hover:text-slate-200'}`} title="상품 정보 수정">
+                                    <Icon name="pencil-simple" weight={isEditing ? "fill" : "regular"} size={11} />
+                                </button>
+                                <button onClick={handleDelete} className={`p-0.5 rounded hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors ${item.isLocked ? 'text-slate-200 dark:text-slate-700 cursor-not-allowed' : 'text-slate-300 hover:text-red-500'}`} title="상품 삭제">
+                                    <Icon name="trash" weight="regular" size={11} />
+                                </button>
+                                <button onClick={(e) => { e.stopPropagation(); setExpandedInventoryItem(prev => prev === item.name ? null : item.name); }} className={`ml-0.5 px-1 py-0.5 flex items-center justify-center rounded transition-colors ${isBuyerListOpen || orderedCount > 0 || waitlistCount > 0 ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-bold' : 'text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`} title="구매자 명단 접기/펴기">
+                                    <Icon name={isBuyerListOpen ? "caret-up" : "caret-down"} weight="bold" size={10} />
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* ✏️ 연필 아이콘 클릭 시에만 열리는 인라인 상품 수정창 */}
+                    {isEditing && (
+                        <div onClick={e => e.stopPropagation()} className="px-2 py-1.5 border-t border-blue-100 dark:border-blue-900/50 bg-blue-50/40 dark:bg-slate-900/90 flex flex-col gap-1 text-[10px]">
+                            <input type="text" value={localName} onChange={e=>setLocalName(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')handleSave(e);}} className="w-full border border-blue-300 dark:border-blue-700 bg-white dark:bg-slate-800 dark:text-white px-1.5 py-0.5 rounded text-[11px] outline-none focus:ring-1 focus:ring-blue-500 font-bold" placeholder="상품명" autoFocus />
+                            <div className="flex items-center gap-1">
+                                <div className="flex items-center flex-1 border border-blue-300 dark:border-blue-700 bg-white dark:bg-slate-800 rounded overflow-hidden">
+                                    <span className="px-1 text-[9px] text-slate-500 bg-slate-100 dark:bg-slate-700 h-full flex items-center shrink-0">단가</span>
+                                    <input type="text" value={localPrice} onChange={e=>{const v = e.target.value.replace(/,/g, ''); if (v === '' || v === '-') setLocalPrice(v); else if(!isNaN(v)) setLocalPrice(Number(v).toLocaleString());}} onKeyDown={e=>{if(e.key==='Enter')handleSave(e);}} className="w-full bg-transparent dark:text-white px-1 py-0.5 text-[10px] text-right outline-none font-bold" placeholder="0" />
+                                </div>
+                                <div className="flex items-center w-16 border border-blue-300 dark:border-blue-700 bg-white dark:bg-slate-800 rounded overflow-hidden shrink-0">
+                                    <span className="px-1 text-[9px] text-slate-500 bg-slate-100 dark:bg-slate-700 h-full flex items-center shrink-0">재고</span>
+                                    <input type="number" value={localStock} onChange={e=>setLocalStock(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')handleSave(e);}} className="w-full bg-transparent dark:text-white px-1 py-0.5 text-[10px] text-right outline-none font-bold" placeholder="∞" />
+                                </div>
+                                <button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700 text-white px-2 py-0.5 rounded shadow-sm text-[10px] font-bold shrink-0">저장</button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ⌄ 화살표 아이콘 클릭 시 열리는 확정/대기 명단 영역 */}
+                    {isBuyerListOpen && (
+                        <div onClick={e => e.stopPropagation()} className="px-2 py-1.5 border-t border-slate-100 dark:border-slate-700/80 bg-white dark:bg-slate-800 flex flex-col gap-1.5 text-[10px]">
+                            <div>
+                                <div className="flex justify-between items-center mb-1">
+                                    <span className="font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1 text-[10px]">
+                                        <Icon name="users" weight="bold" size={11} /> 확정 명단 (총 {orderedCount}개)
+                                    </span>
+                                    <button onClick={handleCopyNames} className="text-[9px] bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 text-slate-600 dark:text-slate-300 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-600 font-bold shadow-sm">
+                                        명단 복사
+                                    </button>
+                                </div>
+                                {aggregatedOrders.length === 0 ? (
+                                    <div className="text-center py-1.5 text-slate-400 dark:text-slate-500 text-[10px]">
+                                        확정된 주문이 없습니다.
                                     </div>
-                                    <div className="grid grid-cols-2 gap-1 max-h-[160px] overflow-y-auto pr-1">
-                                        {waitlistAggregated.map(agg => {
+                                ) : (
+                                    <div className="flex flex-wrap gap-1">
+                                        {aggregatedOrders.map(agg => {
+                                            const isPaid = customerPaidStatus && customerPaidStatus[agg.customer];
+                                            const isCard = cardPayments && cardPayments[agg.customer];
+                                            let textColor = isCard ? "text-purple-600 font-bold" : (!isPaid ? "text-red-500 font-bold" : "text-slate-700 dark:text-slate-300 font-semibold");
                                             return (
-                                                <div key={agg.customer} className="flex justify-between items-center bg-orange-50 dark:bg-orange-900/20 p-1 rounded border border-orange-200 dark:border-orange-800 shadow-sm text-[10px] group hover:border-orange-300 min-w-0">
-                                                    <span className="cursor-pointer hover:underline truncate flex-1 flex items-center gap-0.5 text-orange-700 dark:text-orange-400" onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        const textArea = document.createElement("textarea"); textArea.value = agg.customer; document.body.appendChild(textArea); textArea.select();
-                                                        try { document.execCommand('copy'); } catch (err) {} document.body.removeChild(textArea);
-                                                        const el = e.currentTarget; el.classList.add('text-green-500'); setTimeout(() => el.classList.remove('text-green-500'), 500);
-                                                    }} title="클릭하여 닉네임 복사">
-                                                        <span className="truncate">{agg.customer}</span> {agg.quantity > 1 && <span className="text-orange-500 ml-0.5 shrink-0">({agg.quantity}개)</span>}
-                                                    </span>
-                                                    <button onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        openModal(`'${agg.customer}'님의 '${item.name}' 대기를 삭제하시겠습니까?`, 'confirm', () => { setOrders(prev => prev.filter(order => !agg.orderIds.includes(order.id))); });
-                                                    }} className="text-red-400 hover:text-red-600 bg-red-50 hover:bg-red-100 px-1.5 py-0.5 rounded font-bold shrink-0 ml-1 opacity-0 group-hover:opacity-100">삭제</button>
+                                                <div key={agg.customer} className="inline-flex items-center bg-slate-50 dark:bg-slate-900 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700 shadow-sm">
+                                                    <span className={`truncate max-w-[90px] ${textColor}`}>{agg.customer}{agg.quantity > 1 ? `(${agg.quantity})` : ''}</span>
+                                                    <button onClick={() => openModal(`'${agg.customer}'님의 '${item.name}' 주문을 삭제하시겠습니까?`, 'confirm', () => setOrders(prev => prev.filter(o => !agg.orderIds.includes(o.id))))} className="text-slate-400 hover:text-red-500 ml-1 font-bold leading-none" title="이 주문 삭제">×</button>
                                                 </div>
                                             );
                                         })}
                                     </div>
-                                </>
+                                )}
+                            </div>
+
+                            {waitlistAggregated.length > 0 && (
+                                <div className="pt-1 border-t border-slate-100 dark:border-slate-700/60">
+                                    <span className="font-bold text-orange-500 text-[9px] block mb-0.5">대기 명단 ({waitlistCount}개)</span>
+                                    <div className="flex flex-wrap gap-1">
+                                        {waitlistAggregated.map(agg => (
+                                            <div key={agg.customer} className="inline-flex items-center bg-orange-50 dark:bg-orange-900/20 px-1.5 py-0.5 rounded border border-orange-200 dark:border-orange-800 shadow-sm">
+                                                <span className="truncate max-w-[90px] text-orange-700 dark:text-orange-400 font-bold">{agg.customer}{agg.quantity > 1 ? `(${agg.quantity})` : ''}</span>
+                                                <button onClick={() => openModal(`'${agg.customer}'님의 '${item.name}' 대기를 삭제하시겠습니까?`, 'confirm', () => setOrders(prev => prev.filter(o => !agg.orderIds.includes(o.id))))} className="text-orange-400 hover:text-red-600 ml-1 font-bold leading-none" title="이 대기 삭제">×</button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
                             )}
                         </div>
                     )}
                 </div>
             );
         }, (prev, next) => {
-            if (prev.item.name !== next.item.name || prev.item.price !== next.item.price || prev.item.isSoldOut !== next.item.isSoldOut || prev.item.stock !== next.item.stock || prev.item.isLocked !== next.item.isLocked) return false;
-            
-            const isExpandedPrev = prev.expandedInventoryItem === prev.item.name;
-            const isExpandedNext = next.expandedInventoryItem === next.item.name;
-            if (isExpandedPrev !== isExpandedNext) return false;
-            
-            if (isExpandedNext) {
-                if (prev.itemStats !== next.itemStats) return false;
-                if (prev.customerPaidStatus !== next.customerPaidStatus) return false;
-                if (prev.cardPayments !== next.cardPayments) return false;
-            } else {
-                const prevCount = prev.itemStats ? prev.itemStats.count : 0;
-                const nextCount = next.itemStats ? next.itemStats.count : 0;
-                if (prevCount !== nextCount) return false;
-                const prevWCount = prev.itemStats ? (prev.itemStats.waitlistCount||0) : 0;
-                const nextWCount = next.itemStats ? (next.itemStats.waitlistCount||0) : 0;
-                if (prevWCount !== nextWCount) return false;
-            }
+            if (!prev.item || !next.item) return false;
+            if (prev.item.name !== next.item.name || prev.item.price !== next.item.price || prev.item.stock !== next.item.stock || prev.item.isSoldOut !== next.item.isSoldOut || prev.item.isLocked !== next.item.isLocked) return false;
+            if (prev.isPinned !== next.isPinned) return false;
+            const prevExp = prev.expandedInventoryItem === prev.item.name;
+            const nextExp = next.expandedInventoryItem === next.item.name;
+            if (prevExp !== nextExp) return false;
+            if (prev.itemStats !== next.itemStats || prev.customerPaidStatus !== next.customerPaidStatus || prev.cardPayments !== next.cardPayments) return false;
             return true;
         });
 
@@ -1291,7 +1166,15 @@ useEffect(() => {
             }
             
             const suggestions = useMemo(() => findAddressSuggestions ? findAddressSuggestions(nick) : [], [nick, findAddressSuggestions]);
-            const isVip = useMemo(() => { const nickNorm = normalizeString(nick); const key = Object.keys(specialCustomers || {}).find(k => normalizeString(k) === nickNorm); return key && specialCustomers[key].type === 'vip'; }, [specialCustomers, nick]);
+            const specialType = useMemo(() => { 
+                const nickNorm = normalizeString(nick); 
+                const direct = specialCustomers?.[nickNorm];
+                if (direct) return direct.type;
+                const key = Object.keys(specialCustomers || {}).find(k => normalizeString(k) === nickNorm); 
+                return key ? specialCustomers[key].type : null; 
+            }, [specialCustomers, nick]);
+            const isVip = specialType === 'vip';
+            const isManager = specialType === 'manager';
             const [showDeposits, setShowDeposits] = useState(false);
 
            const cleanPhoneDisplay = addr && addr.phone ? fixPhoneNumber(addr.phone) : '';
@@ -1304,6 +1187,7 @@ useEffect(() => {
                                 <span onClick={(e) => { e.stopPropagation(); const textArea = document.createElement("textarea"); textArea.value = nick; document.body.appendChild(textArea); textArea.select(); try { document.execCommand('copy'); const el = e.currentTarget; el.classList.add('text-green-500'); setTimeout(() => el.classList.remove('text-green-500'), 500); } catch (err) {} document.body.removeChild(textArea); }} className={`font-bold text-[12px] text-slate-900 truncate max-w-[120px] sm:max-w-[150px] inline-block align-bottom cursor-pointer hover:text-slate-600`} title="클릭하여 닉네임 복사">{nick}</span>
                                 {addrConflict && <button onClick={(e) => { e.stopPropagation(); handlePromoteAddress(nick, addrConflict); }} className="ml-1 bg-red-50 border border-red-300 text-red-600 text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm animate-pulse flex items-center gap-0.5 shrink-0">🚨 정보변경 감지</button>}
                                 {isVip && <span onClick={(e) => e.stopPropagation()} className="ml-1 text-[10px] px-1.5 py-0.5 rounded border bg-slate-800 text-amber-400 font-bold shadow-sm shrink-0 flex items-center gap-0.5"><Icon name="crown" weight="fill"/> VIP</span>}
+                                {isManager && <span onClick={(e) => e.stopPropagation()} className="ml-1 text-[10px] px-1.5 py-0.5 rounded border bg-blue-600 border-blue-700 text-white font-bold shadow-sm shrink-0 flex items-center gap-0.5"><Icon name="shield-check" weight="fill"/> 관리자</span>}
                                 
                                 <button onClick={(e) => { e.stopPropagation(); handleMultiAddOpen(nick); }} className="bg-blue-100 text-blue-600 rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-blue-200 shrink-0 ml-1 shadow-sm transition-colors" title="장바구니에서 일괄 추가"><Icon name="shopping-cart" weight="fill" size={12}/></button>
                                 <button onClick={(e) => { e.stopPropagation(); addOrderLogic(nick, '', 1); }} className="bg-slate-200 text-slate-700 rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold hover:bg-slate-300 shrink-0 ml-1 transition-colors" title="빈 상품줄 추가">+</button>
@@ -1409,9 +1293,9 @@ useEffect(() => {
             if (prev.noShowStatus !== next.noShowStatus) return false;
             if (prev.waitlistStatus !== next.waitlistStatus) return false;
             
-            const pVip = prev.specialCustomers && prev.specialCustomers[normalizeString(prev.nick)]?.type === 'vip';
-            const nVip = next.specialCustomers && next.specialCustomers[normalizeString(next.nick)]?.type === 'vip';
-            if (pVip !== nVip) return false;
+            const pType = prev.specialCustomers && prev.specialCustomers[normalizeString(prev.nick)]?.type;
+            const nType = next.specialCustomers && next.specialCustomers[normalizeString(next.nick)]?.type;
+            if (pType !== nType) return false;
             
             if (prev.items.length !== next.items.length) return false;
             for (let i = 0; i < prev.items.length; i++) {
@@ -1533,73 +1417,6 @@ useEffect(() => {
     );
 };
 
-const BatchEditModal = ({ isOpen, onClose, inventory, setInventory, setOrders, setProductHistory, saveInventoryToServer, openModal }) => {
-    const [findText, setFindText] = useState('');
-    const [replaceText, setReplaceText] = useState('');
-
-    useEffect(() => { if (isOpen) { setFindText(''); setReplaceText(''); } }, [isOpen]);
-
-    const handleApply = () => {
-        if (!findText.trim()) return openModal("찾을 단어를 입력해주세요.", "alert");
-        
-        let changedCount = 0;
-        setInventory(prevInv => {
-            const newInv = prevInv.map(item => {
-                if (item.name.includes(findText)) {
-                    changedCount++;
-                    return { ...item, name: item.name.split(findText).join(replaceText) };
-                }
-                return item;
-            });
-            if (changedCount > 0) saveInventoryToServer(newInv);
-            return newInv;
-        });
-
-        if (changedCount > 0) {
-            setOrders(prevOrders => prevOrders.map(o => {
-                if (o.product && o.product.includes(findText)) {
-                    return { ...o, product: o.product.split(findText).join(replaceText) };
-                }
-                return o;
-            }));
-            setProductHistory(prevHist => {
-                const next = { ...prevHist };
-                Object.keys(next).forEach(key => {
-                    if (key.includes(findText)) {
-                        const newKey = key.split(findText).join(replaceText);
-                        next[newKey] = next[key];
-                    }
-                });
-                return next;
-            });
-            openModal(`총 ${changedCount}개의 상품 이름이 변경되었습니다.`, "alert");
-            onClose();
-        } else {
-            openModal("해당 단어가 포함된 상품이 없습니다.", "alert");
-        }
-    };
-
-    if (!isOpen) return null;
-    return (
-        <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-[9999] animate-pop">
-            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-5 w-80 max-w-sm" onClick={e => e.stopPropagation()}>
-                <div className="mb-4 border-b dark:border-slate-700 pb-3 flex justify-between items-center">
-                    <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2"><Icon name="text-aa" weight="fill" className="text-blue-500" /> 상품명 일괄 변경</h3>
-                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><Icon name="x" weight="bold" size={20}/></button>
-                </div>
-                <div className="space-y-3 mb-5">
-                    <div><label className="block text-[10px] font-bold text-slate-500 mb-1">찾을 단어 (기존)</label><input type="text" value={findText} onChange={e=>setFindText(e.target.value)} placeholder="예: 01" autoFocus className="w-full border dark:border-slate-600 rounded px-2 py-2 text-sm bg-slate-50 dark:bg-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-blue-500" /></div>
-                    <div><label className="block text-[10px] font-bold text-slate-500 mb-1">바꿀 단어 (새로운)</label><input type="text" value={replaceText} onChange={e=>setReplaceText(e.target.value)} placeholder="예: 14" className="w-full border dark:border-slate-600 rounded px-2 py-2 text-sm bg-slate-50 dark:bg-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-blue-500" /></div>
-                </div>
-                <div className="flex gap-2">
-                    <button onClick={onClose} className="flex-1 py-2.5 rounded-lg text-sm font-bold text-slate-500 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">취소</button>
-                    <button onClick={handleApply} className="flex-1 py-2.5 rounded-lg text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 transition-colors shadow-sm">일괄 변경</button>
-                </div>
-            </div>
-        </div>
-    );
-};
-
 const LiveTab = ({ youtubeApiKey, youtubeVideoId, orders, setOrders, productHistory, setProductHistory, quickShipping, jejuShipping, freeShippingThreshold, shippingOverrides, setShippingOverrides, bankAccount, googleScriptUrl, depSheetId, addrSheetId, masterSheetId, addresses, setAddresses, cardPayments, setCardPayments, manualDeposits, setManualDeposits, matchedDeposits, setMatchedDeposits, depositorNames, setDepositorNames, clickedChats, setClickedChats, openModal, keywords, setKeywords, sentAddressRequests, setSentAddressRequests, deletedDepositIds, setDeletedDepositIds, checkedOrders, setCheckedOrders, addressMapping, setAddressMapping, templateConfig, specialCustomers, setSpecialCustomers, inventory, setInventory, quickMessages, handleResetAllData, broadcastName, setGlobalError, cashReceipts, setCashReceipts, soundEnabled, soundVolume, depositLinks, setDepositLinks, noShowCustomers, setNoShowCustomers, waitlistCustomers, setWaitlistCustomers }) => {
             const [serverDeposits, setServerDeposits] = useState([]);
             const [selectedNick, setSelectedNick] = useState(null);
@@ -1658,8 +1475,51 @@ const LiveTab = ({ youtubeApiKey, youtubeVideoId, orders, setOrders, productHist
             const [filterStatus, setFilterStatus] = useState('all');
             const [expandedInventoryItem, setExpandedInventoryItem] = useState(null);
             
+            const handleInventoryItemAction = useCallback((item, clickCount) => {
+                try {
+                    if (!item) return null;
+                    if (clickCount === 'pin') {
+                        if (isFixedProductMode && manualProduct === item.name) {
+                            setIsFixedProductMode(false);
+                            return { msg: '📌 고정해제', color: 'text-slate-500' };
+                        } else {
+                            setManualProduct(item.name);
+                            const uPrice = item.price > 0 ? item.price : (productHistoryRef.current[item.name] || 0);
+                            if (uPrice > 0) setManualPrice(Number(uPrice).toLocaleString()); else setManualPrice('');
+                            setIsFixedProductMode(true);
+                            return { msg: '📌 고정됨', color: 'text-purple-600 dark:text-purple-400' };
+                        }
+                    }
+                    if (clickCount === 1) {
+                        const textArea = document.createElement("textarea"); textArea.value = item.name.trim(); document.body.appendChild(textArea); textArea.select();
+                        try { document.execCommand('copy'); } catch (err) {} document.body.removeChild(textArea);
+                        return { msg: '📋 복사됨', color: 'text-blue-600 dark:text-blue-400' };
+                    } 
+                    else if (clickCount === 2) {
+                        setManualProduct(item.name);
+                        const uPrice = item.price > 0 ? item.price : (productHistoryRef.current[item.name] || 0);
+                        if (uPrice > 0) setManualPrice(Number(uPrice).toLocaleString()); else setManualPrice('');
+                        setIsFixedProductMode(true);
+                        return { msg: '📌 고정됨', color: 'text-purple-600 dark:text-purple-400' };
+                    } 
+                    else if (clickCount >= 3) {
+                        const groups = generateSmartGroups(inventoryRef.current || []);
+                        const group = groups.find(g => g.rawNames.includes(item.name)) || { baseName: item.name, options: [], price: item.price };
+                        const optText = group.options.length > 0 ? ` ${group.options.join(', ')}` : '';
+                        const textToCopy = `${group.baseName}${optText} - ${Number(group.price).toLocaleString()}원`;
+                        
+                        const textArea = document.createElement("textarea"); textArea.value = textToCopy; document.body.appendChild(textArea); textArea.select();
+                        try { document.execCommand('copy'); } catch (err) {} document.body.removeChild(textArea);
+                        
+                        return { msg: '✅ 메뉴복사', color: 'text-green-600 dark:text-green-400' };
+                    }
+                } catch (e) {
+                    console.error("Inventory Action Error: ", e);
+                    return null;
+                }
+            }, [isFixedProductMode, manualProduct, setManualProduct, setManualPrice, setIsFixedProductMode]);
+            
             const [multiAddNick, setMultiAddNick] = useState(null);
-            const [isBatchRenameModalOpen, setIsBatchRenameModalOpen] = useState(false);
             
             const [chats, setChats] = useLocalStorage('savedChats', []);
             
@@ -1756,7 +1616,7 @@ const LiveTab = ({ youtubeApiKey, youtubeVideoId, orders, setOrders, productHist
                 });
             };
             
-            const [isMenuModalOpen, setIsMenuModalOpen] = useState(false);
+                    const [ isMenuModalOpen, setIsMenuModalOpen ] = useState(false);
             const [batchChangeModal, setBatchChangeModal] = useState({ isOpen: false, oldStr: '', newStr: '' });
             const [liveChatId, setLiveChatId] = useState(null);
             const chatNextPageTokenRef = useRef('');
@@ -1765,6 +1625,13 @@ const LiveTab = ({ youtubeApiKey, youtubeVideoId, orders, setOrders, productHist
             // ✨ 추가: 유튜브 요구 폴링 간격 및 GAS 중복 실행 방지 락
             const chatPollingIntervalRef = useRef(4000);
             const isGasFetchingRef = useRef(false);
+
+            const saveInventoryToServer = useCallback(async (newInvList) => {
+                if (googleScriptUrl && masterSheetId) {
+                    inventorySyncLock.current = Date.now();
+                    try { await fetchGas(googleScriptUrl, { action: 'save_inventory', masterId: getCleanSheetId(masterSheetId), data: newInvList.map(i => ({ name: i.name, price: i.price, status: i.isSoldOut ? '품절' : '' })) }); } catch (e) {}
+                }
+            }, [googleScriptUrl, masterSheetId]);
 
           const inventoryStats = useMemo(() => {
                 const stats = {};
@@ -1791,11 +1658,41 @@ const LiveTab = ({ youtubeApiKey, youtubeVideoId, orders, setOrders, productHist
                     }
                 });
                 for (let prod in stats) {
-                    stats[prod].aggregated = Object.values(stats[prod].customers).sort((a, b) => String(a.customer).localeCompare(String(b.customer), 'ko'));
-                    stats[prod].waitlistAggregated = Object.values(stats[prod].waitlistCustomers).sort((a, b) => String(a.customer).localeCompare(String(b.customer), 'ko'));
+                    // ✨ 등록 시간(클릭 순서) 기반 선착순 정렬
+                    stats[prod].aggregated = Object.values(stats[prod].customers).sort((a, b) => Math.min(...a.orderIds) - Math.min(...b.orderIds));
+                    stats[prod].waitlistAggregated = Object.values(stats[prod].waitlistCustomers).sort((a, b) => Math.min(...a.orderIds) - Math.min(...b.orderIds));
                 }
                 return stats;
             }, [orders]);
+
+            // ✨ 자동 품절 및 품절 해제 처리 로직 (재고 도달 시)
+            useEffect(() => {
+                setInventory(prevInv => {
+                    let hasChanges = false;
+                    const nextInv = prevInv.map(item => {
+                        if (item.stock !== '' && item.stock !== undefined && item.stock !== null) {
+                            const stats = inventoryStats[item.name];
+                            const orderedCount = stats ? stats.count : 0;
+                            const stockNum = Number(item.stock);
+                            if (orderedCount >= stockNum && !item.isSoldOut) {
+                                hasChanges = true;
+                                return { ...item, isSoldOut: true };
+                            } else if (orderedCount < stockNum && item.isSoldOut) {
+                                hasChanges = true;
+                                return { ...item, isSoldOut: false };
+                            }
+                        }
+                        return item;
+                    });
+                    
+                    if (hasChanges) {
+                        saveInventoryToServer(nextInv);
+                        return nextInv;
+                    }
+                    return prevInv;
+                });
+            }, [inventoryStats, setInventory, saveInventoryToServer]);
+
             const [copyStatus, setCopyStatus] = useState({});
             const [quickMsgCopyStatus, setQuickMsgCopyStatus] = useState({});
             const [isSaving, setIsSaving] = useState(false);
@@ -1871,7 +1768,7 @@ const LiveTab = ({ youtubeApiKey, youtubeVideoId, orders, setOrders, productHist
                 const handleKeyDown = (e) => {
                     if (e.key === 'Escape') {
                         setSelectedNick(null); setIsFixedProductMode(false); setManualNick(''); setManualProduct('');
-                        setManualPrice(''); setCurrentSearchTerm(''); setIsBatchEditOpen(false); setChatSearch(''); setDepositSearch(''); setAddressSearch(''); setOrderSearch('');
+                        setManualPrice(''); setCurrentSearchTerm(''); setBatchChangeModal(p => ({ ...p, isOpen: false })); setChatSearch(''); setDepositSearch(''); setAddressSearch(''); setOrderSearch('');
                     }
                 };
                 window.addEventListener('keydown', handleKeyDown);
@@ -1889,13 +1786,6 @@ const LiveTab = ({ youtubeApiKey, youtubeVideoId, orders, setOrders, productHist
                     setDepositLinks({});
                 });
             }, [openModal, setOrders, setMatchedDeposits, setDepositLinks]);
-
-            const saveInventoryToServer = useCallback(async (newInvList) => {
-                if (googleScriptUrl && masterSheetId) {
-                    inventorySyncLock.current = Date.now();
-                    try { await fetchGas(googleScriptUrl, { action: 'save_inventory', masterId: getCleanSheetId(masterSheetId), data: newInvList.map(i => ({ name: i.name, price: i.price, status: i.isSoldOut ? '품절' : '' })) }); } catch (e) {}
-                }
-            }, [googleScriptUrl, masterSheetId]);
 
             const handleQuickAddressSubmit = async (addrData) => {
                 if (!addrData.timestamp) addrData.timestamp = new Date().toISOString();
@@ -1985,9 +1875,16 @@ const LiveTab = ({ youtubeApiKey, youtubeVideoId, orders, setOrders, productHist
             }, [openModal]);
 
             const getCalculatedShipping = useCallback((nick, productTotal) => {
+                // ✨ 1순위: VIP 또는 관리자는 수동 배송비 설정이나 제주도 여부와 상관없이 무조건 무료배송(0원) 고정!
+                const nickNorm = normalizeString(nick); 
+                const directSpecial = specialCustomers?.[nickNorm];
+                const specialType = directSpecial ? directSpecial.type : (() => {
+                    const specialKey = Object.keys(specialCustomers || {}).find(k => normalizeString(k) === nickNorm);
+                    return specialKey ? specialCustomers[specialKey].type : null;
+                })();
+                if (specialType === 'vip' || specialType === 'manager') return 0; 
+
                 if (shippingOverrides[nick] !== undefined) return Number(shippingOverrides[nick]);
-                const nickNorm = normalizeString(nick); const specialKey = Object.keys(specialCustomers || {}).find(k => normalizeString(k) === nickNorm);
-                if (specialKey && specialCustomers[specialKey].type === 'vip') return 0; 
                 const addrRes = addressLookup.get(nick); const isJeju = addrRes && addrRes.data && addrRes.data.address && addrRes.data.address.includes('제주');
                 let calcShip = (freeShippingThreshold > 0 && productTotal >= freeShippingThreshold) ? 0 : Number(quickShipping);
                 if (isJeju) { calcShip += (Number(jejuShipping) - Number(quickShipping)); }
@@ -2045,7 +1942,7 @@ const LiveTab = ({ youtubeApiKey, youtubeVideoId, orders, setOrders, productHist
 
         const fetchYoutubeData = useCallback(async () => {
             if (!activeApiKey || !liveChatId) {
-                setYoutubeStatus("채팅(대기)");
+                setYoutubeStatus(prev => prev === "채팅(대기)" ? prev : "채팅(대기)");
                 return;
             }
             try {
@@ -2058,9 +1955,10 @@ const LiveTab = ({ youtubeApiKey, youtubeVideoId, orders, setOrders, productHist
                 if (!res.ok) {
                     if (res.status === 403) {
                         handleKeySwitch();
-                        setYoutubeStatus(`채팅(키교체중⚡)`);
+                        setYoutubeStatus(prev => prev === `채팅(키교체중⚡)` ? prev : `채팅(키교체중⚡)`);
                     } else {
-                        setYoutubeStatus(`채팅(에러:${res.status})`);
+                        const errStr = `채팅(에러:${res.status})`;
+                        setYoutubeStatus(prev => prev === errStr ? prev : errStr);
                     }
                 } else {
                     if (data.nextPageToken) chatNextPageTokenRef.current = data.nextPageToken;
@@ -2084,19 +1982,25 @@ const LiveTab = ({ youtubeApiKey, youtubeVideoId, orders, setOrders, productHist
                         if (googleScriptUrl && masterSheetId && broadcastName) {
                             unsavedChatsRef.current.push(...newChats);
                         }
-                        setYoutubeStatus(`채팅(${newChats.length})`);
+                        const okStr = `채팅(${newChats.length})`;
+                        setYoutubeStatus(prev => prev === okStr ? prev : okStr);
                     } else {
-                        setYoutubeStatus(`채팅(없음)`);
+                        setYoutubeStatus(prev => prev === `채팅(없음)` ? prev : `채팅(없음)`);
                     }
                 }
             } catch (e) {
-                setYoutubeStatus(`채팅(오류)`);
+                setYoutubeStatus(prev => prev === `채팅(오류)` ? prev : `채팅(오류)`);
             }
         }, [activeApiKey, liveChatId, handleKeySwitch, setChats, googleScriptUrl, masterSheetId, broadcastName]);
 
         const fetchGasData = useCallback(async () => {
             if (!googleScriptUrl) {
-                setGasStatus("설정 ⚙️: 스크립트 URL 입력!");
+                setGasStatus(prev => prev === "설정 ⚙️: 스크립트 URL 입력!" ? prev : "설정 ⚙️: 스크립트 URL 입력!");
+                return;
+            }
+            // ✨ 사용자가 입력창(input/textarea)에 타이핑 중일 때는 백그라운드 시트 동기화로 인한 화면 끊김(포커스/IME 풀림) 방지
+            const activeEl = document.activeElement;
+            if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA') && activeEl.type !== 'checkbox') {
                 return;
             }
             if (isGasFetchingRef.current) return;
@@ -2224,33 +2128,45 @@ const LiveTab = ({ youtubeApiKey, youtubeVideoId, orders, setOrders, productHist
                         
                         res.customerDb.forEach(row => {
                             const nick = String(row['닉네임'] || '').trim();
-                            const status = String(row['고객상태'] || '').trim();
+                            const status = String(row['고객상태'] || '').trim().toLowerCase();
                             const ts = row['저장시간'] || '';
                             if (nick) {
-                                if (status === 'vip' || status === 'manager') {
-                                    parsedSpecial[normalizeString(nick)] = { type: status, originalName: nick, timestamp: ts };
-                                } else if (status === 'noshow') {
+                                if (status === 'vip' || status === 'manager' || status === '관리자') {
+                                    const normType = status === '관리자' ? 'manager' : status;
+                                    parsedSpecial[normalizeString(nick)] = { type: normType, originalName: nick, timestamp: ts };
+                                } else if (status === 'noshow' || status === '노쇼') {
                                     parsedNoShow[nick] = true;
-                                } else if (status === 'waitlist') {
+                                } else if (status === 'waitlist' || status === '대기') {
                                     parsedWaitlist[nick] = true;
                                 }
                             }
                         });
                         
-                        setSpecialCustomers(prev => JSON.stringify(prev) !== JSON.stringify(parsedSpecial) ? parsedSpecial : prev);
-                        setNoShowCustomers(prev => JSON.stringify(prev) !== JSON.stringify(parsedNoShow) ? parsedNoShow : prev);
-                        setWaitlistCustomers(prev => JSON.stringify(prev) !== JSON.stringify(parsedWaitlist) ? parsedWaitlist : prev);
+                        // ✨ 중요: 구글 시트 폴링 시 로컬에 등록된 VIP/관리자 목록이 빈 값으로 초기화되지 않도록 안전하게 병합(Merge) 유지
+                        setSpecialCustomers(prev => {
+                            const merged = { ...prev, ...parsedSpecial };
+                            return JSON.stringify(prev) !== JSON.stringify(merged) ? merged : prev;
+                        });
+                        setNoShowCustomers(prev => {
+                            const merged = { ...prev, ...parsedNoShow };
+                            return JSON.stringify(prev) !== JSON.stringify(merged) ? merged : prev;
+                        });
+                        setWaitlistCustomers(prev => {
+                            const merged = { ...prev, ...parsedWaitlist };
+                            return JSON.stringify(prev) !== JSON.stringify(merged) ? merged : prev;
+                        });
                     }
 
-                    setGasStatus(gasMsg);
-                    setGlobalError('');
+                    setGasStatus(prev => prev === gasMsg ? prev : gasMsg);
+                    setGlobalError(prev => prev === '' ? prev : '');
                 } else { 
                     const errMsg = res ? (res.message || res.error || "서버 응답 오류") : "서버 응답 없음";
-                    setGasStatus(`통신 실패: ${errMsg}`); 
+                    const failStr = `통신 실패: ${errMsg}`;
+                    setGasStatus(prev => prev === failStr ? prev : failStr); 
                 }
             } catch(e) { 
                 clearTimeout(slowWarningTimer); // ✨ 에러 시에도 경고 타이머 해제
-                setGasStatus("네트워크 에러 발생"); 
+                setGasStatus(prev => prev === "네트워크 에러 발생" ? prev : "네트워크 에러 발생"); 
             } finally {
                 isGasFetchingRef.current = false;
             }
@@ -2557,10 +2473,8 @@ const dashboardStats = useMemo(() => {
                     const isInputActive = document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA');
 
                     if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-                        // 입력창에 커서가 있어도 강제로 포커스를 해제하고 채팅창 이동
-                        if (isInputActive) {
-                            document.activeElement.blur();
-                        }
+                        // ✨ 입력창에서 타이핑하거나 자동완성 목록을 고르는 중일 때는 방향키가 포커스를 뺏지 않도록 보호
+                        if (isInputActive) return;
                         e.preventDefault(); // 스크롤 이동 방지
                         
                         const currentIndex = reversedChats.findIndex(c => c.id === focusedChatId);
@@ -2604,6 +2518,18 @@ const dashboardStats = useMemo(() => {
             useEffect(() => { 
                 if (!isFixedProductMode) setFocusedChatId(null); 
             }, [isFixedProductMode]);
+
+            // ✨ 고정 모드를 켜는 순간 입력창 포커스를 해제하고 첫 번째 채팅을 즉시 선택하여 방향키가 바로 작동하도록 보장
+            useEffect(() => {
+                if (isFixedProductMode) {
+                    if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA')) {
+                        document.activeElement.blur();
+                    }
+                    if (!focusedChatId && reversedChats.length > 0) {
+                        setFocusedChatId(reversedChats[0].id);
+                    }
+                }
+            }, [isFixedProductMode, reversedChats, focusedChatId]);
             // ✨ 키보드 네비게이션 로직 종료
 
             const renderChatContent = useCallback((content, keywordsArr) => {
@@ -2740,8 +2666,13 @@ const dashboardStats = useMemo(() => {
 
             const lastSavedDataStr = useRef('');
 
-            const autoSaveToGoogleSheet = useCallback(async () => { 
+            const autoSaveToGoogleSheet = useCallback(async (isManual = false) => { 
                 if (!googleScriptUrl || !masterSheetId || Object.keys(orders).length === 0) return; 
+                // ✨ 자동 저장(10초 주기) 시에는 사용자가 타이핑 중일 때 리렌더링(isSaving 스피너)으로 글자가 끊기지 않도록 대기
+                if (!isManual) {
+                    const activeEl = document.activeElement;
+                    if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) return;
+                }
                 
                 const customerTotalsForShipping = {}; 
                 const customerTotalDeposits = {}; 
@@ -2771,7 +2702,8 @@ const dashboardStats = useMemo(() => {
                         printedDeposits[customerVal] = true;
                     }
                     
-                    const isVip = specialCustomers && specialCustomers[normalizeString(customerVal)]?.type === 'vip';
+                    const custType = specialCustomers && specialCustomers[normalizeString(customerVal)]?.type;
+                    const isVip = custType === 'vip' || custType === 'manager';
                     const isNoShow = noShowCustomers && noShowCustomers[customerVal];
                     const isWaitlist = waitlistCustomers && waitlistCustomers[customerVal];
                     
@@ -2918,6 +2850,20 @@ const dashboardStats = useMemo(() => {
                             let uPrice = invItem ? Number(invItem.price) : (hist[cleanVal] || 0);
                             if (isDiscount(cleanVal) && uPrice > 0) uPrice = -Math.abs(uPrice);
                             newOrder.price = (Number(newOrder.quantity) || 0) * uPrice; 
+                            
+                            // ✨ '사은품' 단어가 포함되어 있으면 즉시 재고(인벤토리)에 등록
+                            if (cleanVal.includes('사은품')) {
+                                setInventory(prevInv => {
+                                    if (!Array.isArray(prevInv)) return prevInv;
+                                    const exists = prevInv.find(i => String(i.name).trim() === cleanVal);
+                                    if (!exists) {
+                                        const newInv = [{ id: `inv_${Date.now()}_${Math.random()}`, name: cleanVal, price: uPrice || 0, stock: '', isSoldOut: false, isLocked: false }, ...prevInv];
+                                        saveInventoryToServer(newInv); 
+                                        return newInv;
+                                    }
+                                    return prevInv;
+                                });
+                            }
                         } 
                         if (field === 'price' && o.product && String(o.product).trim() !== '') { 
                             const cleanProd = String(o.product).trim(); let valNum = Number(String(value).replace(/,/g, ''));
@@ -2983,10 +2929,10 @@ const dashboardStats = useMemo(() => {
                 });
             }, [openModal, setOrders]);
 
-   const copyOrderSheet = useCallback((nick, items, grandTotal, depositTotal, balance, isCard, hasCashReceipt, addrData, e) => {
-                // ✨ 확정 상품과 대기 상품 분리
-                const activeItems = items.filter(i => !i.isCancelled && !i.isWaitlist); 
-                const waitlistItems = items.filter(i => !i.isCancelled && i.isWaitlist);
+            const copyOrderSheet = useCallback((nick, items, grandTotal, depositTotal, balance, isCard, hasCashReceipt, addrData, e) => {
+                // ✨ 확정 상품과 대기 상품 분리 및 내림차순 정렬 강제 적용
+                const activeItems = items.filter(i => !i.isCancelled && !i.isWaitlist).sort((a, b) => String(b.product || '').localeCompare(String(a.product || ''), 'ko', { numeric: true })); 
+                const waitlistItems = items.filter(i => !i.isCancelled && i.isWaitlist).sort((a, b) => String(b.product || '').localeCompare(String(a.product || ''), 'ko', { numeric: true }));
                 const addr = addrData || addressLookup.get(nick)?.data || {};
                 const productTotal = activeItems.reduce((sum, i) => sum + Number(i.price), 0); 
                 const productTotalForShipping = activeItems.reduce((sum, i) => sum + (Number(i.price) > 0 ? Number(i.price) : 0), 0);
@@ -3116,7 +3062,7 @@ const dashboardStats = useMemo(() => {
                     if(inventory.some(i => i.name === cleanProduct)) return openModal("이미 등록된 상품명입니다.", "alert");
                     
                     setInventory(prev => {
-                        const newInv = [{ id: `inv_${Date.now()}_${Math.random()}`, name: cleanProduct, price: priceNum, stock: '', isSoldOut: false }, ...prev];
+                        const newInv = [{ id: `inv_${Date.now()}_${Math.random()}`, name: cleanProduct, price: priceNum, stock: '', isSoldOut: false, isLocked: false }, ...prev];
                         saveInventoryToServer(newInv);
                         return newInv;
                     });
@@ -3295,7 +3241,7 @@ const dashboardStats = useMemo(() => {
                 if(inventory.some(i => i.name === cleanName)) return openModal("이미 등록된 상품명입니다.", "alert");
                 
                 setInventory(prev => {
-                    const newInv = [{ id: `inv_${Date.now()}_${Math.random()}`, name: cleanName, price: priceNum, stock: stockNum, isSoldOut: false }, ...prev];
+                    const newInv = [{ id: `inv_${Date.now()}_${Math.random()}`, name: cleanName, price: priceNum, stock: stockNum, isSoldOut: false, isLocked: false }, ...prev];
                     saveInventoryToServer(newInv);
                     return newInv;
                 });
@@ -3304,29 +3250,80 @@ const dashboardStats = useMemo(() => {
                 setNewInvName(''); setNewInvPrice(''); setNewInvStock('');
             };
 
+            // ✨ 띄어쓰기 및 단어 경계를 정확히 인식하여 통째로 찾아 바꾸는 도우미 함수
+            const getExactReplacedName = useCallback((name, oldStr, newStr) => {
+                if (!oldStr) return null;
+                const target = String(name);
+                // 1) 완벽히 일치하는 경우
+                if (target === oldStr) return newStr;
+                // 2) "11번 치마 블랙 55" 처럼 찾으려는 구문 뒤에 공백과 사이즈가 오는 경우 (가장 흔한 케이스)
+                if (target.startsWith(oldStr + ' ')) {
+                    return (newStr ? newStr + ' ' : '') + target.slice(oldStr.length + 1);
+                }
+                // 3) 중간이나 끝에 공백 단위로 정확히 일치하는 경우
+                if (target.includes(' ' + oldStr + ' ')) {
+                    return target.split(' ' + oldStr + ' ').join(' ' + newStr + ' ').trim();
+                }
+                if (target.endsWith(' ' + oldStr)) {
+                    return target.slice(0, target.length - oldStr.length - 1) + (newStr ? ' ' + newStr : '');
+                }
+                // 4) 위 공백 기준에 안 걸리더라도 사용자가 입력한 구문이 그대로 들어있는 경우
+                if (target.includes(oldStr)) {
+                    return target.split(oldStr).join(newStr).trim();
+                }
+                return null;
+            }, []);
+
+            const batchPreviewList = useMemo(() => {
+                const { oldStr, newStr } = batchChangeModal;
+                if (!oldStr) return [];
+                return (inventory || []).map(item => {
+                    const nextName = getExactReplacedName(item.name, oldStr, newStr);
+                    if (nextName !== null && nextName !== item.name) {
+                        return { oldName: item.name, newName: nextName };
+                    }
+                    return null;
+                }).filter(Boolean);
+            }, [inventory, batchChangeModal, getExactReplacedName]);
+
             const executeBatchNameChange = (e) => {
                 e.preventDefault();
                 const { oldStr, newStr } = batchChangeModal;
-                if (!oldStr.trim()) return openModal("변경할 대상(찾을 단어)을 입력해주세요.", "alert");
+                if (!oldStr) return openModal("변경할 대상(찾을 구문)을 입력해주세요.", "alert");
+                if (batchPreviewList.length === 0) return openModal("일치하는 상품이 없습니다.", "alert");
                 
-                openModal(`'${oldStr}' 문자를 모두 '${newStr}'(으)로 변경하시겠습니까?\n(주문서, 실시간 재고 모두 한 번에 변경됩니다)`, 'confirm', () => {
-                    setInventory(prev => {
-                        const next = prev.map(i => ({...i, name: String(i.name).replace(new RegExp(oldStr, 'g'), newStr)}));
-                        saveInventoryToServer(next);
-                        return next;
-                    });
-                    setProductHistory(prev => {
-                        const next = {};
-                        Object.entries(prev).forEach(([k, v]) => {
-                            next[String(k).replace(new RegExp(oldStr, 'g'), newStr)] = v;
-                        });
-                        return next;
-                    });
-                    setOrders(prev => prev.map(o => ({...o, product: String(o.product).replace(new RegExp(oldStr, 'g'), newStr)})));
-                    setBatchChangeModal({ isOpen: false, oldStr: '', newStr: '' });
-                    openModal("일괄 변경이 완료되었습니다.", "alert");
+                const changeMap = {};
+                batchPreviewList.forEach(p => { changeMap[p.oldName] = p.newName; });
+
+                setInventory(prev => {
+                    const next = prev.map(i => changeMap[i.name] ? { ...i, name: changeMap[i.name] } : i);
+                    saveInventoryToServer(next);
+                    return next;
                 });
+                setProductHistory(prev => {
+                    const next = { ...prev };
+                    Object.entries(changeMap).forEach(([oldN, newN]) => {
+                        if (next[oldN] !== undefined) {
+                            next[newN] = next[oldN];
+                        }
+                    });
+                    return next;
+                });
+                setOrders(prev => prev.map(o => {
+                    if (changeMap[o.product]) return { ...o, product: changeMap[o.product] };
+                    const replaced = getExactReplacedName(o.product, oldStr, newStr);
+                    return replaced ? { ...o, product: replaced } : o;
+                }));
+                setBatchChangeModal({ isOpen: false, oldStr: '', newStr: '' });
+                openModal(`총 ${batchPreviewList.length}건의 상품명이 일괄 변경되었습니다.`, "alert");
             };
+
+            const panelChat = useResizablePanel('chat', '14%');
+            const panelOrder = useResizablePanel('order', '30%');
+            const panelDeposit = useResizablePanel('deposit', '10%');
+            const panelAddr = useResizablePanel('addr', '13%');
+            const panelInv = useResizablePanel('inv', '17%');
+            const panelOpt = useResizablePanel('opt', '16%');
 
             return (
                 <div className="flex h-full gap-2 p-2 overflow-x-auto bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100">
@@ -3337,30 +3334,52 @@ const dashboardStats = useMemo(() => {
 
                     {batchChangeModal.isOpen && (
                         <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-[9999] animate-pop">
-                            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 w-full max-w-sm mx-4" onClick={e => e.stopPropagation()}>
-                                <div className="mb-4 border-b dark:border-slate-700 pb-3 flex justify-between items-center">
-                                    <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2"><Icon name="magic-wand" weight="fill" className="text-purple-500"/> 상품명 일괄 변경</h3>
+                            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-5 w-full max-w-md mx-4 flex flex-col max-h-[85vh]" onClick={e => e.stopPropagation()}>
+                                <div className="mb-3 border-b dark:border-slate-700 pb-2.5 flex justify-between items-center shrink-0">
+                                    <h3 className="text-base font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2"><Icon name="magic-wand" weight="fill" className="text-purple-500"/> 상품명 통째로 찾아 바꾸기</h3>
                                     <button onClick={() => setBatchChangeModal({ isOpen: false, oldStr: '', newStr: '' })} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><Icon name="x" weight="bold" size={20}/></button>
                                 </div>
-                                <form onSubmit={executeBatchNameChange} className="space-y-3">
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-500 mb-1">찾을 단어 (예: 01)</label>
-                                        <input type="text" value={batchChangeModal.oldStr} onChange={e=>setBatchChangeModal(p=>({...p, oldStr: e.target.value}))} autoFocus className="w-full border dark:border-slate-600 rounded px-3 py-2 text-sm bg-slate-50 dark:bg-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-purple-500" />
+                                <form onSubmit={executeBatchNameChange} className="flex flex-col flex-1 overflow-hidden gap-3">
+                                    <div className="space-y-2.5 shrink-0">
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">찾을 상품 구문 (띄어쓰기 포함 입력)</label>
+                                            <input type="text" value={batchChangeModal.oldStr} onChange={e=>setBatchChangeModal(p=>({...p, oldStr: e.target.value}))} placeholder="예: 11번 치마 블랙" autoFocus className="w-full border dark:border-slate-600 rounded px-3 py-2 text-sm bg-slate-50 dark:bg-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-purple-500 font-bold" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">바꿀 상품 구문 (띄어쓰기 포함 입력)</label>
+                                            <input type="text" value={batchChangeModal.newStr} onChange={e=>setBatchChangeModal(p=>({...p, newStr: e.target.value}))} placeholder="예: 11번 치마 챠콜" className="w-full border dark:border-slate-600 rounded px-3 py-2 text-sm bg-slate-50 dark:bg-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-purple-500 font-bold" />
+                                        </div>
                                     </div>
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-500 mb-1">바꿀 단어 (예: 14)</label>
-                                        <input type="text" value={batchChangeModal.newStr} onChange={e=>setBatchChangeModal(p=>({...p, newStr: e.target.value}))} className="w-full border dark:border-slate-600 rounded px-3 py-2 text-sm bg-slate-50 dark:bg-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-purple-500" />
+                                    <div className="flex-1 overflow-y-auto border-t dark:border-slate-700 pt-2.5 space-y-1.5 pr-1">
+                                        <div className="text-xs font-bold text-slate-500 flex justify-between items-center mb-1">
+                                            <span>변경될 상품 미리보기</span>
+                                            <span className="text-purple-600 dark:text-purple-400 font-black">{batchPreviewList.length}건 일치</span>
+                                        </div>
+                                        {batchPreviewList.length === 0 ? (
+                                            <div className="text-center py-6 text-slate-400 text-xs bg-slate-50 dark:bg-slate-900/50 rounded border border-dashed dark:border-slate-700">
+                                                일치하는 상품이 없습니다.<br/>(예: '11번 치마 블랙' 입력 시 55, 66, 77 사이즈가 모두 잡힙니다)
+                                            </div>
+                                        ) : (
+                                            batchPreviewList.map((p, idx) => (
+                                                <div key={idx} className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-2 rounded flex flex-col gap-0.5 text-xs">
+                                                    <span className="text-slate-400 line-through text-[11px]">{p.oldName}</span>
+                                                    <span className="text-purple-600 dark:text-purple-400 font-bold flex items-center gap-1">
+                                                        <Icon name="arrow-bend-down-right" weight="bold" /> {p.newName}
+                                                    </span>
+                                                </div>
+                                            ))
+                                        )}
                                     </div>
-                                    <div className="pt-3 flex gap-2">
+                                    <div className="pt-2 border-t dark:border-slate-700 flex gap-2 shrink-0">
                                         <button type="button" onClick={() => setBatchChangeModal({ isOpen: false, oldStr: '', newStr: '' })} className="flex-1 py-2.5 rounded font-bold text-sm bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">취소</button>
-                                        <button type="submit" className="flex-1 py-2.5 rounded font-bold text-sm bg-purple-600 hover:bg-purple-700 text-white">일괄 변경 실행</button>
+                                        <button type="submit" disabled={batchPreviewList.length === 0} className={`flex-1 py-2.5 rounded font-bold text-sm text-white transition-colors ${batchPreviewList.length > 0 ? 'bg-purple-600 hover:bg-purple-700 shadow-sm' : 'bg-slate-300 dark:bg-slate-700 cursor-not-allowed'}`}>일괄 변경 ({batchPreviewList.length}건)</button>
                                     </div>
                                 </form>
                             </div>
                         </div>
                     )}
 
-                    <div className="flex flex-col bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-lg shadow-sm resizable-panel" style={{ width: '14%', minWidth: '130px' }}>
+                    <div ref={panelChat.ref} className="flex flex-col bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-lg shadow-sm resizable-panel" style={{ width: panelChat.width, minWidth: '130px' }}>
                         <div className="p-1.5 bg-slate-100 dark:bg-slate-900 border-b dark:border-slate-700 grid grid-cols-3 gap-1 shrink-0">
                             {quickMessages.map((msg, idx) => (
                                 <button key={idx} onClick={(e) => handleCopyQuickMessage(e, msg, idx)} className={`text-[10px] border rounded py-1 truncate transition-colors shadow-sm bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300`}>{msg || "빈칸"}</button>
@@ -3425,7 +3444,7 @@ const dashboardStats = useMemo(() => {
                         </div>
                     </div>
 
-                    <div className="flex flex-col bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-lg flex flex-col shadow-sm resizable-panel" style={{ width: '30%', minWidth: '280px' }}>
+                    <div ref={panelOrder.ref} className="flex flex-col bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-lg flex flex-col shadow-sm resizable-panel" style={{ width: panelOrder.width, minWidth: '280px' }}>
                         <div className="grid grid-cols-5 gap-1 p-2 bg-slate-100 dark:bg-slate-800 border-b dark:border-slate-700 text-center text-[10px] shrink-0">
                             {[{id:'all', label:'총매출', val:dashboardStats.totalSales, isCurrency:true, colSpan:2}, 
                               {id:'no-address', label:'주소없음', val:dashboardStats.missingAddressCount, isCurrency:false, onClick:handleNoAddressClick},
@@ -3452,7 +3471,7 @@ const dashboardStats = useMemo(() => {
                                     {isSaving && <Icon name="spinner" className="animate-spin text-blue-500 ml-2" />}
                                 </span>
                                 <div className="flex items-center gap-1.5">
-                                    <button onClick={autoSaveToGoogleSheet} disabled={isSaving} className={`px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1 shadow-sm transition-colors ${isSaving ? 'bg-slate-400 text-slate-200 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 text-white'}`} title="마스터 시트에 즉시 저장">
+                                    <button onClick={() => autoSaveToGoogleSheet(true)} disabled={isSaving} className={`px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1 shadow-sm transition-colors ${isSaving ? 'bg-slate-400 text-slate-200 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 text-white'}`} title="마스터 시트에 즉시 저장">
                                         <Icon name="floppy-disk" weight="fill" /> 수동 저장
                                     </button>
                                     <button onClick={handleResetAllData} className="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1 shadow-sm transition-colors"><Icon name="trash" weight="fill"/> 초기화</button>
@@ -3490,7 +3509,7 @@ const dashboardStats = useMemo(() => {
                                                 }} 
                                                 className={`w-full border dark:border-slate-600 rounded pl-2 pr-9 py-1.5 text-xs outline-none focus:ring-1 focus:ring-slate-500 bg-white dark:bg-slate-900 dark:text-white transition-all ${isFixedProductMode ? 'ring-2 ring-slate-600 border-slate-600' : ''}`} 
                                             />
-                                            <button type="button" onClick={() => setIsFixedProductMode(!isFixedProductMode)} className={`absolute right-1 top-1/2 -translate-y-1/2 px-1.5 py-0.5 rounded text-[10px] font-bold transition-colors ${isFixedProductMode ? 'bg-slate-700 text-white shadow-inner' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-300'}`} title="고정">고정</button>
+                                            <button type="button" onClick={(e) => { e.currentTarget.blur(); setIsFixedProductMode(prev => !prev); }} className={`absolute right-1 top-1/2 -translate-y-1/2 px-1.5 py-0.5 rounded text-[10px] font-bold transition-colors ${isFixedProductMode ? 'bg-slate-700 text-white shadow-inner' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-300'}`} title="고정">고정</button>
                                         </div>
                                         <input type="text" placeholder="단가" value={manualPrice} onChange={e => { const val = e.target.value.replace(/,/g, ''); if (val === '' || val === '-') setManualPrice(val); else if(!isNaN(val)) setManualPrice(Number(val).toLocaleString()); }} className={`w-16 border dark:border-slate-600 rounded px-2 py-1.5 text-xs outline-none text-right bg-white dark:bg-slate-900 transition-all ${isFixedProductMode ? 'ring-2 ring-slate-600 border-slate-600' : ''}`} />
                                     </div>
@@ -3531,8 +3550,8 @@ const dashboardStats = useMemo(() => {
                         </div>
                     </div>
 
-                    <div className="flex flex-col bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-lg shadow-sm resizable-panel" style={{ width: '10%', minWidth: '90px' }}>
-                        <div className="p-2 bg-slate-100 dark:bg-slate-800 border-b dark:border-slate-700 flex flex-col gap-2 shrink-0 relative">
+                    <div ref={panelDeposit.ref} className="flex flex-col bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-lg shadow-sm resizable-panel" style={{ width: panelDeposit.width, minWidth: '90px' }}>
+                        <div className="p-2 bg-slate-100 dark:bg-slate-800 border-b dark:border-slate-700 flex flex-col gap-1.5 shrink-0">
                             <div className="font-bold text-slate-800 dark:text-slate-200 flex items-center justify-between shrink-0">
                                 <span className="flex items-center gap-1"><Icon name="money" weight="fill"/> 입금 내역</span>
                                 <div className="flex items-center gap-1.5"><span className="text-[10px] text-slate-500 dark:text-slate-400 mr-1">{filteredDeposits.length}건</span><button onClick={handleRematchAll} className="bg-red-500 hover:bg-red-600 text-white text-[9px] px-1.5 py-0.5 rounded shadow-sm transition-colors flex items-center gap-0.5"><Icon name="arrows-clockwise" weight="bold"/></button></div>
@@ -3544,7 +3563,12 @@ const dashboardStats = useMemo(() => {
                                 </div>
                                 <div className="relative shrink-0"><Icon name="magnifying-glass" className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-400 text-[10px]"/><input type="text" placeholder="검색" value={depositSearch} onChange={e => setDepositSearch(e.target.value)} onKeyDown={e => { if(e.key==='Escape'){ setDepositSearch(''); e.target.blur(); } }} className="w-full text-[10px] pl-6 pr-6 py-1.5 border dark:border-slate-600 rounded focus:ring-1 focus:ring-slate-500 outline-none bg-white dark:bg-slate-900" />{depositSearch && <button onClick={()=>setDepositSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><Icon name="x-circle" weight="fill" size={12}/></button>}</div>
                             </div>
-                            {selectedNick && <div className="absolute top-[calc(100%+4px)] left-1/2 -translate-x-1/2 w-11/12 z-20 text-[10px] text-slate-700 dark:text-slate-300 bg-slate-200 dark:bg-slate-700 p-1 rounded text-center font-bold animate-pulse border border-slate-300 dark:border-slate-600 shadow-lg truncate">👇 '{selectedNick}' 대기</div>}
+                            {selectedNick && (
+                                <div className="w-full text-[10px] text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/30 px-2 py-1 rounded text-center font-bold border border-blue-200 dark:border-blue-800 truncate flex items-center justify-between gap-1 shrink-0">
+                                    <span className="truncate">🎯 '{selectedNick}' 매칭중</span>
+                                    <button type="button" onClick={() => setSelectedNick(null)} className="text-blue-400 hover:text-blue-600 shrink-0"><Icon name="x" weight="bold" size={10}/></button>
+                                </div>
+                            )}
                         </div>
                         <div className="flex-1 overflow-y-auto p-1 space-y-1 bg-slate-50 dark:bg-slate-900">
                             {visibleDeposits.map(d => {
@@ -3582,7 +3606,7 @@ const dashboardStats = useMemo(() => {
                         <div className="p-1 bg-white dark:bg-slate-800 text-center font-bold text-[10px] border-t dark:border-slate-700 shrink-0">총: <span className="text-slate-800 dark:text-slate-200 text-xs">{totalDepositAmount.toLocaleString()}</span>원</div>
                     </div>
                     
-                    <div className="flex flex-col bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-lg shadow-sm resizable-panel" style={{ width: '13%', minWidth: '130px' }}>
+                    <div ref={panelAddr.ref} className="flex flex-col bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-lg shadow-sm resizable-panel" style={{ width: panelAddr.width, minWidth: '130px' }}>
                         <div className="p-2 bg-slate-100 dark:bg-slate-800 border-b dark:border-slate-700 flex flex-col gap-2 shrink-0">
                             <div className="font-bold text-slate-800 dark:text-slate-200 flex items-center justify-between shrink-0">
                                 <span className="flex items-center gap-1"><Icon name="address-book" weight="fill"/> 실시간 주소록</span>
@@ -3608,7 +3632,9 @@ const dashboardStats = useMemo(() => {
                         </div>
                     </div>
 
-                    <div className="flex flex-col bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-lg shadow-sm resizable-panel" style={{ width: '20%', minWidth: '200px' }}>
+                    {}
+                    {/* ✨ 5번째 패널: 실시간 재고 2줄 컴팩트 리스트 (클릭 시 제자리에서 열림) */}
+                    <div ref={panelInv.ref} className="flex flex-col bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-lg shadow-sm resizable-panel" style={{ width: panelInv.width, minWidth: '160px' }}>
                         <div className="p-2 bg-slate-100 dark:bg-slate-800 border-b dark:border-slate-700 flex flex-col gap-2 shrink-0">
                             <div className="font-bold text-slate-800 dark:text-slate-200 flex items-center justify-between shrink-0">
                                 <span className="flex items-center gap-1"><Icon name="package" weight="fill"/> 실시간 재고</span>
@@ -3620,77 +3646,146 @@ const dashboardStats = useMemo(() => {
                                 <div className="relative w-full"><Icon name="magnifying-glass" className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-[10px]"/><input type="text" placeholder="검색" value={currentSearchTerm} onChange={e => setCurrentSearchTerm(e.target.value)} className="w-full text-[10px] pl-6 pr-2 py-1.5 border dark:border-slate-600 rounded outline-none bg-white dark:bg-slate-900 dark:text-white shadow-sm" /></div>
                             </div>
                         </div>
-                        <div className="flex-1 overflow-y-auto p-1.5 space-y-1.5 bg-slate-50 dark:bg-slate-900">
+                        <div className="flex-1 overflow-y-auto p-1 space-y-0.5 bg-slate-50 dark:bg-slate-900">
                             {inventory
                                 .filter(i => !deferredSearchTerm || String(i.name).toLowerCase().includes(String(deferredSearchTerm).toLowerCase()))
                                 .sort((a, b) => String(b.name).localeCompare(String(a.name), 'ko', { numeric: true }))
                                 .map(item => (
-                                    <InventoryItemRow key={item.id || item.name} item={item} itemStats={inventoryStats[item.name]} getInventory={() => inventoryRef.current} setOrders={setOrders} setInventory={setInventory} setProductHistory={setProductHistory} openModal={openModal} expandedInventoryItem={expandedInventoryItem} setExpandedInventoryItem={setExpandedInventoryItem} setManualProduct={setManualProduct} setCurrentSearchTerm={setCurrentSearchTerm} setManualPrice={setManualPrice} setIsFixedProductMode={setIsFixedProductMode} customerPaidStatus={customerPaidStatus} saveInventoryToServer={saveInventoryToServer} cardPayments={cardPayments} />
+                                    <InventoryItemRow 
+                                        key={item.id || item.name} 
+                                        item={item} 
+                                        itemStats={inventoryStats[item.name]} 
+                                        expandedInventoryItem={expandedInventoryItem} 
+                                        isPinned={isFixedProductMode && manualProduct === item.name}
+                                        onItemAction={handleInventoryItemAction}
+                                        setInventory={setInventory}
+                                        setOrders={setOrders}
+                                        setProductHistory={setProductHistory}
+                                        saveInventoryToServer={saveInventoryToServer}
+                                        openModal={openModal}
+                                        customerPaidStatus={customerPaidStatus}
+                                        cardPayments={cardPayments}
+                                        setExpandedInventoryItem={setExpandedInventoryItem}
+                                    />
                             ))}
                         </div>
                     </div>
 
-                    <div className="flex flex-col bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-lg shadow-sm resizable-panel shrink-0" style={{ width: '13%', minWidth: '140px' }}>
+                    {/* ✨ 6번째 패널: 오른쪽 '선택된 상품 관리' 창을 완전히 없애고 옵션 생성기를 최상단으로 고정 */}
+                    <div ref={panelOpt.ref} className="flex flex-col bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-lg shadow-sm resizable-panel shrink-0" style={{ width: panelOpt.width, minWidth: '180px' }}>
                         <div className="p-2 bg-slate-100 dark:bg-slate-800 border-b dark:border-slate-700 flex flex-col gap-2 shrink-0">
                             <div className="font-bold text-slate-800 dark:text-slate-200 flex items-center justify-between shrink-0">
-                                <span className="flex items-center gap-1 text-[13px]"><Icon name="magic-wand" weight="fill" className="text-slate-500" /> 옵션 및 메뉴 관리</span>
+                                <span className="flex items-center gap-1 text-[13px]"><Icon name="magic-wand" weight="fill" className="text-slate-500" /> 옵션 상품 등록</span>
                             </div>
                             <div className="flex gap-1.5 shrink-0">
                                 <button onClick={() => setIsMenuModalOpen(true)} className="flex-1 bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800 text-[10px] py-1.5 rounded shadow-sm transition-colors flex items-center justify-center gap-1 font-bold"><Icon name="clipboard-text" weight="bold"/> 메뉴판</button>
                                 <button onClick={() => setBatchChangeModal({ isOpen: true, oldStr: '', newStr: '' })} className="flex-1 bg-purple-50 text-purple-600 border border-purple-200 hover:bg-purple-100 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800 text-[10px] py-1.5 rounded shadow-sm transition-colors flex items-center justify-center gap-1 font-bold"><Icon name="text-t" weight="bold"/> 이름변경</button>
                             </div>
                         </div>
-                        <div className="p-3 flex flex-col gap-3 overflow-y-auto bg-white dark:bg-slate-800">
-                            
-                            <div>
-                                <label className="block text-[10px] font-bold text-slate-500 mb-1">기본 상품명</label>
-                                <input id="batch-basename-input" type="text" value={batchBaseName} onChange={e => setBatchBaseName(e.target.value)} onKeyDown={(e) => { if(e.key === 'Enter') { e.preventDefault(); document.getElementById('batch-opt1-input')?.focus(); } }} placeholder="예: 나그랑 티셔츠" className="w-full border dark:border-slate-600 rounded px-2 py-1.5 text-xs bg-slate-50 dark:bg-slate-900 outline-none dark:text-white" />
-                            </div>
-                            <div>
-                                <label className="block text-[10px] font-bold text-slate-500 mb-1">옵션 1 (색상 등, 쉼표 구분)</label>
-                                <input id="batch-opt1-input" type="text" value={batchOpt1} onChange={e => setBatchOpt1(e.target.value)} onKeyDown={(e) => { if(e.key === 'Enter') { e.preventDefault(); document.getElementById('batch-opt2-input')?.focus(); } }} placeholder="예: 블랙, 화이트" className="w-full border dark:border-slate-600 rounded px-2 py-1.5 text-xs bg-slate-50 dark:bg-slate-900 outline-none dark:text-white" />
-                            </div>
-                            <div>
-                                <label className="block text-[10px] font-bold text-slate-500 mb-1">옵션 2 (사이즈 등, 쉼표 구분)</label>
-                                <input id="batch-opt2-input" type="text" value={batchOpt2} onChange={e => setBatchOpt2(e.target.value)} onKeyDown={(e) => { if(e.key === 'Enter') { e.preventDefault(); document.getElementById('batch-price-input')?.focus(); } }} placeholder="직접 입력 또는 아래 버튼 클릭" className="w-full border dark:border-slate-600 rounded px-2 py-1.5 text-xs bg-slate-50 dark:bg-slate-900 outline-none dark:text-white mb-1.5" />
-                                <div className="flex flex-col gap-1">
-                                    <div className="flex flex-wrap gap-1">{['F', 'XS', 'S', 'M', 'L', 'XL', 'XXL'].map(renderSizeBtn)}</div>
-                                    <div className="flex flex-wrap gap-1">{['44', '55', '66', '77', '88'].map(renderSizeBtn)}</div>
-                                    <div className="flex flex-wrap gap-1">{['225', '230', '235', '240', '245', '250'].map(renderSizeBtn)}</div>
+                        
+                        <div className="flex-1 overflow-y-auto flex flex-col bg-white dark:bg-slate-800">
+                            {/* 최상단으로 올라온 옵션 생성기 영역 */}
+                            <div className="p-2.5 flex flex-col gap-2.5">
+                                <div>
+                                    <label className="block text-[10px] font-bold text-slate-500 mb-1">기본 상품명</label>
+                                    <input id="batch-basename-input" type="text" value={batchBaseName} onChange={e => setBatchBaseName(e.target.value)} onKeyDown={(e) => { if(e.key === 'Enter') { e.preventDefault(); document.getElementById('batch-opt1-input')?.focus(); } }} placeholder="예: 나그랑 티셔츠" className="w-full border dark:border-slate-600 rounded px-2 py-1.5 text-xs bg-slate-50 dark:bg-slate-900 outline-none dark:text-white" />
                                 </div>
-                            </div>
-                            <div>
-                                <label className="block text-[10px] font-bold text-slate-500 mb-1">일괄 단가 (선택)</label>
-                                <input id="batch-price-input" type="text" value={batchBasePrice} onChange={e => { const val = e.target.value.replace(/,/g, ''); if(!isNaN(val)) setBatchBasePrice(val ? Number(val).toLocaleString() : ''); }} onKeyDown={(e) => { if(e.key === 'Enter') { e.preventDefault(); handleGeneratePreview(); } }} placeholder="예: 15,000" className="w-full border dark:border-slate-600 rounded px-2 py-1.5 text-xs bg-slate-50 dark:bg-slate-900 outline-none dark:text-white" />
-                            </div>
-                            
-                            <button onClick={handleGeneratePreview} className="bg-slate-700 hover:bg-slate-800 text-white font-bold py-2 rounded text-xs transition-colors mt-1 shadow-sm">
-                                미리보기 생성
-                            </button>
+                                <div>
+                                    <label className="block text-[10px] font-bold text-slate-500 mb-1">옵션 1 (색상 등, 쉼표 구분)</label>
+                                    <input id="batch-opt1-input" type="text" value={batchOpt1} onChange={e => setBatchOpt1(e.target.value)} onKeyDown={(e) => { if(e.key === 'Enter') { e.preventDefault(); document.getElementById('batch-opt2-input')?.focus(); } }} placeholder="예: 블랙, 화이트" className="w-full border dark:border-slate-600 rounded px-2 py-1.5 text-xs bg-slate-50 dark:bg-slate-900 outline-none dark:text-white" />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-bold text-slate-500 mb-1">옵션 2 (사이즈 등, 쉼표 구분)</label>
+                                    <input id="batch-opt2-input" type="text" value={batchOpt2} onChange={e => setBatchOpt2(e.target.value)} onKeyDown={(e) => { if(e.key === 'Enter') { e.preventDefault(); document.getElementById('batch-price-input')?.focus(); } }} placeholder="직접 입력 또는 아래 버튼 클릭" className="w-full border dark:border-slate-600 rounded px-2 py-1.5 text-xs bg-slate-50 dark:bg-slate-900 outline-none dark:text-white mb-1.5" />
+                                    <div className="flex flex-col gap-1">
+                                        <div className="flex flex-wrap gap-1">{['F', 'XS', 'S', 'M', 'L', 'XL', 'XXL'].map(renderSizeBtn)}</div>
+                                        <div className="flex flex-wrap gap-1">{['44', '55', '66', '77', '88'].map(renderSizeBtn)}</div>
+                                        <div className="flex flex-wrap gap-1">{['225', '230', '235', '240', '245', '250'].map(renderSizeBtn)}</div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-bold text-slate-500 mb-1">일괄 단가 (선택)</label>
+                                    <input id="batch-price-input" type="text" value={batchBasePrice} onChange={e => { const val = e.target.value.replace(/,/g, ''); if(!isNaN(val)) setBatchBasePrice(val ? Number(val).toLocaleString() : ''); }} onKeyDown={(e) => { if(e.key === 'Enter') { e.preventDefault(); handleGeneratePreview(); } }} placeholder="예: 15,000" className="w-full border dark:border-slate-600 rounded px-2 py-1.5 text-xs bg-slate-50 dark:bg-slate-900 outline-none dark:text-white" />
+                                </div>
+                                
+                                <button onClick={handleGeneratePreview} className="bg-slate-700 hover:bg-slate-800 text-white font-bold py-2 rounded text-[11px] transition-colors mt-1 shadow-sm">
+                                    미리보기 생성
+                                </button>
 
-                            {previewItems.length > 0 && (
-                                <div className="border-t dark:border-slate-700 mt-2 pt-3 flex flex-col gap-2">
-                                    {previewItems.map((item, idx) => (
-                                        <div key={item.id} className="bg-slate-50 dark:bg-slate-900 border dark:border-slate-700 p-2 rounded relative group shadow-sm">
-                                            <button onClick={() => setPreviewItems(prev => prev.filter(p => p.id !== item.id))} className="absolute -top-1.5 -right-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"><Icon name="x" size={10} weight="bold"/></button>
-                                            <div className="font-bold text-[11px] mb-1.5 text-slate-800 dark:text-slate-200 truncate pr-3" title={item.name}>{item.name}</div>
-                                            <div className="flex gap-1">
-                                                <div className="flex items-center flex-1 border dark:border-slate-600 bg-white dark:bg-slate-800 rounded overflow-hidden">
-                                                    <span className="px-1 text-[9px] text-slate-400 bg-slate-100 dark:bg-slate-700 h-full flex items-center shrink-0">단가</span>
-                                                    <input type="text" value={item.price ? Number(item.price).toLocaleString() : ''} onChange={e => { const val = e.target.value.replace(/,/g, ''); if(!isNaN(val)) setPreviewItems(prev => prev.map(p => p.id === item.id ? {...p, price: Number(val)} : p)); }} className="w-full bg-transparent px-1 py-1 text-[10px] text-right outline-none dark:text-white" />
+                                {previewItems.length > 0 && (
+                                    <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 pb-2 border-t dark:border-slate-700 pt-3 mt-3">
+                                        <div className="flex justify-between items-center mb-2">
+                                            <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400">미리보기 <span className="text-blue-500">({previewItems.length}개)</span></span>
+                                            <button type="button" onClick={() => setPreviewItems([])} className="text-[9px] text-red-500 hover:underline font-bold">전체 비우기</button>
+                                        </div>
+                                        {previewItems.map((item, idx) => (
+                                            <div key={item.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-1.5 rounded flex flex-col gap-1.5 shadow-sm">
+                                                <div className="flex justify-between items-center gap-1">
+                                                    <input 
+                                                        type="text" 
+                                                        value={item.name} 
+                                                        onChange={e => {
+                                                            const val = e.target.value;
+                                                            setPreviewItems(prev => prev.map(p => p.id === item.id ? { ...p, name: val } : p));
+                                                        }}
+                                                        className="text-[11px] font-bold text-slate-800 dark:text-slate-200 bg-transparent border-b border-transparent focus:border-blue-400 outline-none flex-1 min-w-0"
+                                                    />
+                                                    <button 
+                                                        type="button"
+                                                        onClick={() => setPreviewItems(prev => prev.filter(p => p.id !== item.id))} 
+                                                        className="text-slate-400 hover:text-red-500 p-0.5 rounded hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors shrink-0"
+                                                        title="이 옵션 삭제"
+                                                    >
+                                                        <Icon name="x" weight="bold" size={12}/>
+                                                    </button>
                                                 </div>
-                                                <div className="flex items-center flex-1 border dark:border-slate-600 bg-white dark:bg-slate-800 rounded overflow-hidden">
-                                                    <span className="px-1 text-[9px] text-slate-400 bg-slate-100 dark:bg-slate-700 h-full flex items-center shrink-0">재고</span>
-                                                    <input type="number" value={item.stock} onChange={e => setPreviewItems(prev => prev.map(p => p.id === item.id ? {...p, stock: e.target.value} : p))} autoFocus={idx === 0} onFocus={e => e.target.select()} className="w-full bg-transparent px-1 py-1 text-[10px] text-right outline-none dark:text-white" placeholder="∞" />
+                                                <div className="flex items-center gap-1">
+                                                    <div className="flex items-center flex-1 border dark:border-slate-700 bg-slate-50 dark:bg-slate-800 rounded px-1.5 py-0.5">
+                                                        <span className="text-[9px] text-slate-400 mr-1 shrink-0">단가</span>
+                                                        <input 
+                                                            type="text" 
+                                                            value={item.price ? Number(item.price).toLocaleString() : ''} 
+                                                            onChange={e => {
+                                                                const val = e.target.value.replace(/,/g, '');
+                                                                if (!isNaN(val)) {
+                                                                    setPreviewItems(prev => prev.map(p => p.id === item.id ? { ...p, price: val === '' ? 0 : Number(val) } : p));
+                                                                }
+                                                            }}
+                                                            placeholder="0"
+                                                            className="w-full text-[10px] font-bold text-blue-600 dark:text-blue-400 bg-transparent text-right outline-none"
+                                                        />
+                                                    </div>
+                                                    <div className="flex items-center w-20 border dark:border-slate-700 bg-slate-50 dark:bg-slate-800 rounded px-1.5 py-0.5 shrink-0">
+                                                        <span className="text-[9px] text-slate-400 mr-1 shrink-0">재고</span>
+                                                        <input 
+                                                            id={`preview-stock-${idx}`}
+                                                            type="number" 
+                                                            value={item.stock} 
+                                                            onChange={e => {
+                                                                const val = e.target.value;
+                                                                setPreviewItems(prev => prev.map(p => p.id === item.id ? { ...p, stock: val } : p));
+                                                            }}
+                                                            onKeyDown={e => {
+                                                                if (e.key === 'Enter') {
+                                                                    e.preventDefault();
+                                                                    const nextInput = document.getElementById(`preview-stock-${idx + 1}`);
+                                                                    if (nextInput) nextInput.focus();
+                                                                    else handleRegisterBatch();
+                                                                }
+                                                            }}
+                                                            placeholder="∞"
+                                                            className="w-full text-[10px] font-bold text-slate-700 dark:text-slate-200 bg-transparent text-right outline-none"
+                                                        />
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    ))}
-                                    <button onClick={handleRegisterBatch} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded text-[11px] mt-2 shadow-sm transition-colors">
-                                        실시간 재고로 일괄 등록
-                                    </button>
-                                </div>
-                            )}
+                                        ))}
+                                        <button onClick={handleRegisterBatch} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded text-[11px] mt-2 shadow-sm transition-colors">
+                                            실시간 재고로 일괄 등록 ({previewItems.length}건)
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -3718,9 +3813,16 @@ const dashboardStats = useMemo(() => {
             };
 
             const getCalculatedShipping = (nick, productTotal) => {
+                // ✨ 정산/엑셀 출력 시에도 VIP와 관리자는 무조건 배송비 0원 고정!
+                const nickNorm = normalizeString(nick); 
+                const directSpecial = specialCustomers?.[nickNorm];
+                const specialType = directSpecial ? directSpecial.type : (() => {
+                    const specialKey = Object.keys(specialCustomers || {}).find(k => normalizeString(k) === nickNorm);
+                    return specialKey ? specialCustomers[specialKey].type : null;
+                })();
+                if (specialType === 'vip' || specialType === 'manager') return 0;
+
                 if (shippingOverrides && shippingOverrides[nick] !== undefined) return Number(shippingOverrides[nick]);
-                const nickNorm = normalizeString(nick); const specialKey = Object.keys(specialCustomers || {}).find(k => normalizeString(k) === nickNorm);
-                if (specialKey && specialCustomers[specialKey].type === 'vip') return 0;
                 const addr = findAddress(nick); const isJeju = addr && addr.address && addr.address.includes('제주');
                 let calcShip = (freeShippingThreshold > 0 && productTotal >= freeShippingThreshold) ? 0 : Number(quickShipping);
                 if (isJeju) { calcShip += (Number(jejuShipping) - Number(quickShipping)); }
@@ -3759,9 +3861,9 @@ const dashboardStats = useMemo(() => {
                 let entries = Object.entries(groups).map(([nick, items]) => {
                     const isNoShow = noShowCustomers && noShowCustomers[nick];
                     
-                    // ✨ 핵심: 노쇼 고객일 경우, '자동 취소' 처리된 아이템들도 엑셀에 내보내기 위해 필터에서 예외 처리로 살려줍니다.
-                    const activeItems = items.filter(i => !i.isWaitlist && (!i.isCancelled || isNoShow)); 
-                    const waitlistItems = items.filter(i => i.isWaitlist && (!i.isCancelled || isNoShow));
+                    // ✨ 핵심: 노쇼 고객일 경우 예외 처리 유지 + 상품명 내림차순 정렬 강제 적용
+                    const activeItems = items.filter(i => !i.isWaitlist && (!i.isCancelled || isNoShow)).sort((a, b) => String(b.product || '').localeCompare(String(a.product || ''), 'ko', { numeric: true })); 
+                    const waitlistItems = items.filter(i => i.isWaitlist && (!i.isCancelled || isNoShow)).sort((a, b) => String(b.product || '').localeCompare(String(a.product || ''), 'ko', { numeric: true }));
                     
                     const isCard = cardPayments[nick]; 
                     const hasCashReceipt = cashReceipts[nick];
@@ -3797,7 +3899,9 @@ const dashboardStats = useMemo(() => {
                     
                     let cleanPhone = fixPhoneNumber(addrInfo.phone);
 
-                    const isVip = specialCustomers && specialCustomers[normalizeString(nick)]?.type === 'vip';
+                    const specialType = specialCustomers && specialCustomers[normalizeString(nick)]?.type;
+                    const isVip = specialType === 'vip';
+                    const isManager = specialType === 'manager';
                     const isWaitlistToggle = waitlistCustomers && waitlistCustomers[nick];
 
                     let statusColumn = "";
@@ -3837,7 +3941,7 @@ const dashboardStats = useMemo(() => {
                     const createRow = (productValue) => ({ 
                         '날짜시간': new Date().toLocaleString(), 
                         '입금상태': statusColumn, 
-                        '닉네임': isVip ? `[VIP] ${nick}` : nick,
+                        '닉네임': isVip ? `[VIP] ${nick}` : (isManager ? `[관리자] ${nick}` : nick),
                         '주문제품(수량)': productValue, 
                         '이름': addrInfo.realname || '', 
                         '핸드폰번호': cleanPhone, 
@@ -3861,8 +3965,9 @@ const dashboardStats = useMemo(() => {
                 const sentAddressRequestsStr = localStorage.getItem(getLsKey('sentAddressRequests')); const sentAddressRequestsLocal = sentAddressRequestsStr ? new Set(JSON.parse(sentAddressRequestsStr)) : new Set();
                 const data = []; 
                 Object.entries(groups).forEach(([nick, items]) => {
-                    const activeItems = items.filter(i => !i.isCancelled && !i.isWaitlist); 
-                    const waitlistItems = items.filter(i => !i.isCancelled && i.isWaitlist);
+                    // ✨ 상품명 내림차순 정렬 강제 적용
+                    const activeItems = items.filter(i => !i.isCancelled && !i.isWaitlist).sort((a, b) => String(b.product || '').localeCompare(String(a.product || ''), 'ko', { numeric: true })); 
+                    const waitlistItems = items.filter(i => !i.isCancelled && i.isWaitlist).sort((a, b) => String(b.product || '').localeCompare(String(a.product || ''), 'ko', { numeric: true }));
                     if (activeItems.length === 0 && waitlistItems.length === 0) return;
 
                     const isCard = cardPayments && cardPayments[nick]; 
